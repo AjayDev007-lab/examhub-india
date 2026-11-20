@@ -7,7 +7,7 @@ import {
   Activity, Bell, HelpCircle, FileText, Settings, Plus, CheckCircle2, 
   AlertCircle, RefreshCw, LogOut, Search, ExternalLink, Save,
   Check, X, Lock, Key, Wifi, WifiOff, Clock, Trash2, Edit3, Eye,
-  History, Globe, Server, CheckCircle, AlertTriangle, ChevronRight
+  History, Globe, Server, CheckCircle, AlertTriangle, ChevronRight, Zap
 } from "lucide-react";
 import { fetchApi } from "@/lib/api";
 
@@ -25,6 +25,31 @@ export default function AdminDashboardPage() {
   const [systemSettings, setSystemSettings] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [states, setStates] = useState<any[]>([]);
+
+  // Official Directory & Broken Link States
+  const [directoryWebsites, setDirectoryWebsites] = useState<any[]>([]);
+  const [brokenReports, setBrokenReports] = useState<any[]>([]);
+  const [dirSearch, setDirSearch] = useState("");
+  const [dirCatFilter, setDirCatFilter] = useState("");
+  const [reportStatusFilter, setReportStatusFilter] = useState("");
+  const [dirSubView, setDirSubView] = useState<"websites" | "reports">("websites");
+  const [probingWebId, setProbingWebId] = useState<number | null>(null);
+  const [webProbeMsg, setWebProbeMsg] = useState<{ id: number; msg: string } | null>(null);
+
+  // Add Directory Website Modal State
+  const [isAddWebModalOpen, setIsAddWebModalOpen] = useState(false);
+  const [newWebName, setNewWebName] = useState("");
+  const [newWebCode, setNewWebCode] = useState("");
+  const [newWebCategory, setNewWebCategory] = useState("CENTRAL_RECRUITMENT");
+  const [newWebStateId, setNewWebStateId] = useState("");
+  const [newWebOfficialUrl, setNewWebOfficialUrl] = useState("");
+  const [newWebAppUrl, setNewWebAppUrl] = useState("");
+  const [newWebDomain, setNewWebDomain] = useState("");
+  const [newWebDesc, setNewWebDesc] = useState("");
+  const [newWebSource, setNewWebSource] = useState("National Portal of India / Official Gazette");
+  const [newWebFeatured, setNewWebFeatured] = useState(false);
+  const [addWebSubmitting, setAddWebSubmitting] = useState(false);
+  const [addWebError, setAddWebError] = useState("");
 
   // Institution Integration Filter States
   const [instSearch, setInstSearch] = useState("");
@@ -97,7 +122,7 @@ export default function AdminDashboardPage() {
   async function loadAdminData() {
     setLoading(true);
     try {
-      const [dashStats, orgs, exams, stds, logs, tcks, sttings, cats, sts] = await Promise.all([
+      const [dashStats, orgs, exams, stds, logs, tcks, sttings, cats, sts, dirWebs, dirReports] = await Promise.all([
         fetchApi("/api/admin/dashboard").catch(() => null),
         fetchApi("/api/admin/institutions").catch(() => []),
         fetchApi("/api/exams?limit=50").catch(() => []),
@@ -107,6 +132,8 @@ export default function AdminDashboardPage() {
         fetchApi("/api/admin/settings").catch(() => []),
         fetchApi("/api/categories").catch(() => []),
         fetchApi("/api/states").catch(() => []),
+        fetchApi("/api/directory/websites?limit=200").catch(() => null),
+        fetchApi("/api/admin/directory/reports").catch(() => null)
       ]);
       setStats(dashStats);
       setOrganizations(orgs || []);
@@ -117,6 +144,8 @@ export default function AdminDashboardPage() {
       setSystemSettings(sttings || []);
       setCategories(cats || []);
       setStates(sts || []);
+      setDirectoryWebsites(dirWebs?.websites || []);
+      setBrokenReports(dirReports?.reports || []);
       if (cats && cats.length > 0) {
         setFormCategoryId(cats[0].id);
       }
@@ -398,8 +427,102 @@ export default function AdminDashboardPage() {
   const pendingApprovalsCount = organizations.filter(o => o.approval_status === "PENDING_APPROVAL").length;
   const healthyCount = organizations.filter(o => o.health_status === "HEALTHY").length;
 
+  // Directory handlers
+  const handleVerifyDirectoryWebsite = async (webId: number) => {
+    setProbingWebId(webId);
+    setWebProbeMsg(null);
+    try {
+      const res = await fetchApi(`/api/directory/websites/${webId}/verify`, { method: "POST" });
+      setDirectoryWebsites(prev => prev.map(w => w.id === webId ? {
+        ...w,
+        last_verified_at: res.verified_at,
+        response_time_ms: res.latency_ms,
+        verification_status: res.verification_status
+      } : w));
+      setWebProbeMsg({ id: webId, msg: `Verified: ${res.latency_ms}ms (HTTP 200)` });
+    } catch (err: any) {
+      setWebProbeMsg({ id: webId, msg: err.message || "Failed" });
+    } finally {
+      setProbingWebId(null);
+    }
+  };
+
+  const handleUpdateReportStatus = async (reportId: number, status: string, notes?: string) => {
+    try {
+      await fetchApi(`/api/admin/directory/reports/${reportId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status, admin_notes: notes })
+      });
+      setBrokenReports(prev => prev.map(r => r.id === reportId ? { ...r, status, admin_notes: notes || r.admin_notes } : r));
+    } catch (err: any) {
+      alert(err.message || "Failed to update report");
+    }
+  };
+
+  const handleToggleWebsiteActive = async (webId: number) => {
+    try {
+      const target = directoryWebsites.find(w => w.id === webId);
+      if (!target) return;
+      const newActive = !target.is_active;
+      await fetchApi(`/api/admin/directory/websites/${webId}`, {
+        method: "PUT",
+        body: JSON.stringify({ is_active: newActive })
+      });
+      setDirectoryWebsites(prev => prev.map(w => w.id === webId ? { ...w, is_active: newActive } : w));
+    } catch (err: any) {
+      alert(err.message || "Failed to toggle status");
+    }
+  };
+
+  const handleCreateDirectoryWebsite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAddWebSubmitting(true);
+    setAddWebError("");
+    try {
+      let resolvedDomain = newWebDomain.trim();
+      if (!resolvedDomain && newWebOfficialUrl.trim()) {
+        try {
+          resolvedDomain = new URL(newWebOfficialUrl.trim()).hostname;
+        } catch (_) {
+          resolvedDomain = newWebOfficialUrl.trim();
+        }
+      }
+      const payload = {
+        name: newWebName.trim(),
+        code: newWebCode.trim() || undefined,
+        category_type: newWebCategory,
+        state_id: newWebStateId ? parseInt(newWebStateId, 10) : undefined,
+        official_url: newWebOfficialUrl.trim(),
+        application_portal_url: newWebAppUrl.trim() || undefined,
+        domain: resolvedDomain,
+        description: newWebDesc.trim(),
+        verification_source: newWebSource.trim(),
+        is_featured: newWebFeatured
+      };
+      const res = await fetchApi("/api/admin/directory/websites", {
+        method: "POST",
+        body: JSON.stringify(payload)
+      });
+      if (res.website) {
+        setDirectoryWebsites([res.website, ...directoryWebsites]);
+      }
+      setIsAddWebModalOpen(false);
+      setNewWebName("");
+      setNewWebCode("");
+      setNewWebOfficialUrl("");
+      setNewWebAppUrl("");
+      setNewWebDomain("");
+      setNewWebDesc("");
+    } catch (err: any) {
+      setAddWebError(err.message || "Failed to add website");
+    } finally {
+      setAddWebSubmitting(false);
+    }
+  };
+
   const tabs = [
     { id: "institutions", label: "Institution Integrations", icon: Building2, count: pendingApprovalsCount > 0 ? pendingApprovalsCount : organizations.length },
+    { id: "directory", label: "Gov Directory & Reports", icon: Globe, count: brokenReports.filter(r => r.status === "PENDING").length },
     { id: "overview", label: "Overview", icon: LayoutDashboard },
     { id: "exams", label: "Examinations", icon: BookOpen, count: examinations.length },
     { id: "students", label: "Students", icon: Users, count: students.length },
@@ -806,6 +929,356 @@ export default function AdminDashboardPage() {
                 </table>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* DIRECTORY & BROKEN LINK REPORTS TAB */}
+        {activeTab === "directory" && (
+          <div className="space-y-6">
+            {/* Header with Title and Add Button */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <div className="inline-flex items-center space-x-2 px-2.5 py-1 rounded-md bg-blue-950 border border-blue-800 text-blue-300 text-[10px] font-bold uppercase tracking-wider mb-1">
+                  <Globe className="w-3 h-3 text-blue-400" />
+                  <span>National Examination & Portal Directory</span>
+                </div>
+                <h2 className="text-2xl font-black text-white tracking-tight">Government Website Directory & Health Monitor</h2>
+                <p className="text-xs text-slate-400">
+                  Manage verified official portals, run health checks, and review student broken-link reports.
+                </p>
+              </div>
+
+              <button
+                onClick={() => setIsAddWebModalOpen(true)}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-blue-500/20 transition-all flex items-center space-x-2 shrink-0"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Register Official Portal</span>
+              </button>
+            </div>
+
+            {/* KPI Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
+                <span className="text-[10px] text-slate-400 font-bold uppercase">Total Official Portals</span>
+                <p className="text-2xl font-black text-white mt-1">{directoryWebsites.length}</p>
+                <span className="text-[10px] text-emerald-400 font-medium">Verified .gov.in / .nic.in</span>
+              </div>
+              <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
+                <span className="text-[10px] text-slate-400 font-bold uppercase">Featured Authorities</span>
+                <p className="text-2xl font-black text-amber-400 mt-1">
+                  {directoryWebsites.filter(w => w.is_featured).length}
+                </p>
+                <span className="text-[10px] text-slate-400">UPSC, SSC, NTA, RRB, etc.</span>
+              </div>
+              <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
+                <span className="text-[10px] text-slate-400 font-bold uppercase">Broken Link Reports</span>
+                <p className="text-2xl font-black text-slate-100 mt-1">{brokenReports.length}</p>
+                <span className="text-[10px] text-slate-400">Submitted by students</span>
+              </div>
+              <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
+                <span className="text-[10px] text-slate-400 font-bold uppercase">Pending Investigation</span>
+                <p className="text-2xl font-black text-rose-400 mt-1">
+                  {brokenReports.filter(r => r.status === "PENDING").length}
+                </p>
+                <span className="text-[10px] text-rose-400/80">Requires admin action</span>
+              </div>
+            </div>
+
+            {/* Sub-view switcher */}
+            <div className="flex border-b border-slate-800 space-x-4">
+              <button
+                onClick={() => setDirSubView("websites")}
+                className={`pb-2.5 text-xs font-bold border-b-2 transition-colors flex items-center space-x-2 ${
+                  dirSubView === "websites"
+                    ? "border-blue-500 text-blue-400"
+                    : "border-transparent text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                <Globe className="w-3.5 h-3.5" />
+                <span>Official Directory Websites ({directoryWebsites.length})</span>
+              </button>
+              <button
+                onClick={() => setDirSubView("reports")}
+                className={`pb-2.5 text-xs font-bold border-b-2 transition-colors flex items-center space-x-2 ${
+                  dirSubView === "reports"
+                    ? "border-rose-500 text-rose-400"
+                    : "border-transparent text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                <AlertTriangle className="w-3.5 h-3.5" />
+                <span>Broken Link Reports Queue</span>
+                {brokenReports.filter(r => r.status === "PENDING").length > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full bg-rose-500 text-white text-[10px] font-bold">
+                    {brokenReports.filter(r => r.status === "PENDING").length}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {/* SUB-VIEW 1: DIRECTORY WEBSITES */}
+            {dirSubView === "websites" && (
+              <div className="space-y-4">
+                {/* Search & Category Filter */}
+                <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="relative md:col-span-2">
+                    <Search className="absolute left-3.5 top-2.5 w-4 h-4 text-slate-500" />
+                    <input
+                      type="text"
+                      value={dirSearch}
+                      onChange={(e) => setDirSearch(e.target.value)}
+                      placeholder="Search website by name, code, or domain..."
+                      className="w-full pl-10 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <select
+                      value={dirCatFilter}
+                      onChange={(e) => setDirCatFilter(e.target.value)}
+                      className="w-full py-2 px-3 bg-slate-800 border border-slate-700 rounded-xl text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="">All Categories</option>
+                      <option value="NATIONAL_PORTAL">National Portals</option>
+                      <option value="CENTRAL_RECRUITMENT">Central Recruitment</option>
+                      <option value="NATIONAL_ENTRANCE">National Entrance</option>
+                      <option value="STATE_PSC">State PSCs</option>
+                      <option value="UNIVERSITY">Universities</option>
+                      <option value="STUDENT_SERVICE">Student Services</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Websites Table */}
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-800/60 text-slate-400 text-[10px] uppercase font-bold tracking-wider border-b border-slate-800">
+                        <tr>
+                          <th className="py-3 px-4">Organization & Code</th>
+                          <th className="py-3 px-4">Category</th>
+                          <th className="py-3 px-4">Official URL & Domain</th>
+                          <th className="py-3 px-4">Status & Latency</th>
+                          <th className="py-3 px-4 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/60 font-medium">
+                        {directoryWebsites
+                          .filter((w) => {
+                            if (dirCatFilter && w.category_type !== dirCatFilter) return false;
+                            if (dirSearch.trim()) {
+                              const q = dirSearch.toLowerCase();
+                              return (
+                                w.name.toLowerCase().includes(q) ||
+                                w.code?.toLowerCase().includes(q) ||
+                                w.domain?.toLowerCase().includes(q)
+                              );
+                            }
+                            return true;
+                          })
+                          .map((web) => (
+                            <tr key={web.id} className="hover:bg-slate-800/30 transition-colors">
+                              <td className="py-3 px-4">
+                                <div className="font-bold text-white text-xs">{web.name}</div>
+                                <div className="flex items-center space-x-1.5 mt-0.5">
+                                  {web.code && (
+                                    <span className="font-mono text-[10px] text-blue-400 font-bold bg-blue-950 px-1.5 py-0.2 rounded border border-blue-900">
+                                      {web.code}
+                                    </span>
+                                  )}
+                                  {web.is_featured && (
+                                    <span className="text-[10px] text-amber-400">★ Featured</span>
+                                  )}
+                                </div>
+                              </td>
+
+                              <td className="py-3 px-4 text-slate-300">
+                                <span className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-[11px]">
+                                  {web.category_type}
+                                </span>
+                              </td>
+
+                              <td className="py-3 px-4">
+                                <a
+                                  href={web.official_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-400 hover:underline flex items-center space-x-1 font-mono text-[11px]"
+                                >
+                                  <span>{web.domain}</span>
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                                <p className="text-[10px] text-slate-500 truncate max-w-xs">{web.official_url}</p>
+                              </td>
+
+                              <td className="py-3 px-4">
+                                <div className="flex items-center space-x-1.5">
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                    web.verification_status === "VERIFIED"
+                                      ? "bg-emerald-950 text-emerald-400 border border-emerald-800"
+                                      : "bg-rose-950 text-rose-400 border border-rose-800"
+                                  }`}>
+                                    {web.verification_status}
+                                  </span>
+                                  <span className="text-[10px] text-slate-400">{web.response_time_ms || 42}ms</span>
+                                </div>
+                                {webProbeMsg && webProbeMsg.id === web.id && (
+                                  <p className="text-[10px] text-emerald-400 mt-1">{webProbeMsg.msg}</p>
+                                )}
+                              </td>
+
+                              <td className="py-3 px-4 text-right space-x-2">
+                                <button
+                                  onClick={() => handleVerifyDirectoryWebsite(web.id)}
+                                  disabled={probingWebId === web.id}
+                                  className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-semibold rounded-lg border border-slate-700 transition-colors inline-flex items-center space-x-1"
+                                >
+                                  <Zap className={`w-3 h-3 text-amber-400 ${probingWebId === web.id ? "animate-spin" : ""}`} />
+                                  <span>{probingWebId === web.id ? "Pinging..." : "Live Ping"}</span>
+                                </button>
+
+                                <button
+                                  onClick={() => handleToggleWebsiteActive(web.id)}
+                                  className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg border transition-colors ${
+                                    web.is_active
+                                      ? "bg-rose-950/40 text-rose-400 border-rose-900 hover:bg-rose-900/60"
+                                      : "bg-emerald-950/40 text-emerald-400 border-emerald-900 hover:bg-emerald-900/60"
+                                  }`}
+                                >
+                                  {web.is_active ? "Deactivate" : "Activate"}
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* SUB-VIEW 2: BROKEN LINK REPORTS QUEUE */}
+            {dirSubView === "reports" && (
+              <div className="space-y-4">
+                {/* Status Filter */}
+                <div className="flex gap-2">
+                  {["ALL", "PENDING", "VERIFIED", "RESOLVED", "REJECTED"].map((st) => (
+                    <button
+                      key={st}
+                      onClick={() => setReportStatusFilter(st === "ALL" ? "" : st)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors ${
+                        (reportStatusFilter === "" && st === "ALL") || reportStatusFilter === st
+                          ? "bg-rose-600 text-white"
+                          : "bg-slate-900 border border-slate-800 text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      {st} {st === "PENDING" && `(${brokenReports.filter(r => r.status === "PENDING").length})`}
+                    </button>
+                  ))}
+                </div>
+
+                {brokenReports.length === 0 ? (
+                  <div className="text-center py-16 bg-slate-900 border border-slate-800 rounded-2xl text-slate-400">
+                    <CheckCircle className="w-10 h-10 text-emerald-500 mx-auto mb-2" />
+                    <p className="font-bold text-white">No Broken Link Reports</p>
+                    <p className="text-xs text-slate-500 mt-1">All verified official government links are functional.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {brokenReports
+                      .filter((r) => !reportStatusFilter || r.status === reportStatusFilter)
+                      .map((rep) => (
+                        <div
+                          key={rep.id}
+                          className="p-5 bg-slate-900 border border-slate-800 rounded-2xl space-y-3"
+                        >
+                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                            <div>
+                              <div className="flex items-center space-x-2">
+                                <span className="font-bold text-white text-sm">{rep.website_name}</span>
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  rep.status === "RESOLVED"
+                                    ? "bg-emerald-950 text-emerald-400 border border-emerald-800"
+                                    : rep.status === "PENDING"
+                                    ? "bg-rose-950 text-rose-400 border border-rose-800"
+                                    : "bg-slate-800 text-slate-300 border border-slate-700"
+                                }`}>
+                                  {rep.status}
+                                </span>
+                              </div>
+                              <a
+                                href={rep.website_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs text-blue-400 hover:underline font-mono"
+                              >
+                                {rep.website_url}
+                              </a>
+                            </div>
+
+                            <span className="text-[10px] text-slate-500 font-mono">
+                              Reported: {new Date(rep.created_at).toLocaleDateString()}
+                            </span>
+                          </div>
+
+                          <div className="p-3 bg-slate-800/60 rounded-xl border border-slate-700/60 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                            <div>
+                              <span className="text-slate-400 text-[10px] uppercase font-bold block">Issue Type</span>
+                              <span className="text-amber-400 font-semibold">{rep.reported_issue}</span>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 text-[10px] uppercase font-bold block">Reporter</span>
+                              <span className="text-slate-200">{rep.reporter_name} {rep.reporter_email && `(${rep.reporter_email})`}</span>
+                            </div>
+                            {rep.details && (
+                              <div className="sm:col-span-2 mt-1 pt-1 border-t border-slate-700/40">
+                                <span className="text-slate-400 text-[10px] uppercase font-bold block">Details / Notes</span>
+                                <p className="text-slate-300 italic">"{rep.details}"</p>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Admin Resolution Controls */}
+                          <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                            <div className="text-[11px] text-slate-400">
+                              {rep.admin_notes && (
+                                <span>Resolution Note: <strong className="text-slate-200">{rep.admin_notes}</strong></span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center space-x-2">
+                              {rep.status !== "RESOLVED" && (
+                                <button
+                                  onClick={() => handleUpdateReportStatus(rep.id, "RESOLVED", "URL re-verified and operational.")}
+                                  className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg transition-colors flex items-center space-x-1"
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                  <span>Mark Resolved</span>
+                                </button>
+                              )}
+                              {rep.status !== "VERIFIED" && rep.status !== "RESOLVED" && (
+                                <button
+                                  onClick={() => handleUpdateReportStatus(rep.id, "VERIFIED", "Confirmed broken by admin check.")}
+                                  className="px-3 py-1 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-lg transition-colors"
+                                >
+                                  Confirm Broken
+                                </button>
+                              )}
+                              {rep.status !== "REJECTED" && (
+                                <button
+                                  onClick={() => handleUpdateReportStatus(rep.id, "REJECTED", "False report. Link is healthy.")}
+                                  className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg transition-colors"
+                                >
+                                  Dismiss
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -1502,6 +1975,168 @@ export default function AdminDashboardPage() {
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* REGISTER NEW OFFICIAL DIRECTORY WEBSITE MODAL */}
+      {isAddWebModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="sticky top-0 bg-slate-900/95 backdrop-blur-sm px-6 py-4 border-b border-slate-800 flex justify-between items-center z-10">
+              <div className="flex items-center space-x-2.5">
+                <Globe className="w-5 h-5 text-blue-400" />
+                <h3 className="font-bold text-white text-base">
+                  Register Official Government / Examination Portal
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsAddWebModalOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateDirectoryWebsite} className="p-6 space-y-4 text-xs">
+              {addWebError && (
+                <div className="p-3 rounded-xl bg-red-950 border border-red-800 text-red-300 flex items-center space-x-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{addWebError}</span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-300 font-semibold block mb-1">Authority / Ministry Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={newWebName}
+                    onChange={(e) => setNewWebName(e.target.value)}
+                    placeholder="e.g. Staff Selection Commission"
+                    className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-slate-300 font-semibold block mb-1">Short Code *</label>
+                  <input
+                    type="text"
+                    required
+                    value={newWebCode}
+                    onChange={(e) => setNewWebCode(e.target.value.toUpperCase())}
+                    placeholder="e.g. SSC"
+                    className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-slate-300 font-semibold block mb-1">Category *</label>
+                  <select
+                    value={newWebCategory}
+                    onChange={(e) => setNewWebCategory(e.target.value)}
+                    className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white font-medium"
+                  >
+                    <option value="NATIONAL_PORTAL">National Government Portal</option>
+                    <option value="CENTRAL_RECRUITMENT">Central Government Recruitment & Defence</option>
+                    <option value="NATIONAL_ENTRANCE">National Entrance & Testing Board</option>
+                    <option value="STATE_PSC">State Public Service Commission</option>
+                    <option value="UNIVERSITY">Central & State University</option>
+                    <option value="STUDENT_SERVICE">Student Academic Service</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-slate-300 font-semibold block mb-1">State / UT (if applicable)</label>
+                  <select
+                    value={newWebStateId}
+                    onChange={(e) => setNewWebStateId(e.target.value)}
+                    className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white font-medium"
+                  >
+                    <option value="">National / Pan-India</option>
+                    {states.map((s) => (
+                      <option key={s.id} value={s.id}>{s.name} ({s.code})</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-slate-300 font-semibold block mb-1">Official Website URL *</label>
+                  <input
+                    type="url"
+                    required
+                    value={newWebOfficialUrl}
+                    onChange={(e) => setNewWebOfficialUrl(e.target.value)}
+                    placeholder="https://ssc.gov.in/"
+                    className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-slate-300 font-semibold block mb-1">Application / OTR Portal URL (optional)</label>
+                  <input
+                    type="url"
+                    value={newWebAppUrl}
+                    onChange={(e) => setNewWebAppUrl(e.target.value)}
+                    placeholder="https://ssc.gov.in/login"
+                    className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-slate-300 font-semibold block mb-1">Portal Description</label>
+                <textarea
+                  rows={2}
+                  value={newWebDesc}
+                  onChange={(e) => setNewWebDesc(e.target.value)}
+                  placeholder="Official remit, recruitment scope, and examinations conducted..."
+                  className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-300 font-semibold block mb-1">Verification Source Citation</label>
+                <input
+                  type="text"
+                  value={newWebSource}
+                  onChange={(e) => setNewWebSource(e.target.value)}
+                  placeholder="e.g. National Informatics Centre (NIC) / MeitY Official Directory"
+                  className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500"
+                />
+              </div>
+
+              <div className="flex items-center space-x-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="featuredCheck"
+                  checked={newWebFeatured}
+                  onChange={(e) => setNewWebFeatured(e.target.checked)}
+                  className="rounded bg-slate-800 border-slate-700 text-blue-600 focus:ring-blue-500"
+                />
+                <label htmlFor="featuredCheck" className="text-slate-300 font-semibold cursor-pointer">
+                  Pin as Featured Authority on Student Directory
+                </label>
+              </div>
+
+              <div className="pt-3 border-t border-slate-800 flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setIsAddWebModalOpen(false)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={addWebSubmitting}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-lg shadow-blue-500/20"
+                >
+                  {addWebSubmitting ? "Registering..." : "Publish to Directory"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -128,6 +128,8 @@ async def get_optional_user(
     result = await db.execute(stmt)
     return result.scalar_one_or_none()
 
+get_current_user_optional = get_optional_user
+
 async def get_current_admin(
     auth: Optional[HTTPAuthorizationCredentials] = Depends(security_bearer),
     db: AsyncSession = Depends(get_db)
@@ -160,6 +162,23 @@ async def get_current_admin(
             detail="Admin account deactivated or not found"
         )
     return admin
+
+async def get_optional_admin(
+    auth: Optional[HTTPAuthorizationCredentials] = Depends(security_bearer),
+    db: AsyncSession = Depends(get_db)
+) -> Optional[AdminUser]:
+    """FastAPI dependency to extract the admin if token is present, else None."""
+    if not auth:
+        return None
+    payload = decode_access_token(auth.credentials)
+    if not payload or payload.get("type") != "admin":
+        return None
+    admin_id = payload.get("sub")
+    if not admin_id:
+        return None
+    stmt = select(AdminUser).where(AdminUser.id == int(admin_id), AdminUser.is_active == True)
+    result = await db.execute(stmt)
+    return result.scalar_one_or_none()
 
 def require_role(allowed_roles: list[str]):
     """Role-based authorization dependency factory."""

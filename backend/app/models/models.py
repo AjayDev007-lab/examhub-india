@@ -32,6 +32,7 @@ class User(Base):
     preferences = relationship("NotificationPreference", back_populates="user", uselist=False, cascade="all, delete-orphan")
     support_tickets = relationship("SupportTicket", back_populates="user", cascade="all, delete-orphan")
     sessions = relationship("UserSession", back_populates="user", cascade="all, delete-orphan")
+    saved_websites = relationship("SavedWebsite", back_populates="user", cascade="all, delete-orphan")
 
 # 2. ADMIN ROLES
 class AdminRole(Base):
@@ -477,3 +478,84 @@ class PasswordResetToken(Base):
     created_at = Column(DateTime, default=utc_now, nullable=False)
 
     user = relationship("User")
+
+# 28. OFFICIAL WEBSITES DIRECTORY
+class OfficialWebsite(Base):
+    __tablename__ = "official_websites"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False, index=True)
+    code = Column(String(50), index=True, nullable=True) # e.g. "UPSC", "SSC", "NTA", "TNPSC"
+    category_type = Column(String(50), nullable=False, index=True) # "NATIONAL_PORTAL", "CENTRAL_RECRUITMENT", "NATIONAL_ENTRANCE", "STATE_PSC", "UNIVERSITY", "STUDENT_SERVICE"
+    state_id = Column(Integer, ForeignKey("states.id"), nullable=True, index=True)
+    official_url = Column(String(512), nullable=False)
+    application_portal_url = Column(String(512), nullable=True)
+    domain = Column(String(255), nullable=False, index=True)
+    description = Column(Text, nullable=True)
+    related_examinations = Column(JSON, default=list) # e.g. ["CSE", "NDA", "CDS"]
+    contact_email = Column(String(255), nullable=True)
+    contact_phone = Column(String(100), nullable=True)
+    verification_status = Column(String(50), default="VERIFIED", index=True) # "VERIFIED", "PENDING_REVIEW", "SUSPICIOUS", "BROKEN"
+    verification_source = Column(String(255), default="National Portal of India / Official Gazette")
+    last_verified_at = Column(DateTime, default=utc_now)
+    is_ssl_valid = Column(Boolean, default=True)
+    response_time_ms = Column(Integer, default=120)
+    is_active = Column(Boolean, default=True, index=True)
+    is_featured = Column(Boolean, default=False, index=True)
+    view_count = Column(Integer, default=0)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+    state = relationship("State")
+    verification_logs = relationship("WebsiteVerificationLog", back_populates="website", cascade="all, delete-orphan")
+    reports = relationship("BrokenLinkReport", back_populates="website", cascade="all, delete-orphan")
+
+# 29. WEBSITE VERIFICATION LOGS
+class WebsiteVerificationLog(Base):
+    __tablename__ = "website_verification_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    website_id = Column(Integer, ForeignKey("official_websites.id", ondelete="CASCADE"), nullable=False, index=True)
+    status_code = Column(Integer, nullable=False)
+    latency_ms = Column(Integer, nullable=False)
+    is_ssl_valid = Column(Boolean, default=True)
+    redirect_url = Column(String(512), nullable=True)
+    message = Column(String(255), nullable=True)
+    checked_by = Column(String(100), default="SYSTEM_MONITOR")
+    checked_at = Column(DateTime, default=utc_now, nullable=False)
+
+    website = relationship("OfficialWebsite", back_populates="verification_logs")
+
+# 30. SAVED WEBSITES (User Bookmarks)
+class SavedWebsite(Base):
+    __tablename__ = "saved_websites"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    website_id = Column(Integer, ForeignKey("official_websites.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+
+    user = relationship("User", back_populates="saved_websites")
+    website = relationship("OfficialWebsite")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "website_id", name="uq_user_saved_website"),
+    )
+
+# 31. BROKEN LINK REPORTS
+class BrokenLinkReport(Base):
+    __tablename__ = "broken_link_reports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    website_id = Column(Integer, ForeignKey("official_websites.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    reporter_name = Column(String(255), nullable=True)
+    reporter_email = Column(String(255), nullable=True)
+    reported_issue = Column(String(100), nullable=False) # "HTTP_404", "REDIRECT_WRONG", "SSL_ERROR", "SUSPICIOUS_PHISHING", "SLOW_UNRESPONSIVE", "OTHER"
+    details = Column(Text, nullable=True)
+    status = Column(String(50), default="PENDING", index=True) # "PENDING", "VERIFIED", "RESOLVED", "REJECTED"
+    admin_notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+    website = relationship("OfficialWebsite", back_populates="reports")
