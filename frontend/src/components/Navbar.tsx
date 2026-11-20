@@ -5,15 +5,22 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { 
   Award, FileText, CreditCard, Search, User, LogIn, Menu, X, 
-  ShieldCheck, LayoutDashboard, Bell, LogOut, ExternalLink, BookOpen
+  ShieldCheck, LayoutDashboard, Bell, LogOut, ExternalLink, BookOpen,
+  Globe, Sparkles, Building2, Landmark
 } from "lucide-react";
+import { Language, translations } from "@/lib/i18n";
 
 export default function Navbar() {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentLang, setCurrentLang] = useState<Language>("en");
 
   useEffect(() => {
+    const savedLang = localStorage.getItem("examhub_lang") as Language;
+    if (savedLang && translations[savedLang]) {
+      setCurrentLang(savedLang);
+    }
     const userStr = localStorage.getItem("examhub_user");
     if (userStr) {
       try {
@@ -22,6 +29,12 @@ export default function Navbar() {
     }
   }, [pathname]);
 
+  const handleLanguageChange = (lang: Language) => {
+    setCurrentLang(lang);
+    localStorage.setItem("examhub_lang", lang);
+    window.dispatchEvent(new Event("examhub-language-changed"));
+  };
+
   const handleLogout = () => {
     localStorage.removeItem("examhub_token");
     localStorage.removeItem("examhub_user");
@@ -29,11 +42,15 @@ export default function Navbar() {
     window.location.href = "/";
   };
 
+  const t = translations[currentLang] || translations.en;
+
   const navLinks = [
-    { name: "Check Results", href: "/results", icon: Award },
-    { name: "Hall Tickets", href: "/hall-tickets", icon: FileText },
-    { name: "Student ID Cards", href: "/id-cards", icon: CreditCard },
-    { name: "Exam Directory", href: "/directory", icon: BookOpen },
+    { name: t.officialWebsites || "Official Portals", href: "/official-websites", icon: Landmark },
+    { name: t.checkResults || "Check Results", href: "/results", icon: Award },
+    { name: t.hallTickets || "Hall Tickets", href: "/hall-tickets", icon: FileText },
+    { name: t.idCards || "Student ID Cards", href: "/id-cards", icon: CreditCard },
+    { name: t.aiAssistant || "AI Assistant", href: "/assistant", icon: Sparkles },
+    { name: t.institutionPortal || "Institutions", href: "/institution", icon: Building2 },
   ];
 
   const isAdminPage = pathname.startsWith("/admin");
@@ -45,17 +62,45 @@ export default function Navbar() {
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center space-x-2">
             <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span className="font-medium text-slate-100">Official National Portal:</span>
-            <span className="hidden sm:inline text-slate-300">Centralized All-India Examination Results, Admit Cards & Academic Identity</span>
+            <span className="font-medium text-slate-100">National Portal:</span>
+            <span className="hidden sm:inline text-slate-300">All-India Examinations, Official Government Registry & Student Document Vault</span>
           </div>
-          <div className="flex items-center space-x-4">
-            <Link href="/directory" className="hover:text-white transition-colors">
-              Directory (28 States & 8 UTs)
+          <div className="flex items-center space-x-3">
+            {/* Language Selector */}
+            <div className="flex items-center space-x-1">
+              <Globe className="w-3.5 h-3.5 text-blue-400" />
+              <select
+                value={currentLang}
+                onChange={(e) => handleLanguageChange(e.target.value as Language)}
+                className="bg-primary-900 border border-slate-700 text-slate-200 text-[11px] font-semibold rounded px-1.5 py-0.5 focus:outline-none cursor-pointer"
+              >
+                <option value="en">English</option>
+                <option value="ta">தமிழ்</option>
+                <option value="hi">हिन्दी</option>
+                <option value="ml">മലയാളം</option>
+                <option value="kn">ಕನ್ನಡ</option>
+                <option value="te">తెలుగు</option>
+              </select>
+            </div>
+
+            <span className="text-slate-700">|</span>
+
+            <Link href="/official-websites" className="hidden md:inline hover:text-white transition-colors">
+              Official Directory (36 States & UTs)
             </Link>
-            <span className="text-slate-600">|</span>
+
+            <span className="hidden md:inline text-slate-700">|</span>
+
+            <Link href="/institution" className="flex items-center space-x-1 text-slate-300 hover:text-white transition-colors">
+              <Building2 className="w-3.5 h-3.5 text-amber-400" />
+              <span>Institutions</span>
+            </Link>
+
+            <span className="text-slate-700">|</span>
+
             <Link href="/admin/login" className="flex items-center space-x-1 text-slate-300 hover:text-white transition-colors">
               <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
-              <span>Admin Portal</span>
+              <span>Admin</span>
             </Link>
           </div>
         </div>

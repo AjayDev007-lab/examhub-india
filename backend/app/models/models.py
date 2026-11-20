@@ -485,8 +485,10 @@ class OfficialWebsite(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False, index=True)
+    slug = Column(String(255), index=True, nullable=True) # e.g. "upsc", "nta", "tnpsc"
     code = Column(String(50), index=True, nullable=True) # e.g. "UPSC", "SSC", "NTA", "TNPSC"
-    category_type = Column(String(50), nullable=False, index=True) # "NATIONAL_PORTAL", "CENTRAL_RECRUITMENT", "NATIONAL_ENTRANCE", "STATE_PSC", "UNIVERSITY", "STUDENT_SERVICE"
+    category_type = Column(String(50), nullable=False, index=True) # "NATIONAL_PORTAL", "CENTRAL_RECRUITMENT", "DEFENCE_RECRUITMENT", "PSU_SCIENTIFIC", "NATIONAL_ENTRANCE", "STATE_PSC", "UNIVERSITY", "SCHOOL_BOARD", "SCHOLARSHIP", "CITIZEN_SERVICE"
+    organization_type = Column(String(50), default="CENTRAL") # "CENTRAL", "STATE", "UT", "AUTONOMOUS", "PUBLIC_SECTOR"
     state_id = Column(Integer, ForeignKey("states.id"), nullable=True, index=True)
     official_url = Column(String(512), nullable=False)
     application_portal_url = Column(String(512), nullable=True)
@@ -559,3 +561,117 @@ class BrokenLinkReport(Base):
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
 
     website = relationship("OfficialWebsite", back_populates="reports")
+
+
+# 32. RRB GROUP D RECRUITMENT & RESULT MANAGEMENT
+class RRBGroupDResult(Base):
+    __tablename__ = "rrb_group_d_results"
+
+    id = Column(Integer, primary_key=True, index=True)
+    cen_number = Column(String(50), nullable=False, index=True) # e.g. "CEN RRC-01/2019", "CEN 02/2024"
+    title = Column(String(255), nullable=False) # e.g. "Level 1 Posts (Group D) - 7th CPC Matrix"
+    zone_code = Column(String(50), nullable=False, index=True) # e.g. "RRB_CHENNAI", "RRB_MUMBAI", "ALL"
+    zone_name = Column(String(100), nullable=False) # e.g. "Railway Recruitment Board, Chennai"
+    vacancies_count = Column(Integer, default=0)
+    official_portal_url = Column(String(512), nullable=False) # e.g. "https://www.rrbchennai.gov.in"
+    scorecard_url = Column(String(512), nullable=True) # e.g. "https://rrb.digialm.com/..."
+    merit_list_pdf_url = Column(String(512), nullable=True)
+    cutoff_marks_pdf_url = Column(String(512), nullable=True)
+    pet_instructions_url = Column(String(512), nullable=True) # Physical Efficiency Test
+    document_verification_url = Column(String(512), nullable=True)
+    announcement_date = Column(DateTime, nullable=True)
+    scorecard_available_until = Column(DateTime, nullable=True)
+    status = Column(String(50), default="DRAFT", index=True) # "DRAFT", "PENDING_VERIFICATION", "APPROVED", "PUBLISHED", "ARCHIVED"
+    verification_source = Column(String(255), default="Ministry of Railways / Railway Recruitment Control Board")
+    verified_by_admin_id = Column(Integer, ForeignKey("admin_users.id", ondelete="SET NULL"), nullable=True)
+    published_by_admin_id = Column(Integer, ForeignKey("admin_users.id", ondelete="SET NULL"), nullable=True)
+    admin_notes = Column(Text, nullable=True)
+    view_count = Column(Integer, default=0)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+
+# 33. SCHOLARSHIP PROGRAMMES
+class Scholarship(Base):
+    __tablename__ = "scholarships"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(255), nullable=False, index=True)
+    provider_name = Column(String(255), nullable=False) # e.g. "Ministry of Minority Affairs", "AICTE"
+    category = Column(String(100), default="CENTRAL") # "CENTRAL", "STATE", "UGC_AICTE", "PRIVATE"
+    eligibility_criteria = Column(Text, nullable=False)
+    award_amount = Column(String(100), nullable=True) # e.g. "₹50,000 per annum"
+    application_portal_url = Column(String(512), nullable=False) # e.g. "https://scholarships.gov.in"
+    notification_pdf_url = Column(String(512), nullable=True)
+    opening_date = Column(DateTime, nullable=True)
+    deadline_date = Column(DateTime, nullable=True, index=True)
+    status = Column(String(50), default="PUBLISHED", index=True) # "DRAFT", "PUBLISHED", "CLOSED"
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+
+# 34. AI SETTINGS & CONFIGURATION
+class AISetting(Base):
+    __tablename__ = "ai_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    provider = Column(String(50), default="google_gemini", nullable=False) # "google_gemini", "anthropic_claude", "openai"
+    model_name = Column(String(100), default="gemini-1.5-flash", nullable=False)
+    is_enabled = Column(Boolean, default=True)
+    daily_student_token_limit = Column(Integer, default=25000)
+    daily_institution_token_limit = Column(Integer, default=500000)
+    temperature = Column(Float, default=0.2)
+    system_prompt = Column(Text, nullable=False)
+    grounded_citation_required = Column(Boolean, default=True)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+
+# 35. AI USAGE LOGS
+class AIUsageLog(Base):
+    __tablename__ = "ai_usage_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    prompt_tokens = Column(Integer, default=0)
+    completion_tokens = Column(Integer, default=0)
+    total_tokens = Column(Integer, default=0)
+    estimated_cost_inr = Column(Float, default=0.0)
+    latency_ms = Column(Integer, default=0)
+    status = Column(String(50), default="SUCCESS") # "SUCCESS", "RATE_LIMITED", "FILTERED_SAFETY", "ERROR"
+    created_at = Column(DateTime, default=utc_now, nullable=False, index=True)
+
+
+# 36. PAYMENT TRANSACTIONS & REVENUE
+class PaymentTransaction(Base):
+    __tablename__ = "payment_transactions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    order_id = Column(String(100), unique=True, nullable=False, index=True)
+    payment_id = Column(String(100), unique=True, nullable=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    tier = Column(String(50), nullable=False) # "STUDENT_PRO", "INSTITUTION_VERIFIED"
+    amount = Column(Integer, nullable=False) # In Paise (e.g. 9900 = ₹99)
+    currency = Column(String(10), default="INR")
+    status = Column(String(50), default="PENDING", index=True) # "PENDING", "COMPLETED", "FAILED", "REFUNDED"
+    hmac_signature = Column(String(255), nullable=True)
+    refund_reason = Column(Text, nullable=True)
+    refund_amount = Column(Integer, default=0)
+    created_at = Column(DateTime, default=utc_now, nullable=False, index=True)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+
+# 37. SECURITY INCIDENT AUDIT
+class SecurityIncident(Base):
+    __tablename__ = "security_incidents"
+
+    id = Column(Integer, primary_key=True, index=True)
+    incident_type = Column(String(100), nullable=False, index=True) # "BRUTE_FORCE_LOGIN", "SUSPICIOUS_IP", "SSRF_ATTEMPT", "PERMISSION_DENIED", "UNAUTHORIZED_API"
+    severity = Column(String(50), default="MEDIUM", index=True) # "LOW", "MEDIUM", "HIGH", "CRITICAL"
+    source_ip = Column(String(64), nullable=True)
+    user_agent = Column(String(512), nullable=True)
+    target_resource = Column(String(255), nullable=True)
+    details = Column(Text, nullable=True)
+    is_resolved = Column(Boolean, default=False)
+    resolved_by_admin_id = Column(Integer, ForeignKey("admin_users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False, index=True)
+

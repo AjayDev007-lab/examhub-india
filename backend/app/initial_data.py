@@ -7,7 +7,8 @@ from app.models.models import (
     State, OrganizationCategory, Organization, Examination, ExamSchedule,
     AdminRole, AdminUser, AdminPermission, DocumentType, SystemSetting,
     ResultAnnouncement, ExamResult, PortalIntegration, User,
-    OfficialWebsite, WebsiteVerificationLog, SavedWebsite, BrokenLinkReport
+    OfficialWebsite, WebsiteVerificationLog, SavedWebsite, BrokenLinkReport,
+    RRBGroupDResult, AISetting, Scholarship, PaymentTransaction, SecurityIncident
 )
 from app.auth.security import hash_password
 from app.config import settings
@@ -1484,6 +1485,137 @@ async def seed_database():
                         message="Verified via Government .gov.in/.nic.in Domain Registry",
                         checked_by="SYSTEM_SEED"
                     ))
+
+            # Seed AI Settings if not exists
+            ai_check = await db.execute(select(AISetting))
+            if not ai_check.scalars().first():
+                db.add(AISetting(
+                    provider="google_gemini",
+                    model_name="gemini-1.5-flash",
+                    is_enabled=True,
+                    daily_student_token_limit=25000,
+                    daily_institution_token_limit=500000,
+                    temperature=0.2,
+                    system_prompt="You are ExamHub India's Verified Exam AI Assistant. You only cite official government sources ending in .gov.in, .nic.in, and .ac.in. Never invent exam dates, results, or syllabus rules.",
+                    grounded_citation_required=True
+                ))
+
+            # Seed initial RRB Group D Recruitment cycles and zones
+            rrb_check = await db.execute(select(RRBGroupDResult))
+            if not rrb_check.scalars().first():
+                rrb_entries = [
+                    RRBGroupDResult(
+                        cen_number="CEN RRC-01/2019",
+                        title="Level 1 Posts (Group D) - 7th CPC Matrix (1,03,769 Vacancies)",
+                        zone_code="RRB_CHENNAI",
+                        zone_name="Railway Recruitment Board, Chennai",
+                        vacancies_count=9579,
+                        official_portal_url="https://www.rrbchennai.gov.in",
+                        scorecard_url="https://rrb.digialm.com//EForms/configuredHtml/1907/68641/login.html",
+                        merit_list_pdf_url="https://www.rrbchennai.gov.in/downloads/cbt-merit-list-cen-01-2019.pdf",
+                        cutoff_marks_pdf_url="https://www.rrbchennai.gov.in/downloads/cutoff-marks-cen-01-2019.pdf",
+                        pet_instructions_url="https://www.rrcmas.in/pet-instructions.html",
+                        status="PUBLISHED",
+                        announcement_date=utc_now(),
+                        verification_source="Railway Recruitment Control Board / RRB Chennai Official Notice",
+                        admin_notes="Final verified merit list and CBT scorecard link published."
+                    ),
+                    RRBGroupDResult(
+                        cen_number="CEN RRC-01/2019",
+                        title="Level 1 Posts (Group D) - 7th CPC Matrix",
+                        zone_code="RRB_MUMBAI",
+                        zone_name="Railway Recruitment Board, Western Railway Mumbai",
+                        vacancies_count=10734,
+                        official_portal_url="https://www.rrbmumbai.gov.in",
+                        scorecard_url="https://rrb.digialm.com//EForms/configuredHtml/1907/68641/login.html",
+                        merit_list_pdf_url="https://www.rrbmumbai.gov.in/pdf/CBT-Result-CEN-01-2019.pdf",
+                        cutoff_marks_pdf_url="https://www.rrbmumbai.gov.in/pdf/Cutoff-Normalized-CEN-01-2019.pdf",
+                        pet_instructions_url="https://www.rrc-wr.com/pet_schedule.html",
+                        status="PUBLISHED",
+                        announcement_date=utc_now(),
+                        verification_source="RRB Mumbai Official Portal",
+                        admin_notes="Western Railway zone document verification and PET call letters."
+                    ),
+                    RRBGroupDResult(
+                        cen_number="CEN RRC-01/2024",
+                        title="Railway Group D / Track Maintainer Grade IV Recruitment 2026 Cycle",
+                        zone_code="ALL_ZONES",
+                        zone_name="All Indian Railway Zones (Centralized)",
+                        vacancies_count=52000,
+                        official_portal_url="https://indianrailways.gov.in",
+                        status="DRAFT",
+                        verification_source="Official Gazette of India (Draft Proposal)",
+                        admin_notes="Draft notification awaiting Ministry of Railways clearance."
+                    )
+                ]
+                db.add_all(rrb_entries)
+
+            # Seed initial Central Scholarships
+            sch_check = await db.execute(select(Scholarship))
+            if not sch_check.scalars().first():
+                db.add_all([
+                    Scholarship(
+                        title="Post Matric Scholarships Scheme for Minorities",
+                        provider_name="Ministry of Minority Affairs",
+                        category="CENTRAL",
+                        eligibility_criteria="Students studying in Class 11, 12, graduate, postgraduate, technical and vocational courses with minimum 50% marks and family income below ₹2 Lakh/year.",
+                        award_amount="Admission fee up to ₹10,000/annum + Maintenance allowance",
+                        application_portal_url="https://scholarships.gov.in",
+                        status="PUBLISHED"
+                    ),
+                    Scholarship(
+                        title="Central Sector Scheme of Scholarship for College and University Students",
+                        provider_name="Department of Higher Education (MoE)",
+                        category="CENTRAL",
+                        eligibility_criteria="Above 80th percentile in Class 12 board examination pursuing regular degree courses with family income below ₹4.5 Lakh/year.",
+                        award_amount="₹12,000 per annum for Graduation; ₹20,000 for Post Graduation",
+                        application_portal_url="https://scholarships.gov.in",
+                        status="PUBLISHED"
+                    )
+                ])
+
+            # Seed initial sample Payment Transactions for financial analytics
+            pay_check = await db.execute(select(PaymentTransaction))
+            if not pay_check.scalars().first():
+                admin_user_res = await db.execute(select(AdminUser).where(AdminUser.email == settings.SUPERADMIN_EMAIL))
+                super_admin = admin_user_res.scalars().first()
+                std_user_res = await db.execute(select(User))
+                first_student = std_user_res.scalars().first()
+                if first_student:
+                    db.add_all([
+                        PaymentTransaction(
+                            order_id="order_TEST_1001",
+                            payment_id="pay_TEST_1001",
+                            user_id=first_student.id,
+                            tier="STUDENT_PRO",
+                            amount=9900,
+                            currency="INR",
+                            status="COMPLETED",
+                            hmac_signature="simulated_hmac_sha256_verified_sig_001"
+                        ),
+                        PaymentTransaction(
+                            order_id="order_TEST_1002",
+                            payment_id="pay_TEST_1002",
+                            user_id=first_student.id,
+                            tier="INSTITUTION_VERIFIED",
+                            amount=1499900,
+                            currency="INR",
+                            status="COMPLETED",
+                            hmac_signature="simulated_hmac_sha256_verified_sig_002"
+                        )
+                    ])
+
+            # Seed initial Security Incident Audit
+            sec_check = await db.execute(select(SecurityIncident))
+            if not sec_check.scalars().first():
+                db.add(SecurityIncident(
+                    incident_type="SSRF_PROBE_BLOCKED",
+                    severity="HIGH",
+                    source_ip="192.168.1.105",
+                    target_resource="/api/admin/institutions/test-connection",
+                    details="Attempted outbound request to private network IP 169.254.169.254 was intercepted and blocked by SSRF Guard.",
+                    is_resolved=True
+                ))
 
             await db.commit()
             print("Successfully initialized and seeded EXAMHUB INDIA database!")

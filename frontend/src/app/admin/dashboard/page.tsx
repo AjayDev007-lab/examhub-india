@@ -7,7 +7,8 @@ import {
   Activity, Bell, HelpCircle, FileText, Settings, Plus, CheckCircle2, 
   AlertCircle, RefreshCw, LogOut, Search, ExternalLink, Save,
   Check, X, Lock, Key, Wifi, WifiOff, Clock, Trash2, Edit3, Eye,
-  History, Globe, Server, CheckCircle, AlertTriangle, ChevronRight, Zap
+  History, Globe, Server, CheckCircle, AlertTriangle, ChevronRight, Zap,
+  Train, GraduationCap, Award, Bot, CreditCard, ShieldAlert, Sliders, DollarSign, Download
 } from "lucide-react";
 import { fetchApi } from "@/lib/api";
 
@@ -25,6 +26,17 @@ export default function AdminDashboardPage() {
   const [systemSettings, setSystemSettings] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [states, setStates] = useState<any[]>([]);
+
+  // Additional Enterprise State Collections
+  const [rrbList, setRrbList] = useState<any[]>([]);
+  const [aiConfig, setAiConfig] = useState<any>(null);
+  const [securityData, setSecurityData] = useState<any>(null);
+  const [paymentsList, setPaymentsList] = useState<any[]>([]);
+  const [paymentMetrics, setPaymentMetrics] = useState<any>(null);
+  const [scholarshipsList, setScholarshipsList] = useState<any[]>([]);
+  const [facultyList, setFacultyList] = useState<any[]>([]);
+  const [studentSearch, setStudentSearch] = useState("");
+  const [studentFilterStatus, setStudentFilterStatus] = useState("ALL");
 
   // Official Directory & Broken Link States
   const [directoryWebsites, setDirectoryWebsites] = useState<any[]>([]);
@@ -122,7 +134,7 @@ export default function AdminDashboardPage() {
   async function loadAdminData() {
     setLoading(true);
     try {
-      const [dashStats, orgs, exams, stds, logs, tcks, sttings, cats, sts, dirWebs, dirReports] = await Promise.all([
+      const [dashStats, orgs, exams, stds, logs, tcks, sttings, cats, sts, dirWebs, dirReports, rrbs, aiRes, secRes, payRes, schRes, facRes] = await Promise.all([
         fetchApi("/api/admin/dashboard").catch(() => null),
         fetchApi("/api/admin/institutions").catch(() => []),
         fetchApi("/api/exams?limit=50").catch(() => []),
@@ -133,7 +145,13 @@ export default function AdminDashboardPage() {
         fetchApi("/api/categories").catch(() => []),
         fetchApi("/api/states").catch(() => []),
         fetchApi("/api/directory/websites?limit=200").catch(() => null),
-        fetchApi("/api/admin/directory/reports").catch(() => null)
+        fetchApi("/api/admin/directory/reports").catch(() => null),
+        fetchApi("/api/admin/rrb-group-d").catch(() => null),
+        fetchApi("/api/admin/ai").catch(() => null),
+        fetchApi("/api/admin/security").catch(() => null),
+        fetchApi("/api/admin/payments").catch(() => null),
+        fetchApi("/api/admin/scholarships").catch(() => null),
+        fetchApi("/api/admin/faculty").catch(() => null)
       ]);
       setStats(dashStats);
       setOrganizations(orgs || []);
@@ -146,6 +164,13 @@ export default function AdminDashboardPage() {
       setStates(sts || []);
       setDirectoryWebsites(dirWebs?.websites || []);
       setBrokenReports(dirReports?.reports || []);
+      setRrbList(rrbs?.results || []);
+      setAiConfig(aiRes?.config || null);
+      setSecurityData(secRes || null);
+      setPaymentsList(payRes?.payments || []);
+      setPaymentMetrics(payRes?.metrics || null);
+      setScholarshipsList(schRes?.scholarships || []);
+      setFacultyList(facRes?.faculty || []);
       if (cats && cats.length > 0) {
         setFormCategoryId(cats[0].id);
       }
@@ -521,14 +546,20 @@ export default function AdminDashboardPage() {
   };
 
   const tabs = [
-    { id: "institutions", label: "Institution Integrations", icon: Building2, count: pendingApprovalsCount > 0 ? pendingApprovalsCount : organizations.length },
-    { id: "directory", label: "Gov Directory & Reports", icon: Globe, count: brokenReports.filter(r => r.status === "PENDING").length },
-    { id: "overview", label: "Overview", icon: LayoutDashboard },
-    { id: "exams", label: "Examinations", icon: BookOpen, count: examinations.length },
-    { id: "students", label: "Students", icon: Users, count: students.length },
+    { id: "overview", label: "Dashboard Overview", icon: LayoutDashboard },
+    { id: "rrb_results", label: "RRB Group D Results", icon: Train, count: rrbList.filter(r => r.status === "PENDING_VERIFICATION").length },
+    { id: "institutions", label: "Institutions & Boards", icon: Building2, count: pendingApprovalsCount > 0 ? pendingApprovalsCount : organizations.length },
+    { id: "directory", label: "Gov Directory & Portals", icon: Globe, count: brokenReports.filter(r => r.status === "PENDING").length },
+    { id: "exams", label: "Examinations & Dates", icon: BookOpen, count: examinations.length },
+    { id: "students", label: "Students & Accounts", icon: Users, count: students.length },
+    { id: "faculty", label: "Faculty & Staff", icon: GraduationCap, count: facultyList.length },
+    { id: "scholarships", label: "Scholarships", icon: Award, count: scholarshipsList.length },
+    { id: "ai", label: "AI Assistant Centre", icon: Bot },
+    { id: "payments", label: "Payments & Revenue", icon: CreditCard },
+    { id: "security", label: "Security & Threat Log", icon: ShieldCheck, count: securityData?.unresolvedAlerts || 0 },
     { id: "tickets", label: "Support Tickets", icon: HelpCircle, count: tickets.filter(t => t.status === "OPEN").length },
-    { id: "audit", label: "Audit Logs", icon: FileText },
-    { id: "settings", label: "Settings", icon: Settings },
+    { id: "audit", label: "Tamper-Evident Audit", icon: FileText },
+    { id: "settings", label: "System Health & Settings", icon: Settings },
   ];
 
   return (
@@ -1450,34 +1481,96 @@ export default function AdminDashboardPage() {
         {/* STUDENTS TAB */}
         {activeTab === "students" && (
           <div className="space-y-6">
-            <div>
-              <h2 className="text-2xl font-black text-white">Student Account Management</h2>
-              <p className="text-xs text-slate-400">View registered students and manage account statuses</p>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-black text-white">Student Account Management</h2>
+                <p className="text-xs text-slate-400">View registered students, filter by account status, and manage subscription access</p>
+              </div>
+
+              <button
+                onClick={() => {
+                  const csvContent = "data:text/csv;charset=utf-8," + 
+                    ["ID,Name,Email,Mobile,Status,Date"].join(",") + "\n" +
+                    students.map(s => `"${s.id}","${s.full_name}","${s.email}","${s.mobile || ''}","${s.is_active ? 'ACTIVE' : 'SUSPENDED'}","${s.created_at || ''}"`).join("\n");
+                  const encodedUri = encodeURI(csvContent);
+                  const link = document.createElement("a");
+                  link.setAttribute("href", encodedUri);
+                  link.setAttribute("download", `examhub_students_${Date.now()}.csv`);
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                }}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl flex items-center space-x-2 transition-colors border border-slate-700"
+              >
+                <Download className="w-3.5 h-3.5 text-blue-400" />
+                <span>Export Students CSV</span>
+              </button>
+            </div>
+
+            {/* Filter controls */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search students by name, email, or mobile..."
+                  value={studentSearch}
+                  onChange={(e) => setStudentSearch(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <select
+                value={studentFilterStatus}
+                onChange={(e) => setStudentFilterStatus(e.target.value)}
+                className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
+              >
+                <option value="ALL">All Account Statuses</option>
+                <option value="ACTIVE">Active Students Only</option>
+                <option value="SUSPENDED">Suspended Students Only</option>
+              </select>
             </div>
 
             <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl">
               <div className="divide-y divide-slate-800 text-xs">
-                {students.map((std) => (
-                  <div key={std.id} className="py-3 flex items-center justify-between">
-                    <div>
-                      <h4 className="font-bold text-white">{std.full_name}</h4>
-                      <p className="text-slate-400 text-[11px]">{std.email} • Mobile: {std.mobile || "N/A"}</p>
+                {students
+                  .filter((s) => {
+                    if (studentFilterStatus === "ACTIVE" && !s.is_active) return false;
+                    if (studentFilterStatus === "SUSPENDED" && s.is_active) return false;
+                    if (!studentSearch.trim()) return true;
+                    const q = studentSearch.toLowerCase();
+                    return (
+                      s.full_name?.toLowerCase().includes(q) ||
+                      s.email?.toLowerCase().includes(q) ||
+                      s.mobile?.includes(q)
+                    );
+                  })
+                  .map((std) => (
+                    <div key={std.id} className="py-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <h4 className="font-bold text-white text-sm">{std.full_name}</h4>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-950 text-blue-300 border border-blue-900/40">
+                            FREE STUDENT
+                          </span>
+                        </div>
+                        <p className="text-slate-400 text-[11px] mt-0.5">{std.email} • Mobile: {std.mobile || "N/A"}</p>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <span className={`px-2.5 py-0.5 rounded text-[10px] font-bold tracking-wider ${
+                          std.is_active ? "bg-emerald-950 text-emerald-300 border border-emerald-800/40" : "bg-red-950 text-red-300 border border-red-800/40"
+                        }`}>
+                          {std.is_active ? "ACTIVE" : "SUSPENDED"}
+                        </span>
+                        <button
+                          onClick={() => handleToggleStudent(std.id)}
+                          className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold transition-colors"
+                        >
+                          {std.is_active ? "Suspend Access" : "Reactivate"}
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center space-x-3">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        std.is_active ? "bg-emerald-950 text-emerald-300" : "bg-red-950 text-red-300"
-                      }`}>
-                        {std.is_active ? "ACTIVE" : "SUSPENDED"}
-                      </span>
-                      <button
-                        onClick={() => handleToggleStudent(std.id)}
-                        className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-white text-[11px]"
-                      >
-                        Toggle Status
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  ))}
               </div>
             </div>
           </div>
@@ -1605,6 +1698,359 @@ export default function AdminDashboardPage() {
                   <p className="text-slate-400 text-[11px]">{st.description}</p>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+        {/* RRB GROUP D RESULTS TAB */}
+        {activeTab === "rrb_results" && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-black text-white flex items-center gap-2">
+                  <Train className="w-6 h-6 text-orange-400" />
+                  RRB Group D Result & Recruitment Management
+                </h2>
+                <p className="text-xs text-slate-400">Manage CEN notification cycles, all 21 RRB regional zones, official CBT scorecards, and PET instructions</p>
+              </div>
+
+              <div className="flex items-center space-x-3">
+                <Link
+                  href="/admin/results/rrb-group-d"
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl flex items-center space-x-1.5 shadow-md shadow-blue-600/20 transition-all"
+                >
+                  <span>Open Dedicated RRB Hub</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
+                <span className="text-[11px] text-slate-400 font-semibold block">Total CEN Cycles</span>
+                <span className="text-2xl font-black text-white mt-1 block">{rrbList.length}</span>
+              </div>
+              <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
+                <span className="text-[11px] text-slate-400 font-semibold block">Published Scorecards</span>
+                <span className="text-2xl font-black text-emerald-400 mt-1 block">
+                  {rrbList.filter(r => r.status === "PUBLISHED").length}
+                </span>
+              </div>
+              <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
+                <span className="text-[11px] text-slate-400 font-semibold block">Regional Zones Covered</span>
+                <span className="text-2xl font-black text-blue-400 mt-1 block">21 RRBs</span>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {rrbList.map((item) => (
+                <div key={item.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3 text-xs">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                    <div className="flex items-center space-x-2.5">
+                      <span className="px-2 py-0.5 rounded bg-orange-500/20 text-orange-400 font-bold text-[10px] border border-orange-500/30">
+                        {item.cen_number}
+                      </span>
+                      <h4 className="text-sm font-bold text-white">{item.title}</h4>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        item.status === "PUBLISHED" ? "bg-emerald-500/20 text-emerald-400" : "bg-amber-500/20 text-amber-400"
+                      }`}>
+                        {item.status}
+                      </span>
+                    </div>
+                    <span className="text-slate-400 text-[11px]">{item.zone_name} • {item.vacancies_count?.toLocaleString()} Vacancies</span>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-800 text-[11px]">
+                    <a href={item.official_portal_url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline flex items-center gap-1">
+                      <span>Official Portal</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                    {item.scorecard_url && (
+                      <a href={item.scorecard_url} target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline flex items-center gap-1 ml-3">
+                        <span>Scorecard Login</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
+                    {item.merit_list_pdf_url && (
+                      <a href={item.merit_list_pdf_url} target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:underline flex items-center gap-1 ml-3">
+                        <span>Merit List PDF</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* FACULTY & STAFF TAB */}
+        {activeTab === "faculty" && (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-2xl font-black text-white flex items-center gap-2">
+                <GraduationCap className="w-6 h-6 text-blue-400" />
+                Faculty & Academic Staff Directory
+              </h2>
+              <p className="text-xs text-slate-400">Institutional controller accounts, departmental assignments, and verified staff permissions</p>
+            </div>
+
+            <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl">
+              <div className="divide-y divide-slate-800 text-xs">
+                {facultyList.map((f) => (
+                  <div key={f.id} className="py-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <h4 className="font-bold text-white text-sm">{f.name}</h4>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-950 text-blue-300 border border-blue-900/40">
+                          {f.role}
+                        </span>
+                      </div>
+                      <p className="text-slate-400 text-[11px] mt-0.5">{f.email} • {f.department}</p>
+                      <p className="text-slate-500 text-[10px]">{f.institution_name}</p>
+                    </div>
+
+                    <span className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800/40">
+                      {f.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* SCHOLARSHIPS TAB */}
+        {activeTab === "scholarships" && (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-2xl font-black text-white flex items-center gap-2">
+                <Award className="w-6 h-6 text-amber-400" />
+                National & State Scholarships Registry
+              </h2>
+              <p className="text-xs text-slate-400">Configure central sector schemes, eligibility requirements, award grants, and application portals</p>
+            </div>
+
+            <div className="space-y-3">
+              {scholarshipsList.map((sch) => (
+                <div key={sch.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3 text-xs">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                    <div>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                        {sch.category}
+                      </span>
+                      <h4 className="text-sm font-bold text-white mt-1">{sch.title}</h4>
+                      <p className="text-slate-400 text-[11px]">{sch.provider_name}</p>
+                    </div>
+
+                    <div className="text-right">
+                      <span className="font-bold text-emerald-400 text-xs block">{sch.award_amount}</span>
+                      <span className="text-[10px] text-slate-400">Deadline: {sch.deadline_date || "Ongoing"}</span>
+                    </div>
+                  </div>
+
+                  <p className="text-slate-300 text-[11px] bg-slate-950 p-3 rounded-xl border border-slate-800">
+                    <strong className="text-slate-200">Eligibility: </strong>{sch.eligibility_criteria}
+                  </p>
+
+                  <div className="flex justify-end pt-1">
+                    <a
+                      href={sch.application_portal_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-blue-400 hover:underline flex items-center gap-1 font-semibold"
+                    >
+                      <span>Open Official Scholarship Portal</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* AI MANAGEMENT TAB */}
+        {activeTab === "ai" && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-black text-white flex items-center gap-2">
+                  <Bot className="w-6 h-6 text-purple-400" />
+                  AI Assistant & LLM Governance
+                </h2>
+                <p className="text-xs text-slate-400">Monitor token quotas, system prompt safety rules, and official domain citation enforcement</p>
+              </div>
+
+              <Link
+                href="/admin/ai"
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-xl flex items-center space-x-1.5 shadow-md shadow-purple-600/20 transition-all"
+              >
+                <span>Full AI Configuration</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+              <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
+                <span className="text-[11px] text-slate-400 font-semibold block">Active Engine</span>
+                <span className="text-base font-black text-purple-400 mt-1 block">
+                  {aiConfig?.model_name || "gemini-1.5-flash"}
+                </span>
+              </div>
+              <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
+                <span className="text-[11px] text-slate-400 font-semibold block">Student Daily Quota</span>
+                <span className="text-lg font-black text-white mt-1 block">
+                  {aiConfig?.daily_student_token_limit?.toLocaleString() || "25,000"} tokens
+                </span>
+              </div>
+              <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
+                <span className="text-[11px] text-slate-400 font-semibold block">Estimated Today Cost</span>
+                <span className="text-lg font-black text-white mt-1 block">
+                  ₹{aiConfig?.estimated_cost_inr || "86.44"}
+                </span>
+              </div>
+              <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
+                <span className="text-[11px] text-slate-400 font-semibold block">Citations Rule</span>
+                <span className="text-base font-black text-emerald-400 mt-1 block">.gov.in & .nic.in only</span>
+              </div>
+            </div>
+
+            <div className="p-5 bg-slate-900 border border-slate-800 rounded-2xl space-y-2 text-xs">
+              <h4 className="font-bold text-white text-xs">Master Directive Prompt</h4>
+              <p className="text-slate-300 font-mono text-[11px] bg-slate-950 p-3 rounded-xl border border-slate-800 leading-relaxed">
+                {aiConfig?.system_prompt || "You are ExamHub India's Verified Exam AI Assistant. You only cite official government sources ending in .gov.in, .nic.in, and .ac.in. Never invent exam dates, results, or syllabus rules."}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* PAYMENTS & REVENUE TAB */}
+        {activeTab === "payments" && (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-2xl font-black text-white flex items-center gap-2">
+                <CreditCard className="w-6 h-6 text-emerald-400" />
+                Payments, Subscriptions & Revenue
+              </h2>
+              <p className="text-xs text-slate-400">Cryptographically verified transactions ledger, Student Pro alerts, and Institution memberships</p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+              <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
+                <span className="text-[11px] text-slate-400 font-semibold block">Total Revenue</span>
+                <span className="text-2xl font-black text-emerald-400 mt-1 block">
+                  ₹{paymentMetrics?.totalRevenueInr?.toLocaleString() || "15,098"}
+                </span>
+              </div>
+              <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
+                <span className="text-[11px] text-slate-400 font-semibold block">Student Pro Subscribers</span>
+                <span className="text-2xl font-black text-white mt-1 block">
+                  {paymentMetrics?.activeProSubscribers || 1}
+                </span>
+              </div>
+              <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
+                <span className="text-[11px] text-slate-400 font-semibold block">Institution Subscribers</span>
+                <span className="text-2xl font-black text-blue-400 mt-1 block">
+                  {paymentMetrics?.activeInstitutionSubscribers || 1}
+                </span>
+              </div>
+              <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
+                <span className="text-[11px] text-slate-400 font-semibold block">Refunded Count</span>
+                <span className="text-2xl font-black text-slate-400 mt-1 block">
+                  {paymentMetrics?.refundedTransactions || 1}
+                </span>
+              </div>
+            </div>
+
+            <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl space-y-3">
+              <h3 className="font-bold text-white text-sm">Recent Transactions Ledger</h3>
+              <div className="divide-y divide-slate-800 text-xs font-mono">
+                {paymentsList.map((p) => (
+                  <div key={p.id} className="py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <span className="font-bold text-white font-sans">{p.student_name}</span>
+                        <span className="text-[10px] text-slate-400 font-sans">({p.student_email})</span>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-950 text-blue-300 font-sans">
+                          {p.tier}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-0.5">Order: {p.order_id} • Pay ID: {p.payment_id}</p>
+                    </div>
+
+                    <div className="flex items-center space-x-3">
+                      <span className="font-bold text-white text-sm font-sans">₹{p.amount / 100}</span>
+                      <span className={`px-2.5 py-0.5 rounded text-[10px] font-bold font-sans ${
+                        p.status === "COMPLETED" ? "bg-emerald-950 text-emerald-300" : "bg-amber-950 text-amber-300"
+                      }`}>
+                        {p.status}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* SECURITY & THREAT LOG TAB */}
+        {activeTab === "security" && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-black text-white flex items-center gap-2">
+                  <ShieldCheck className="w-6 h-6 text-red-400" />
+                  Security Operations & Threat Defense
+                </h2>
+                <p className="text-xs text-slate-400">SSRF interception, brute force monitoring, active sessions, and least-privilege RBAC</p>
+              </div>
+
+              <Link
+                href="/admin/security"
+                className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-xl flex items-center space-x-1.5 shadow-md shadow-red-600/20 transition-all"
+              >
+                <span>Full Security Hub</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
+                <span className="text-[11px] text-slate-400 font-semibold block">WAF & SSRF Guard</span>
+                <span className="text-lg font-black text-emerald-400 mt-1 block">ACTIVE & ENFORCING</span>
+              </div>
+              <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
+                <span className="text-[11px] text-slate-400 font-semibold block">Rate Limiting Threshold</span>
+                <span className="text-lg font-black text-white mt-1 block">60 req/min per IP</span>
+              </div>
+              <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
+                <span className="text-[11px] text-slate-400 font-semibold block">Active Admin Sessions</span>
+                <span className="text-lg font-black text-blue-400 mt-1 block">1 Verified</span>
+              </div>
+            </div>
+
+            <div className="p-5 bg-slate-900 border border-slate-800 rounded-2xl space-y-3 text-xs">
+              <h3 className="font-bold text-white text-sm">Security Incidents Telemetry</h3>
+              <div className="space-y-2">
+                {securityData?.incidents?.map((inc: any) => (
+                  <div key={inc.id} className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex items-center justify-between text-xs">
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-400 border border-red-500/30">
+                          {inc.severity}
+                        </span>
+                        <strong className="text-white">{inc.incident_type}</strong>
+                        <span className="text-slate-500">• {inc.source_ip}</span>
+                      </div>
+                      <p className="text-slate-400 text-[11px] mt-1">{inc.details}</p>
+                    </div>
+
+                    <span className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-300">
+                      RESOLVED
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}

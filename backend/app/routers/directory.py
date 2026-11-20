@@ -68,9 +68,13 @@ class ReportUpdate(BaseModel):
 async def list_official_websites(
     search: Optional[str] = Query(None, description="Search keyword in name, code, domain, or related exams"),
     category_type: Optional[str] = Query(None, description="Filter by category type"),
+    organization_type: Optional[str] = Query(None, description="Filter by organization type (CENTRAL, STATE, UT)"),
     state_code: Optional[str] = Query(None, description="Filter by state code"),
+    state_id: Optional[int] = Query(None, description="Filter by state id"),
     is_featured: Optional[bool] = Query(None, description="Filter featured"),
-    limit: int = Query(100, ge=1, le=200),
+    is_verified_only: Optional[bool] = Query(None, description="Filter only verified websites"),
+    sort_by: Optional[str] = Query("default", description="Sort by popular, recent, or default"),
+    limit: int = Query(150, ge=1, le=300),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user_optional)
@@ -80,8 +84,15 @@ async def list_official_websites(
     if category_type and category_type.strip() and category_type != "ALL":
         query = query.where(OfficialWebsite.category_type == category_type.strip())
 
-    if state_code and state_code.strip():
-        # Join state
+    if organization_type and organization_type.strip() and organization_type != "ALL":
+        query = query.where(OfficialWebsite.organization_type == organization_type.strip())
+
+    if is_verified_only:
+        query = query.where(OfficialWebsite.verification_status == "VERIFIED")
+
+    if state_id:
+        query = query.where(OfficialWebsite.state_id == state_id)
+    elif state_code and state_code.strip():
         query = query.join(State, OfficialWebsite.state_id == State.id, isouter=True).where(State.code == state_code.strip().upper())
 
     if search and search.strip():
@@ -98,8 +109,15 @@ async def list_official_websites(
     if is_featured is not None:
         query = query.where(OfficialWebsite.is_featured == is_featured)
 
-    # Order featured first, then name
-    query = query.order_by(desc(OfficialWebsite.is_featured), OfficialWebsite.name.asc()).offset(offset).limit(limit)
+    # Ordering
+    if sort_by == "popular":
+        query = query.order_by(desc(OfficialWebsite.view_count), OfficialWebsite.name.asc())
+    elif sort_by == "recent":
+        query = query.order_by(desc(OfficialWebsite.last_verified_at), desc(OfficialWebsite.id))
+    else:
+        query = query.order_by(desc(OfficialWebsite.is_featured), OfficialWebsite.name.asc())
+
+    query = query.offset(offset).limit(limit)
 
     result = await db.execute(query)
     websites = result.scalars().all()
@@ -122,8 +140,10 @@ async def list_official_websites(
         out.append({
             "id": w.id,
             "name": w.name,
+            "slug": w.slug or (w.code or str(w.id)).lower().replace("_", "-"),
             "code": w.code,
             "category_type": w.category_type,
+            "organization_type": w.organization_type or "CENTRAL",
             "state": state_obj,
             "state_id": w.state_id,
             "official_url": w.official_url,
@@ -146,13 +166,27 @@ async def list_official_websites(
     return {"total": len(out), "websites": out}
 
 
-@router.get("/websites/{website_id}")
+@router.get("/websites/{identifier}")
 async def get_official_website(
-    website_id: int,
+    identifier: str,
     db: AsyncSession = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user_optional)
 ):
-    website = await db.get(OfficialWebsite, website_id)
+    website = None
+    if identifier.isdigit():
+        website = await db.get(OfficialWebsite, int(identifier))
+    if not website:
+        # Lookup by slug or code
+        res = await db.execute(
+            select(OfficialWebsite).where(
+                or_(
+                    OfficialWebsite.slug == identifier.lower(),
+                    OfficialWebsite.code == identifier.upper()
+                )
+            )
+        )
+        website = res.scalars().first()
+
     if not website or not website.is_active:
         raise HTTPException(status_code=404, detail="Official website not found")
 
@@ -179,8 +213,10 @@ async def get_official_website(
     return {
         "id": website.id,
         "name": website.name,
+        "slug": website.slug or (website.code or str(website.id)).lower().replace("_", "-"),
         "code": website.code,
         "category_type": website.category_type,
+        "organization_type": website.organization_type or "CENTRAL",
         "state": state_obj,
         "state_id": website.state_id,
         "official_url": website.official_url,

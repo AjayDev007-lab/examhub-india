@@ -6,9 +6,12 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search")?.toLowerCase().trim();
     const categoryType = searchParams.get("category_type")?.trim();
+    const orgType = searchParams.get("organization_type")?.trim();
     const stateIdStr = searchParams.get("state_id");
     const stateCode = searchParams.get("state_code")?.toUpperCase().trim();
     const isFeaturedStr = searchParams.get("is_featured");
+    const isVerifiedOnly = searchParams.get("is_verified_only") === "true";
+    const sortBy = searchParams.get("sort_by") || "default";
 
     // Check for student auth header or cookie to populate is_saved
     const authHeader = request.headers.get("authorization") || "";
@@ -44,6 +47,14 @@ export async function GET(request: NextRequest) {
       websites = websites.filter((w) => w.category_type === categoryType);
     }
 
+    if (orgType && orgType !== "ALL") {
+      websites = websites.filter((w: any) => (w.organization_type || "CENTRAL") === orgType);
+    }
+
+    if (isVerifiedOnly) {
+      websites = websites.filter((w) => w.verification_status === "VERIFIED");
+    }
+
     if (targetStateId !== null) {
       websites = websites.filter((w) => w.state_id === targetStateId);
     }
@@ -63,12 +74,18 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Sort: featured first, then name
-    websites.sort((a, b) => {
-      if (a.is_featured && !b.is_featured) return -1;
-      if (!a.is_featured && b.is_featured) return 1;
-      return a.name.localeCompare(b.name);
-    });
+    // Sort: popular, recent, or default
+    if (sortBy === "popular") {
+      websites.sort((a, b) => (b.view_count || 0) - (a.view_count || 0));
+    } else if (sortBy === "recent") {
+      websites.sort((a, b) => new Date(b.last_verified_at || 0).getTime() - new Date(a.last_verified_at || 0).getTime());
+    } else {
+      websites.sort((a, b) => {
+        if (a.is_featured && !b.is_featured) return -1;
+        if (!a.is_featured && b.is_featured) return 1;
+        return a.name.localeCompare(b.name);
+      });
+    }
 
     const enriched = websites.map((w) => {
       const stateObj = w.state_id ? stateMap.get(w.state_id) : null;
