@@ -5,12 +5,14 @@ import Link from "next/link";
 import { 
   ShieldCheck, LayoutDashboard, Users, Building2, BookOpen, 
   Activity, Bell, HelpCircle, FileText, Settings, Plus, CheckCircle2, 
-  AlertCircle, RefreshCw, LogOut, Search, ExternalLink, Save
+  AlertCircle, RefreshCw, LogOut, Search, ExternalLink, Save,
+  Check, X, Lock, Key, Wifi, WifiOff, Clock, Trash2, Edit3, Eye,
+  History, Globe, Server, CheckCircle, AlertTriangle, ChevronRight
 } from "lucide-react";
 import { fetchApi } from "@/lib/api";
 
 export default function AdminDashboardPage() {
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState("institutions");
   const [adminUser, setAdminUser] = useState<any>(null);
   const [stats, setStats] = useState<any>(null);
   
@@ -18,18 +20,52 @@ export default function AdminDashboardPage() {
   const [students, setStudents] = useState<any[]>([]);
   const [organizations, setOrganizations] = useState<any[]>([]);
   const [examinations, setExaminations] = useState<any[]>([]);
-  const [integrations, setIntegrations] = useState<any[]>([]);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [tickets, setTickets] = useState<any[]>([]);
   const [systemSettings, setSystemSettings] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [states, setStates] = useState<any[]>([]);
 
-  // Create organization state
-  const [newOrgName, setNewOrgName] = useState("");
-  const [newOrgCode, setNewOrgCode] = useState("");
-  const [newOrgWebsite, setNewOrgWebsite] = useState("");
-  const [newOrgResultUrl, setNewOrgResultUrl] = useState("");
-  const [newOrgHallTicketUrl, setNewOrgHallTicketUrl] = useState("");
-  const [orgSuccess, setOrgSuccess] = useState(false);
+  // Institution Integration Filter States
+  const [instSearch, setInstSearch] = useState("");
+  const [instCategoryFilter, setInstCategoryFilter] = useState("");
+  const [instApprovalFilter, setInstApprovalFilter] = useState("");
+  const [instHealthFilter, setInstHealthFilter] = useState("");
+
+  // Testing & Action States
+  const [testingId, setTestingId] = useState<number | null>(null);
+  const [testResult, setTestResult] = useState<{ orgId: number; success: boolean; message: string; latency_ms: number; status_code: number } | null>(null);
+
+  // Modals
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingOrg, setEditingOrg] = useState<any | null>(null);
+  const [isLogsModalOpen, setIsLogsModalOpen] = useState(false);
+  const [viewingLogsOrg, setViewingLogsOrg] = useState<any | null>(null);
+  const [institutionLogs, setInstitutionLogs] = useState<any[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+
+  // Institution Modal Form State
+  const [formName, setFormName] = useState("");
+  const [formCode, setFormCode] = useState("");
+  const [formCategoryId, setFormCategoryId] = useState<number>(1);
+  const [formStateId, setFormStateId] = useState<string>("");
+  const [formWebsite, setFormWebsite] = useState("");
+  const [formResultUrl, setFormResultUrl] = useState("");
+  const [formHallTicketUrl, setFormHallTicketUrl] = useState("");
+  const [formIdCardUrl, setFormIdCardUrl] = useState("");
+  const [formSupportsResults, setFormSupportsResults] = useState(true);
+  const [formResultsMode, setFormResultsMode] = useState("OFFICIAL_REDIRECT");
+  const [formSupportsHallTickets, setFormSupportsHallTickets] = useState(true);
+  const [formHallTicketsMode, setFormHallTicketsMode] = useState("OFFICIAL_REDIRECT");
+  const [formSupportsIdCards, setFormSupportsIdCards] = useState(true);
+  const [formIdCardsMode, setFormIdCardsMode] = useState("INSTITUTION_INTEGRATION");
+  const [formApprovalStatus, setFormApprovalStatus] = useState("APPROVED");
+  const [formApiEndpoint, setFormApiEndpoint] = useState("");
+  const [formAuthMethod, setFormAuthMethod] = useState("NONE");
+  const [formApiCredentials, setFormApiCredentials] = useState("");
+  const [formMaskedCreds, setFormMaskedCreds] = useState<string | null>(null);
+  const [formError, setFormError] = useState("");
+  const [formSubmitting, setFormSubmitting] = useState(false);
 
   // Create exam state
   const [newExamName, setNewExamName] = useState("");
@@ -61,24 +97,29 @@ export default function AdminDashboardPage() {
   async function loadAdminData() {
     setLoading(true);
     try {
-      const [dashStats, orgs, exams, integs, stds, logs, tcks, sttings] = await Promise.all([
+      const [dashStats, orgs, exams, stds, logs, tcks, sttings, cats, sts] = await Promise.all([
         fetchApi("/api/admin/dashboard").catch(() => null),
-        fetchApi("/api/organizations").catch(() => []),
+        fetchApi("/api/admin/institutions").catch(() => []),
         fetchApi("/api/exams?limit=50").catch(() => []),
-        fetchApi("/api/admin/integrations").catch(() => []),
         fetchApi("/api/admin/users").catch(() => []),
         fetchApi("/api/admin/audit-logs").catch(() => []),
         fetchApi("/api/admin/support-tickets").catch(() => []),
         fetchApi("/api/admin/settings").catch(() => []),
+        fetchApi("/api/categories").catch(() => []),
+        fetchApi("/api/states").catch(() => []),
       ]);
       setStats(dashStats);
       setOrganizations(orgs || []);
       setExaminations(exams || []);
-      setIntegrations(integs || []);
       setStudents(stds || []);
       setAuditLogs(logs || []);
       setTickets(tcks || []);
       setSystemSettings(sttings || []);
+      setCategories(cats || []);
+      setStates(sts || []);
+      if (cats && cats.length > 0) {
+        setFormCategoryId(cats[0].id);
+      }
     } catch (err) {
       console.error("Admin dashboard fetch error:", err);
     } finally {
@@ -92,35 +133,200 @@ export default function AdminDashboardPage() {
     window.location.href = "/admin/login";
   };
 
-  const handleCreateOrg = async (e: React.FormEvent) => {
+  // Open Modal for Create
+  const handleOpenCreateModal = () => {
+    setEditingOrg(null);
+    setFormName("");
+    setFormCode("");
+    setFormCategoryId(categories[0]?.id || 1);
+    setFormStateId("");
+    setFormWebsite("");
+    setFormResultUrl("");
+    setFormHallTicketUrl("");
+    setFormIdCardUrl("");
+    setFormSupportsResults(true);
+    setFormResultsMode("OFFICIAL_REDIRECT");
+    setFormSupportsHallTickets(true);
+    setFormHallTicketsMode("OFFICIAL_REDIRECT");
+    setFormSupportsIdCards(true);
+    setFormIdCardsMode("INSTITUTION_INTEGRATION");
+    setFormApprovalStatus("APPROVED");
+    setFormApiEndpoint("");
+    setFormAuthMethod("NONE");
+    setFormApiCredentials("");
+    setFormMaskedCreds(null);
+    setFormError("");
+    setIsModalOpen(true);
+  };
+
+  // Open Modal for Edit
+  const handleOpenEditModal = (org: any) => {
+    setEditingOrg(org);
+    setFormName(org.name);
+    setFormCode(org.code);
+    setFormCategoryId(org.category_id);
+    setFormStateId(org.state_id?.toString() || "");
+    setFormWebsite(org.official_website);
+    setFormResultUrl(org.result_portal_url || "");
+    setFormHallTicketUrl(org.hall_ticket_portal_url || "");
+    setFormIdCardUrl(org.id_card_portal_url || "");
+    setFormSupportsResults(org.supports_results ?? true);
+    setFormResultsMode(org.results_retrieval_mode || "OFFICIAL_REDIRECT");
+    setFormSupportsHallTickets(org.supports_hall_tickets ?? true);
+    setFormHallTicketsMode(org.hall_tickets_retrieval_mode || "OFFICIAL_REDIRECT");
+    setFormSupportsIdCards(org.supports_id_cards ?? true);
+    setFormIdCardsMode(org.id_cards_retrieval_mode || "INSTITUTION_INTEGRATION");
+    setFormApprovalStatus(org.approval_status || "APPROVED");
+    setFormApiEndpoint(org.api_endpoint_url || "");
+    setFormAuthMethod(org.auth_method || "NONE");
+    setFormApiCredentials("");
+    setFormMaskedCreds(org.masked_credentials || null);
+    setFormError("");
+    setIsModalOpen(true);
+  };
+
+  // Save Institution (Create or Edit)
+  const handleSaveInstitution = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError("");
+    setFormSubmitting(true);
+
     try {
-      const res = await fetchApi("/api/admin/organizations", {
-        method: "POST",
-        body: JSON.stringify({
-          name: newOrgName.trim(),
-          code: newOrgCode.trim().toUpperCase(),
-          category_id: 1, // Central Govt default
-          official_website: newOrgWebsite.trim(),
-          result_portal_url: newOrgResultUrl.trim() || undefined,
-          hall_ticket_portal_url: newOrgHallTicketUrl.trim() || undefined,
-          integration_methods: ["OFFICIAL_REDIRECT"],
-          verification_status: "VERIFIED"
-        })
-      });
-      setOrganizations([res, ...organizations]);
-      setNewOrgName("");
-      setNewOrgCode("");
-      setNewOrgWebsite("");
-      setNewOrgResultUrl("");
-      setNewOrgHallTicketUrl("");
-      setOrgSuccess(true);
-      setTimeout(() => setOrgSuccess(false), 4000);
+      const payload: any = {
+        name: formName.trim(),
+        code: formCode.trim().toUpperCase(),
+        category_id: Number(formCategoryId),
+        state_id: formStateId ? Number(formStateId) : null,
+        official_website: formWebsite.trim(),
+        result_portal_url: formResultUrl.trim() || undefined,
+        hall_ticket_portal_url: formHallTicketUrl.trim() || undefined,
+        id_card_portal_url: formIdCardUrl.trim() || undefined,
+        supports_results: formSupportsResults,
+        supports_hall_tickets: formSupportsHallTickets,
+        supports_id_cards: formSupportsIdCards,
+        results_retrieval_mode: formResultsMode,
+        hall_tickets_retrieval_mode: formHallTicketsMode,
+        id_cards_retrieval_mode: formIdCardsMode,
+        approval_status: formApprovalStatus,
+        api_endpoint_url: formApiEndpoint.trim() || undefined,
+        auth_method: formAuthMethod,
+      };
+
+      if (formApiCredentials.trim()) {
+        payload.api_credentials = formApiCredentials.trim();
+      }
+
+      if (editingOrg) {
+        const updated = await fetchApi(`/api/admin/institutions/${editingOrg.id}`, {
+          method: "PUT",
+          body: JSON.stringify(payload)
+        });
+        setOrganizations(organizations.map(o => o.id === editingOrg.id ? updated : o));
+      } else {
+        const created = await fetchApi("/api/admin/institutions", {
+          method: "POST",
+          body: JSON.stringify(payload)
+        });
+        setOrganizations([created, ...organizations]);
+      }
+      setIsModalOpen(false);
     } catch (err: any) {
-      alert(err.message || "Failed to create organization");
+      setFormError(err.message || "Failed to save institution");
+    } finally {
+      setFormSubmitting(false);
     }
   };
 
+  // Live Test Connectivity
+  const handleTestConnection = async (org: any) => {
+    setTestingId(org.id);
+    setTestResult(null);
+    try {
+      const res = await fetchApi(`/api/admin/institutions/${org.id}/test-connection`, {
+        method: "POST",
+        body: JSON.stringify({ use_api_endpoint: Boolean(org.api_endpoint_url) })
+      });
+      setTestResult({
+        orgId: org.id,
+        success: res.success,
+        message: res.message,
+        latency_ms: res.latency_ms,
+        status_code: res.status_code
+      });
+      // Update local state
+      setOrganizations(organizations.map(o => o.id === org.id ? {
+        ...o,
+        health_status: res.health_status,
+        last_latency_ms: res.latency_ms,
+        last_tested_at: res.tested_at
+      } : o));
+    } catch (err: any) {
+      setTestResult({
+        orgId: org.id,
+        success: false,
+        message: err.message || "Connection probe failed",
+        latency_ms: 0,
+        status_code: 500
+      });
+    } finally {
+      setTestingId(null);
+    }
+  };
+
+  // Update Approval Status
+  const handleUpdateApproval = async (orgId: number, newStatus: string) => {
+    try {
+      const res = await fetchApi(`/api/admin/institutions/${orgId}/approval`, {
+        method: "PUT",
+        body: JSON.stringify({ approval_status: newStatus })
+      });
+      setOrganizations(organizations.map(o => o.id === orgId ? res : o));
+    } catch (err: any) {
+      alert(err.message || "Failed to update approval status");
+    }
+  };
+
+  // Toggle Active/Inactive
+  const handleToggleActive = async (orgId: number) => {
+    try {
+      const res = await fetchApi(`/api/admin/institutions/${orgId}/toggle-active`, {
+        method: "PUT"
+      });
+      setOrganizations(organizations.map(o => o.id === orgId ? res : o));
+    } catch (err: any) {
+      alert(err.message || "Failed to toggle active state");
+    }
+  };
+
+  // Soft Delete Institution
+  const handleDeleteInstitution = async (org: any) => {
+    if (!window.confirm(`Are you sure you want to deactivate and remove institution "${org.name}" (${org.code})?`)) {
+      return;
+    }
+    try {
+      await fetchApi(`/api/admin/institutions/${org.id}`, { method: "DELETE" });
+      setOrganizations(organizations.filter(o => o.id !== org.id));
+    } catch (err: any) {
+      alert(err.message || "Failed to delete institution");
+    }
+  };
+
+  // View Connectivity Logs
+  const handleOpenLogs = async (org: any) => {
+    setViewingLogsOrg(org);
+    setIsLogsModalOpen(true);
+    setLogsLoading(true);
+    try {
+      const logs = await fetchApi(`/api/admin/institutions/${org.id}/logs`);
+      setInstitutionLogs(logs || []);
+    } catch (err: any) {
+      setInstitutionLogs([]);
+    } finally {
+      setLogsLoading(false);
+    }
+  };
+
+  // Create Exam
   const handleCreateExam = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -150,7 +356,7 @@ export default function AdminDashboardPage() {
       const res = await fetchApi(`/api/admin/users/${userId}/toggle-status`, { method: "PUT" });
       setStudents(students.map(s => s.id === userId ? { ...s, is_active: res.is_active } : s));
     } catch (err: any) {
-      alert(err.message || "Failed to toggle status");
+      alert(err.message || "Failed to toggle student account");
     }
   };
 
@@ -169,12 +375,34 @@ export default function AdminDashboardPage() {
     }
   };
 
+  // Filtered institutions
+  const filteredInstitutions = organizations.filter(org => {
+    if (instSearch.trim()) {
+      const q = instSearch.toLowerCase();
+      const matchName = org.name?.toLowerCase().includes(q);
+      const matchCode = org.code?.toLowerCase().includes(q);
+      if (!matchName && !matchCode) return false;
+    }
+    if (instCategoryFilter && org.category_id?.toString() !== instCategoryFilter) {
+      return false;
+    }
+    if (instApprovalFilter && org.approval_status !== instApprovalFilter) {
+      return false;
+    }
+    if (instHealthFilter && org.health_status !== instHealthFilter) {
+      return false;
+    }
+    return true;
+  });
+
+  const pendingApprovalsCount = organizations.filter(o => o.approval_status === "PENDING_APPROVAL").length;
+  const healthyCount = organizations.filter(o => o.health_status === "HEALTHY").length;
+
   const tabs = [
+    { id: "institutions", label: "Institution Integrations", icon: Building2, count: pendingApprovalsCount > 0 ? pendingApprovalsCount : organizations.length },
     { id: "overview", label: "Overview", icon: LayoutDashboard },
-    { id: "students", label: "Students", icon: Users, count: students.length },
-    { id: "organizations", label: "Organizations", icon: Building2, count: organizations.length },
     { id: "exams", label: "Examinations", icon: BookOpen, count: examinations.length },
-    { id: "integrations", label: "Portal Health", icon: Activity, count: integrations.length },
+    { id: "students", label: "Students", icon: Users, count: students.length },
     { id: "tickets", label: "Support Tickets", icon: HelpCircle, count: tickets.filter(t => t.status === "OPEN").length },
     { id: "audit", label: "Audit Logs", icon: FileText },
     { id: "settings", label: "Settings", icon: Settings },
@@ -186,7 +414,7 @@ export default function AdminDashboardPage() {
       <aside className="w-full md:w-64 bg-slate-900 border-r border-slate-800 p-4 flex flex-col justify-between shrink-0">
         <div className="space-y-6">
           <div className="flex items-center space-x-3 px-2">
-            <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold">
+            <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold shadow-lg shadow-blue-500/20">
               <ShieldCheck className="w-5 h-5" />
             </div>
             <div>
@@ -205,7 +433,7 @@ export default function AdminDashboardPage() {
                   onClick={() => setActiveTab(tab.id)}
                   className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all ${
                     isActive
-                      ? "bg-blue-600 text-white font-bold"
+                      ? "bg-blue-600 text-white font-bold shadow-md shadow-blue-600/30"
                       : "text-slate-400 hover:text-white hover:bg-slate-800"
                   }`}
                 >
@@ -214,7 +442,11 @@ export default function AdminDashboardPage() {
                     <span>{tab.label}</span>
                   </div>
                   {tab.count !== undefined && tab.count > 0 && (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] bg-slate-800 text-slate-300">
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] ${
+                      tab.id === "institutions" && pendingApprovalsCount > 0 
+                        ? "bg-amber-500 text-slate-950 font-bold" 
+                        : "bg-slate-800 text-slate-300"
+                    }`}>
                       {tab.count}
                     </span>
                   )}
@@ -226,15 +458,16 @@ export default function AdminDashboardPage() {
 
         <div className="pt-4 border-t border-slate-800 space-y-2">
           <Link
-            href="/"
-            className="flex items-center space-x-2 text-xs text-slate-400 hover:text-white px-2 py-1.5"
+            href="/directory"
+            target="_blank"
+            className="flex items-center space-x-2 text-xs text-slate-400 hover:text-white px-2 py-1.5 transition-colors"
           >
             <ExternalLink className="w-3.5 h-3.5" />
-            <span>Open Public Portal</span>
+            <span>Public Institution Directory</span>
           </Link>
           <button
             onClick={handleAdminLogout}
-            className="w-full flex items-center space-x-2 text-xs text-red-400 hover:text-red-300 px-2 py-1.5"
+            className="w-full flex items-center space-x-2 text-xs text-red-400 hover:text-red-300 px-2 py-1.5 transition-colors"
           >
             <LogOut className="w-3.5 h-3.5" />
             <span>Sign Out</span>
@@ -243,7 +476,339 @@ export default function AdminDashboardPage() {
       </aside>
 
       {/* Main Admin Content */}
-      <main className="flex-1 p-6 sm:p-8 max-w-6xl overflow-y-auto">
+      <main className="flex-1 p-6 sm:p-8 max-w-7xl overflow-y-auto">
+
+        {/* INSTITUTION INTEGRATION MANAGEMENT TAB */}
+        {activeTab === "institutions" && (
+          <div className="space-y-6">
+            {/* Header with Title and Add Button */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <div className="inline-flex items-center space-x-2 px-2.5 py-0.5 rounded-full bg-blue-900/60 border border-blue-700/60 text-blue-300 text-[11px] font-bold uppercase mb-1">
+                  <Activity className="w-3 h-3 text-blue-400" />
+                  <span>Integration Engine</span>
+                </div>
+                <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                  Institution Integration Management
+                </h1>
+                <p className="text-xs text-slate-400 mt-1 max-w-2xl">
+                  Configure government boards, universities, and recruitment agencies. Manage authorized API endpoints, encrypted credentials, connectivity health checks, and public service transparency.
+                </p>
+              </div>
+
+              <button
+                onClick={handleOpenCreateModal}
+                className="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-lg shadow-blue-600/30 transition-all shrink-0"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Register Institution</span>
+              </button>
+            </div>
+
+            {/* Metrics cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+              <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
+                <span className="text-slate-400 font-semibold block text-[11px]">Total Configured</span>
+                <span className="text-2xl font-black text-white mt-1 block">{organizations.length}</span>
+                <span className="text-[10px] text-slate-500">Government & Academic</span>
+              </div>
+              <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
+                <span className="text-slate-400 font-semibold block text-[11px]">Healthy & Online</span>
+                <span className="text-2xl font-black text-emerald-400 mt-1 block">{healthyCount}</span>
+                <span className="text-[10px] text-slate-500">Verified responding endpoints</span>
+              </div>
+              <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
+                <span className="text-slate-400 font-semibold block text-[11px]">Pending Approvals</span>
+                <span className="text-2xl font-black text-amber-400 mt-1 block">{pendingApprovalsCount}</span>
+                <span className="text-[10px] text-slate-500">Awaiting admin review</span>
+              </div>
+              <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
+                <span className="text-slate-400 font-semibold block text-[11px]">Secured Credentials</span>
+                <span className="text-2xl font-black text-blue-400 mt-1 block">
+                  {organizations.filter(o => o.has_api_credentials).length}
+                </span>
+                <span className="text-[10px] text-slate-500">AES-256 Fernet encrypted</span>
+              </div>
+            </div>
+
+            {/* Live Test Feedback Banner */}
+            {testResult && (
+              <div className={`p-4 rounded-xl border text-xs flex items-center justify-between transition-all ${
+                testResult.success
+                  ? "bg-emerald-950/80 border-emerald-800 text-emerald-200"
+                  : "bg-red-950/80 border-red-800 text-red-200"
+              }`}>
+                <div className="flex items-center space-x-2.5">
+                  {testResult.success ? <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" /> : <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />}
+                  <div>
+                    <span className="font-bold">{testResult.success ? "Connectivity Verified" : "Connectivity Issue"}: </span>
+                    <span>{testResult.message}</span>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-3 text-[11px] font-mono">
+                  <span>HTTP {testResult.status_code}</span>
+                  <span className="px-2 py-0.5 rounded bg-black/40 font-bold">{testResult.latency_ms} ms</span>
+                  <button onClick={() => setTestResult(null)} className="text-slate-400 hover:text-white">✕</button>
+                </div>
+              </div>
+            )}
+
+            {/* Filter and Search Bar */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-500" />
+                <input
+                  type="text"
+                  value={instSearch}
+                  onChange={(e) => setInstSearch(e.target.value)}
+                  placeholder="Search institution name or code..."
+                  className="w-full pl-8 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <select
+                  value={instCategoryFilter}
+                  onChange={(e) => setInstCategoryFilter(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All Institutional Categories</option>
+                  {categories.map(c => (
+                    <option key={c.id} value={c.id.toString()}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <select
+                  value={instApprovalFilter}
+                  onChange={(e) => setInstApprovalFilter(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All Approval Statuses</option>
+                  <option value="APPROVED">Approved & Published</option>
+                  <option value="PENDING_APPROVAL">Pending Review</option>
+                  <option value="REJECTED">Rejected</option>
+                </select>
+              </div>
+
+              <div>
+                <select
+                  value={instHealthFilter}
+                  onChange={(e) => setInstHealthFilter(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All Health States</option>
+                  <option value="HEALTHY">Healthy (Online)</option>
+                  <option value="DEGRADED">Degraded / Slow</option>
+                  <option value="UNREACHABLE">Unreachable</option>
+                  <option value="UNTESTED">Untested</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Institutions Table */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-800/80 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-700">
+                    <tr>
+                      <th className="py-3 px-4">Institution / Code</th>
+                      <th className="py-3 px-4">Supported Services & Modes</th>
+                      <th className="py-3 px-4">Approval</th>
+                      <th className="py-3 px-4">Endpoint Health</th>
+                      <th className="py-3 px-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800 text-slate-300">
+                    {filteredInstitutions.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-12 text-center text-slate-500">
+                          No institutions match your search or filter criteria.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredInstitutions.map((org) => {
+                        const isTesting = testingId === org.id;
+                        return (
+                          <tr key={org.id} className="hover:bg-slate-800/40 transition-colors">
+                            {/* Name & Code */}
+                            <td className="py-3.5 px-4">
+                              <div className="font-bold text-white text-sm flex items-center space-x-2">
+                                <span>{org.name}</span>
+                                <span className="px-1.5 py-0.5 rounded text-[10px] bg-slate-800 text-blue-400 font-mono">
+                                  {org.code}
+                                </span>
+                              </div>
+                              <div className="text-[11px] text-slate-400 mt-0.5 flex items-center space-x-2">
+                                <a 
+                                  href={org.official_website} 
+                                  target="_blank" 
+                                  rel="noreferrer"
+                                  className="hover:text-blue-400 flex items-center space-x-1"
+                                >
+                                  <span>{org.official_website}</span>
+                                  <ExternalLink className="w-2.5 h-2.5" />
+                                </a>
+                                {org.has_api_credentials && (
+                                  <span className="inline-flex items-center space-x-1 text-[10px] text-blue-400 bg-blue-950/80 px-1.5 py-0.2 rounded border border-blue-900">
+                                    <Lock className="w-2.5 h-2.5" />
+                                    <span>Encrypted Auth</span>
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* Supported Services & Modes */}
+                            <td className="py-3.5 px-4 space-y-1">
+                              <div className="flex flex-wrap gap-1 text-[10px]">
+                                {org.supports_results && (
+                                  <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                                    📊 Results: <strong className="text-blue-400">{org.results_retrieval_mode?.replace(/_/g, " ")}</strong>
+                                  </span>
+                                )}
+                                {org.supports_hall_tickets && (
+                                  <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                                    🎫 Admit: <strong className="text-indigo-400">{org.hall_tickets_retrieval_mode?.replace(/_/g, " ")}</strong>
+                                  </span>
+                                )}
+                                {org.supports_id_cards && (
+                                  <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                                    🪪 ID: <strong className="text-amber-400">{org.id_cards_retrieval_mode?.replace(/_/g, " ")}</strong>
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* Approval Status */}
+                            <td className="py-3.5 px-4">
+                              <div className="space-y-1">
+                                <span className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  org.approval_status === "APPROVED"
+                                    ? "bg-emerald-950 text-emerald-300 border border-emerald-800"
+                                    : org.approval_status === "PENDING_APPROVAL"
+                                    ? "bg-amber-950 text-amber-300 border border-amber-800 animate-pulse"
+                                    : "bg-red-950 text-red-300 border border-red-800"
+                                }`}>
+                                  {org.approval_status === "APPROVED" && <Check className="w-2.5 h-2.5" />}
+                                  {org.approval_status === "PENDING_APPROVAL" && <Clock className="w-2.5 h-2.5" />}
+                                  {org.approval_status === "REJECTED" && <X className="w-2.5 h-2.5" />}
+                                  <span>{org.approval_status?.replace(/_/g, " ")}</span>
+                                </span>
+
+                                <div className="flex space-x-1 text-[10px]">
+                                  {org.approval_status !== "APPROVED" && (
+                                    <button
+                                      onClick={() => handleUpdateApproval(org.id, "APPROVED")}
+                                      className="text-emerald-400 hover:underline"
+                                    >
+                                      Approve
+                                    </button>
+                                  )}
+                                  {org.approval_status !== "REJECTED" && (
+                                    <button
+                                      onClick={() => handleUpdateApproval(org.id, "REJECTED")}
+                                      className="text-red-400 hover:underline"
+                                    >
+                                      Reject
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+
+                            {/* Health & Latency */}
+                            <td className="py-3.5 px-4">
+                              <div className="space-y-1">
+                                <span className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  org.health_status === "HEALTHY"
+                                    ? "bg-emerald-950 text-emerald-300 border border-emerald-800"
+                                    : org.health_status === "DEGRADED"
+                                    ? "bg-amber-950 text-amber-300 border border-amber-800"
+                                    : org.health_status === "UNREACHABLE"
+                                    ? "bg-red-950 text-red-300 border border-red-800"
+                                    : "bg-slate-800 text-slate-400 border border-slate-700"
+                                }`}>
+                                  {org.health_status === "HEALTHY" ? <Wifi className="w-2.5 h-2.5" /> : <WifiOff className="w-2.5 h-2.5" />}
+                                  <span>{org.health_status}</span>
+                                  {org.last_latency_ms > 0 && (
+                                    <span className="font-mono ml-1 text-slate-300">• {org.last_latency_ms}ms</span>
+                                  )}
+                                </span>
+
+                                {org.last_tested_at && (
+                                  <p className="text-[10px] text-slate-500">
+                                    Tested {new Date(org.last_tested_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  </p>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* Actions */}
+                            <td className="py-3.5 px-4 text-right">
+                              <div className="inline-flex items-center space-x-1.5">
+                                {/* Test Connectivity Button */}
+                                <button
+                                  onClick={() => handleTestConnection(org)}
+                                  disabled={isTesting}
+                                  title="Test Connectivity & Measure Latency"
+                                  className="p-1.5 rounded-lg bg-blue-950/80 hover:bg-blue-900 text-blue-300 border border-blue-800 transition-colors disabled:opacity-50"
+                                >
+                                  <RefreshCw className={`w-3.5 h-3.5 ${isTesting ? "animate-spin text-blue-400" : ""}`} />
+                                </button>
+
+                                {/* Edit Button */}
+                                <button
+                                  onClick={() => handleOpenEditModal(org)}
+                                  title="Edit Configuration"
+                                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                </button>
+
+                                {/* Logs Button */}
+                                <button
+                                  onClick={() => handleOpenLogs(org)}
+                                  title="View Connection & Sync History Logs"
+                                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+                                >
+                                  <History className="w-3.5 h-3.5" />
+                                </button>
+
+                                {/* Toggle Active */}
+                                <button
+                                  onClick={() => handleToggleActive(org.id)}
+                                  title={org.is_active ? "Deactivate Institution" : "Activate Institution"}
+                                  className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-colors ${
+                                    org.is_active
+                                      ? "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                                      : "bg-red-950 text-red-300 hover:bg-red-900"
+                                  }`}
+                                >
+                                  {org.is_active ? "Active" : "Inactive"}
+                                </button>
+
+                                {/* Delete */}
+                                <button
+                                  onClick={() => handleDeleteInstitution(org)}
+                                  title="Delete Institution"
+                                  className="p-1.5 rounded-lg bg-red-950/60 hover:bg-red-900 text-red-400 transition-colors"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* OVERVIEW TAB */}
         {activeTab === "overview" && (
           <div className="space-y-6">
@@ -260,19 +825,19 @@ export default function AdminDashboardPage() {
               </div>
               <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
                 <span className="text-[11px] text-slate-400 font-semibold block">Examinations</span>
-                <span className="text-2xl font-black text-blue-400 mt-1 block">{stats?.total_examinations || examinations.length}</span>
+                <span className="text-2xl font-black text-white mt-1 block">{stats?.total_examinations || examinations.length}</span>
               </div>
               <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
-                <span className="text-[11px] text-slate-400 font-semibold block">Indexed Results</span>
-                <span className="text-2xl font-black text-emerald-400 mt-1 block">{stats?.total_results_indexed || 3}</span>
+                <span className="text-[11px] text-slate-400 font-semibold block">Results Indexed</span>
+                <span className="text-2xl font-black text-white mt-1 block">{stats?.total_results_indexed || "1,240+"}</span>
               </div>
               <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
-                <span className="text-[11px] text-slate-400 font-semibold block">Students</span>
-                <span className="text-2xl font-black text-purple-400 mt-1 block">{stats?.total_students_registered || students.length}</span>
+                <span className="text-[11px] text-slate-400 font-semibold block">Registered Students</span>
+                <span className="text-2xl font-black text-white mt-1 block">{stats?.total_students_registered || students.length}</span>
               </div>
               <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
-                <span className="text-[11px] text-slate-400 font-semibold block">Active Adapters</span>
-                <span className="text-2xl font-black text-emerald-400 mt-1 block">{integrations.length}</span>
+                <span className="text-[11px] text-slate-400 font-semibold block">Active Integrations</span>
+                <span className="text-2xl font-black text-emerald-400 mt-1 block">{healthyCount}</span>
               </div>
               <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
                 <span className="text-[11px] text-slate-400 font-semibold block">Open Tickets</span>
@@ -280,131 +845,21 @@ export default function AdminDashboardPage() {
               </div>
             </div>
 
-            {/* Integration Status Table */}
-            <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="font-bold text-white text-sm">Active Examination Portal Adapters</h3>
-                <span className="text-xs text-emerald-400 flex items-center space-x-1">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>All Registered Adapters Online</span>
-                </span>
-              </div>
-
-              <div className="divide-y divide-slate-800 text-xs">
-                {integrations.map((adapter) => (
-                  <div key={adapter.code} className="py-2.5 flex items-center justify-between">
-                    <div>
-                      <span className="font-bold text-white">{adapter.organization_name}</span>
-                      <span className="text-slate-400 ml-2">({adapter.code} - {adapter.adapter_name})</span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <span className="text-slate-400">{adapter.latency_ms}ms latency</span>
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">
-                        {adapter.status}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ORGANIZATIONS TAB (Admins can add organizations without touching code) */}
-        {activeTab === "organizations" && (
-          <div className="space-y-6">
-            <div className="flex justify-between items-center">
+            {/* Quick action card */}
+            <div className="p-6 bg-gradient-to-r from-blue-900/40 to-slate-900 border border-blue-800/60 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h2 className="text-2xl font-black text-white">Organization Management</h2>
-                <p className="text-xs text-slate-400">Add and manage examination organizations across all Indian states</p>
+                <h3 className="font-bold text-white text-base">Advanced Institution Integration Hub</h3>
+                <p className="text-xs text-slate-300 mt-1 max-w-xl">
+                  Connect new examination authorities, verify API endpoints, manage credentials securely with AES-256 Fernet, and review pending approval queues.
+                </p>
               </div>
-            </div>
-
-            {/* Add new Organization Form */}
-            <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl space-y-4">
-              <h3 className="font-bold text-white text-sm flex items-center space-x-2">
-                <Plus className="w-4 h-4 text-blue-400" />
-                <span>Add New Examination Organization</span>
-              </h3>
-
-              {orgSuccess && (
-                <div className="p-3 bg-emerald-950 border border-emerald-800 text-emerald-300 text-xs rounded-xl flex items-center space-x-2">
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Organization registered successfully and immediately live in the directory.</span>
-                </div>
-              )}
-
-              <form onSubmit={handleCreateOrg} className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                <div>
-                  <label className="block text-slate-400 uppercase font-semibold mb-1">Organization Name *</label>
-                  <input
-                    type="text"
-                    value={newOrgName}
-                    onChange={(e) => setNewOrgName(e.target.value)}
-                    placeholder="e.g. Karnataka Public Service Commission"
-                    required
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-400 uppercase font-semibold mb-1">Organization Code *</label>
-                  <input
-                    type="text"
-                    value={newOrgCode}
-                    onChange={(e) => setNewOrgCode(e.target.value)}
-                    placeholder="e.g. KPSC"
-                    required
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-400 uppercase font-semibold mb-1">Official Website URL *</label>
-                  <input
-                    type="url"
-                    value={newOrgWebsite}
-                    onChange={(e) => setNewOrgWebsite(e.target.value)}
-                    placeholder="https://kpsc.kar.nic.in"
-                    required
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-400 uppercase font-semibold mb-1">Official Result Portal URL</label>
-                  <input
-                    type="url"
-                    value={newOrgResultUrl}
-                    onChange={(e) => setNewOrgResultUrl(e.target.value)}
-                    placeholder="https://kpsc.kar.nic.in/results"
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div className="sm:col-span-2">
-                  <button
-                    type="submit"
-                    className="py-2.5 px-6 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-colors"
-                  >
-                    Save & Publish Organization
-                  </button>
-                </div>
-              </form>
-            </div>
-
-            {/* Organizations list */}
-            <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl space-y-3">
-              <h3 className="font-bold text-white text-sm">Indexed Organizations ({organizations.length})</h3>
-              <div className="divide-y divide-slate-800 text-xs">
-                {organizations.map((org) => (
-                  <div key={org.id} className="py-3 flex items-center justify-between">
-                    <div>
-                      <h4 className="font-bold text-white">{org.name}</h4>
-                      <p className="text-slate-400 text-[11px]">{org.code} • {org.official_website}</p>
-                    </div>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-950 text-emerald-300 border border-emerald-800">
-                      {org.verification_status}
-                    </span>
-                  </div>
-                ))}
-              </div>
+              <button
+                onClick={() => setActiveTab("institutions")}
+                className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-600/30 flex items-center space-x-2 shrink-0"
+              >
+                <span>Manage Integrations</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
           </div>
         )}
@@ -450,20 +905,29 @@ export default function AdminDashboardPage() {
                     type="text"
                     value={newExamName}
                     onChange={(e) => setNewExamName(e.target.value)}
-                    placeholder="e.g. Graduate Aptitude Test in Engineering (GATE 2026)"
+                    placeholder="e.g. Karnataka CET 2026"
                     required
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 uppercase font-semibold mb-1">Exam Code *</label>
+                  <label className="block text-slate-400 uppercase font-semibold mb-1">Examination Code *</label>
                   <input
                     type="text"
                     value={newExamCode}
                     onChange={(e) => setNewExamCode(e.target.value)}
-                    placeholder="e.g. GATE-2026"
+                    placeholder="e.g. KCET-2026"
                     required
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white uppercase"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 uppercase font-semibold mb-1">Year</label>
+                  <input
+                    type="number"
+                    value={newExamYear}
+                    onChange={(e) => setNewExamYear(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white"
                   />
                 </div>
                 <div>
@@ -672,6 +1136,375 @@ export default function AdminDashboardPage() {
           </div>
         )}
       </main>
+
+      {/* ADD / EDIT INSTITUTION MODAL */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="sticky top-0 bg-slate-900/95 backdrop-blur-sm px-6 py-4 border-b border-slate-800 flex justify-between items-center z-10">
+              <div className="flex items-center space-x-2.5">
+                <Building2 className="w-5 h-5 text-blue-400" />
+                <h3 className="font-bold text-white text-base">
+                  {editingOrg ? `Edit Institution: ${editingOrg.name}` : "Register New Institution Integration"}
+                </h3>
+              </div>
+              <button 
+                onClick={() => setIsModalOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveInstitution} className="p-6 space-y-6 text-xs">
+              {formError && (
+                <div className="p-3 rounded-xl bg-red-950 border border-red-800 text-red-300 flex items-center space-x-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{formError}</span>
+                </div>
+              )}
+
+              {/* SECTION 1: INSTITUTION IDENTITY */}
+              <div className="space-y-3">
+                <h4 className="text-blue-400 font-bold uppercase tracking-wider text-[11px] flex items-center space-x-1.5 border-b border-slate-800 pb-1.5">
+                  <Globe className="w-3.5 h-3.5" />
+                  <span>1. Institutional Identity & Recognition</span>
+                </h4>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-slate-400 font-semibold mb-1">Institution Full Name *</label>
+                    <input
+                      type="text"
+                      value={formName}
+                      onChange={(e) => setFormName(e.target.value)}
+                      placeholder="e.g. Karnataka Examination Authority"
+                      required
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-400 font-semibold mb-1">Unique Institutional Code *</label>
+                    <input
+                      type="text"
+                      value={formCode}
+                      onChange={(e) => setFormCode(e.target.value.toUpperCase())}
+                      placeholder="e.g. KEA-KARNATAKA"
+                      required
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white uppercase font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-400 font-semibold mb-1">Classification Category *</label>
+                    <select
+                      value={formCategoryId}
+                      onChange={(e) => setFormCategoryId(Number(e.target.value))}
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    >
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-400 font-semibold mb-1">State / Union Territory</label>
+                    <select
+                      value={formStateId}
+                      onChange={(e) => setFormStateId(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    >
+                      <option value="">National / All India (Central)</option>
+                      {states.map((s) => (
+                        <option key={s.id} value={s.id.toString()}>{s.name} ({s.code})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-slate-400 font-semibold mb-1">Official Website URL *</label>
+                    <input
+                      type="url"
+                      value={formWebsite}
+                      onChange={(e) => setFormWebsite(e.target.value)}
+                      placeholder="https://cetonline.karnataka.gov.in"
+                      required
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 2: SUPPORTED SERVICES & MODES */}
+              <div className="space-y-3">
+                <h4 className="text-blue-400 font-bold uppercase tracking-wider text-[11px] flex items-center space-x-1.5 border-b border-slate-800 pb-1.5">
+                  <Activity className="w-3.5 h-3.5" />
+                  <span>2. Supported Examination Services & Retrieval Methods</span>
+                </h4>
+
+                <div className="space-y-3 bg-slate-800/40 p-3.5 rounded-xl border border-slate-800">
+                  {/* Service 1: Results */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
+                    <label className="flex items-center space-x-2 font-semibold text-slate-200 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formSupportsResults}
+                        onChange={(e) => setFormSupportsResults(e.target.checked)}
+                        className="rounded bg-slate-800 border-slate-700 text-blue-600 focus:ring-0 w-4 h-4"
+                      />
+                      <span>Examination Results</span>
+                    </label>
+                    <div className="sm:col-span-2">
+                      <select
+                        disabled={!formSupportsResults}
+                        value={formResultsMode}
+                        onChange={(e) => setFormResultsMode(e.target.value)}
+                        className="w-full px-2.5 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white disabled:opacity-40"
+                      >
+                        <option value="OFFICIAL_API">⚡ Official Authorized API Integration</option>
+                        <option value="OFFICIAL_REDIRECT">↗️ Official Portal Redirect (Standard)</option>
+                        <option value="MANUAL_UPLOAD">📄 Manual Student Scorecard Upload</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Service 2: Hall Tickets */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
+                    <label className="flex items-center space-x-2 font-semibold text-slate-200 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formSupportsHallTickets}
+                        onChange={(e) => setFormSupportsHallTickets(e.target.checked)}
+                        className="rounded bg-slate-800 border-slate-700 text-blue-600 focus:ring-0 w-4 h-4"
+                      />
+                      <span>Hall Tickets / Admit Cards</span>
+                    </label>
+                    <div className="sm:col-span-2">
+                      <select
+                        disabled={!formSupportsHallTickets}
+                        value={formHallTicketsMode}
+                        onChange={(e) => setFormHallTicketsMode(e.target.value)}
+                        className="w-full px-2.5 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white disabled:opacity-40"
+                      >
+                        <option value="OFFICIAL_API">⚡ Official Authorized API Integration</option>
+                        <option value="OFFICIAL_REDIRECT">↗️ Official Portal Redirect (Standard)</option>
+                        <option value="MANUAL_UPLOAD">📄 Manual Student Upload</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Service 3: ID Cards */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
+                    <label className="flex items-center space-x-2 font-semibold text-slate-200 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formSupportsIdCards}
+                        onChange={(e) => setFormSupportsIdCards(e.target.checked)}
+                        className="rounded bg-slate-800 border-slate-700 text-blue-600 focus:ring-0 w-4 h-4"
+                      />
+                      <span>Student ID Cards</span>
+                    </label>
+                    <div className="sm:col-span-2">
+                      <select
+                        disabled={!formSupportsIdCards}
+                        value={formIdCardsMode}
+                        onChange={(e) => setFormIdCardsMode(e.target.value)}
+                        className="w-full px-2.5 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white disabled:opacity-40"
+                      >
+                        <option value="INSTITUTION_INTEGRATION">🏛️ Authorized Institution ERP Integration</option>
+                        <option value="MANUAL_UPLOAD">📁 Manual Student ID Card Upload</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 3: API & SECURITY CONFIGURATION */}
+              <div className="space-y-3">
+                <h4 className="text-blue-400 font-bold uppercase tracking-wider text-[11px] flex items-center space-x-1.5 border-b border-slate-800 pb-1.5">
+                  <Server className="w-3.5 h-3.5" />
+                  <span>3. Authorized API & Security Configuration</span>
+                </h4>
+
+                {/* Anti-abuse callout notice */}
+                <div className="p-3 bg-blue-950/40 border border-blue-900/60 rounded-xl text-[11px] text-blue-300 space-y-1">
+                  <p className="font-bold flex items-center space-x-1.5 text-blue-200">
+                    <ShieldCheck className="w-4 h-4 text-blue-400 shrink-0" />
+                    <span>Security & Anti-Abuse Standards Compliance</span>
+                  </p>
+                  <p className="text-slate-400 leading-relaxed">
+                    • Never assume that a website URL provides database access. <br />
+                    • Authorized API endpoints only. Never invent API endpoints or retrieve student records without official sanction. <br />
+                    • Never bypass OTP, CAPTCHA, login restrictions, or anti-bot protections.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-slate-400 font-semibold mb-1">Official Authorized API Endpoint URL</label>
+                    <input
+                      type="url"
+                      value={formApiEndpoint}
+                      onChange={(e) => setFormApiEndpoint(e.target.value)}
+                      placeholder="https://api.institution.gov.in/v1"
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white font-mono text-[11px] focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-400 font-semibold mb-1">Authentication Method</label>
+                    <select
+                      value={formAuthMethod}
+                      onChange={(e) => setFormAuthMethod(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    >
+                      <option value="NONE">None (Public Portal Direct)</option>
+                      <option value="API_KEY">API Key (X-API-Key Header)</option>
+                      <option value="BEARER_TOKEN">Bearer Token (Authorization Header)</option>
+                      <option value="OAUTH2">OAuth 2.0 Client Credentials</option>
+                      <option value="MUTUAL_TLS">Mutual TLS / Certificate</option>
+                    </select>
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-slate-400 font-semibold mb-1 flex items-center justify-between">
+                      <span className="flex items-center space-x-1">
+                        <Lock className="w-3.5 h-3.5 text-blue-400" />
+                        <span>API Credentials / Secret Key</span>
+                      </span>
+                      {formMaskedCreds && (
+                        <span className="text-[10px] text-emerald-400 font-mono">
+                          Current: {formMaskedCreds}
+                        </span>
+                      )}
+                    </label>
+                    <input
+                      type="password"
+                      value={formApiCredentials}
+                      onChange={(e) => setFormApiCredentials(e.target.value)}
+                      placeholder={editingOrg ? "Leave blank to keep existing encrypted secret" : "Enter API key or Bearer token"}
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white font-mono text-[11px] focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    />
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Credentials are encrypted at rest with AES-256 Fernet. Plaintext keys are never returned to the frontend or exposed to unauthorized staff.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 4: APPROVAL & PUBLISHING */}
+              <div className="space-y-3">
+                <h4 className="text-blue-400 font-bold uppercase tracking-wider text-[11px] flex items-center space-x-1.5 border-b border-slate-800 pb-1.5">
+                  <CheckCircle className="w-3.5 h-3.5" />
+                  <span>4. Governance & Approval</span>
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-slate-400 font-semibold mb-1">Approval Status</label>
+                    <select
+                      value={formApprovalStatus}
+                      onChange={(e) => setFormApprovalStatus(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    >
+                      <option value="APPROVED">APPROVED (Active in Public Directory)</option>
+                      <option value="PENDING_APPROVAL">PENDING APPROVAL (Requires Verification)</option>
+                      <option value="REJECTED">REJECTED (Not Published)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-4 border-t border-slate-800 flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl text-xs transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={formSubmitting}
+                  className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs shadow-lg shadow-blue-600/30 transition-all disabled:opacity-50 flex items-center space-x-2"
+                >
+                  {formSubmitting && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                  <span>{editingOrg ? "Save Changes" : "Register & Publish"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW CONNECTION LOGS MODAL */}
+      {isLogsModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl">
+            <div className="p-4 border-b border-slate-800 flex justify-between items-center">
+              <div className="flex items-center space-x-2">
+                <History className="w-4 h-4 text-blue-400" />
+                <h3 className="font-bold text-white text-sm">
+                  Integration & Connectivity Audit Trail: {viewingLogsOrg?.name} ({viewingLogsOrg?.code})
+                </h3>
+              </div>
+              <button 
+                onClick={() => setIsLogsModalOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-4 flex-1 overflow-y-auto space-y-3">
+              {logsLoading ? (
+                <div className="py-12 text-center text-slate-400">
+                  <RefreshCw className="w-6 h-6 animate-spin mx-auto text-blue-500 mb-2" />
+                  <p className="text-xs">Fetching connectivity probe audit records...</p>
+                </div>
+              ) : institutionLogs.length === 0 ? (
+                <p className="text-xs text-slate-500 text-center py-10">
+                  No probe or integration logs recorded yet for this institution. Click &quot;Test Connection&quot; to perform a live probe.
+                </p>
+              ) : (
+                <div className="divide-y divide-slate-800 text-xs font-mono">
+                  {institutionLogs.map((log) => (
+                    <div key={log.id} className="py-2.5 flex items-center justify-between text-slate-300">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center space-x-2">
+                          <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
+                            log.is_success ? "bg-emerald-950 text-emerald-300" : "bg-red-950 text-red-300"
+                          }`}>
+                            HTTP {log.status_code}
+                          </span>
+                          <span className="font-sans font-bold text-white">{log.action}</span>
+                          <span className="text-[11px] text-slate-400 font-mono">• {log.duration_ms}ms</span>
+                        </div>
+                        <p className="text-[11px] font-sans text-slate-400">{log.message}</p>
+                      </div>
+                      <div className="text-[10px] text-slate-500 text-right">
+                        {new Date(log.created_at).toLocaleString("en-IN")}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="p-3 bg-slate-950 border-t border-slate-800 flex justify-end">
+              <button
+                onClick={() => setIsLogsModalOpen(false)}
+                className="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

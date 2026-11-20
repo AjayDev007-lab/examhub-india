@@ -152,8 +152,9 @@ async def check_result(
             output_path=pdf_path
         )
         generate_pdf_preview(pdf_path, preview_path)
-        db_record.scorecard_path = pdf_filename
-        await db.commit()
+
+    db_record.scorecard_path = pdf_filename
+    await db.commit()
 
     result_data["has_scorecard"] = True
     result_data["scorecard_path"] = pdf_filename

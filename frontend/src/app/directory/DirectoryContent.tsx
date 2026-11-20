@@ -181,13 +181,25 @@ export default function DirectoryContent() {
                   </a>
                 </div>
 
-                {/* Integration methods badges */}
-                <div className="flex flex-wrap gap-1 text-[10px]">
-                  {org.integration_methods?.map((m: string) => (
-                    <span key={m} className="px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">
-                      {m.replace(/_/g, " ")}
-                    </span>
-                  ))}
+                {/* Integration & Service Transparency Badges */}
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex flex-wrap gap-1 text-[10px]">
+                    {org.supports_results !== false && (
+                      <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-semibold border border-blue-100 flex items-center space-x-1">
+                        <span>Results: {org.results_retrieval_mode === "OFFICIAL_API" ? "⚡ Direct API" : org.results_retrieval_mode === "MANUAL_UPLOAD" ? "📄 Upload" : "↗️ Official Redirect"}</span>
+                      </span>
+                    )}
+                    {org.supports_hall_tickets !== false && (
+                      <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-semibold border border-emerald-100 flex items-center space-x-1">
+                        <span>Admit: {org.hall_tickets_retrieval_mode === "OFFICIAL_API" ? "⚡ Direct API" : "↗️ Official Redirect"}</span>
+                      </span>
+                    )}
+                    {org.supports_id_cards !== false && (
+                      <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-700 font-semibold border border-amber-100 flex items-center space-x-1">
+                        <span>ID: {org.id_cards_retrieval_mode === "INSTITUTION_INTEGRATION" ? "🏛️ ERP Sync" : "📁 Upload"}</span>
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 

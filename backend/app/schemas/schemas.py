@@ -89,6 +89,23 @@ class OrganizationOut(BaseModel):
     contact_phone: Optional[str] = None
     integration_methods: List[str] = []
     verification_status: str
+    supports_results: bool = True
+    supports_hall_tickets: bool = True
+    supports_id_cards: bool = True
+    results_retrieval_mode: str = "OFFICIAL_REDIRECT"
+    hall_tickets_retrieval_mode: str = "OFFICIAL_REDIRECT"
+    id_cards_retrieval_mode: str = "INSTITUTION_INTEGRATION"
+    approval_status: str = "APPROVED"
+    approved_by: Optional[int] = None
+    approved_at: Optional[datetime] = None
+    api_endpoint_url: Optional[str] = None
+    auth_method: str = "NONE"
+    has_api_credentials: bool = False
+    masked_credentials: Optional[str] = None
+    health_status: str = "HEALTHY"
+    last_latency_ms: int = 0
+    last_tested_at: Optional[datetime] = None
+    error_count: int = 0
     last_checked_at: Optional[datetime] = None
     is_active: bool
 
@@ -105,6 +122,84 @@ class OrganizationCreate(BaseModel):
     contact_phone: Optional[str] = None
     integration_methods: List[str] = ["OFFICIAL_REDIRECT"]
     verification_status: str = "VERIFIED"
+    supports_results: bool = True
+    supports_hall_tickets: bool = True
+    supports_id_cards: bool = True
+    results_retrieval_mode: str = "OFFICIAL_REDIRECT"
+    hall_tickets_retrieval_mode: str = "OFFICIAL_REDIRECT"
+    id_cards_retrieval_mode: str = "INSTITUTION_INTEGRATION"
+    approval_status: str = "APPROVED"
+    api_endpoint_url: Optional[str] = None
+    auth_method: str = "NONE"
+    api_credentials: Optional[str] = None
+
+class OrganizationUpdate(BaseModel):
+    name: Optional[str] = None
+    code: Optional[str] = None
+    category_id: Optional[int] = None
+    state_id: Optional[int] = None
+    official_website: Optional[str] = None
+    result_portal_url: Optional[str] = None
+    hall_ticket_portal_url: Optional[str] = None
+    id_card_portal_url: Optional[str] = None
+    contact_email: Optional[str] = None
+    contact_phone: Optional[str] = None
+    integration_methods: Optional[List[str]] = None
+    verification_status: Optional[str] = None
+    supports_results: Optional[bool] = None
+    supports_hall_tickets: Optional[bool] = None
+    supports_id_cards: Optional[bool] = None
+    results_retrieval_mode: Optional[str] = None
+    hall_tickets_retrieval_mode: Optional[str] = None
+    id_cards_retrieval_mode: Optional[str] = None
+    approval_status: Optional[str] = None
+    api_endpoint_url: Optional[str] = None
+    auth_method: Optional[str] = None
+    api_credentials: Optional[str] = None
+    is_active: Optional[bool] = None
+
+class ConnectivityTestRequest(BaseModel):
+    target_url: Optional[str] = None
+    use_api_endpoint: bool = False
+
+class ConnectivityTestResponse(BaseModel):
+    success: bool
+    status_code: int
+    latency_ms: int
+    health_status: str
+    message: str
+    tested_url: str
+    tested_at: str
+
+class ApprovalUpdateRequest(BaseModel):
+    approval_status: str # "APPROVED", "REJECTED", "PENDING_APPROVAL"
+    reason: Optional[str] = None
+
+class IntegrationLogOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    organization_id: Optional[int] = None
+    action: str
+    tested_url: Optional[str] = None
+    status_code: int
+    is_success: bool
+    message: Optional[str] = None
+    duration_ms: int
+    created_at: datetime
+
+class StudentInstitutionStatusOut(BaseModel):
+    id: int
+    name: str
+    code: str
+    supports_results: bool
+    results_retrieval_mode: str
+    supports_hall_tickets: bool
+    hall_tickets_retrieval_mode: str
+    supports_id_cards: bool
+    id_cards_retrieval_mode: str
+    health_status: str
+    verification_status: str
 
 # ================= EXAMINATION SCHEMAS =================
 class ExamScheduleOut(BaseModel):

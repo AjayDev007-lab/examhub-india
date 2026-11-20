@@ -36,6 +36,7 @@ def validate_file_content(content: bytes, filename: str) -> str:
 def generate_pdf_preview(pdf_path: str, preview_path: str) -> bool:
     """Uses PyMuPDF to render the first page of a PDF as a high-resolution PNG preview image."""
     try:
+        os.makedirs(os.path.dirname(preview_path), exist_ok=True)
         doc = fitz.open(pdf_path)
         if len(doc) > 0:
             page = doc[0]
@@ -62,6 +63,7 @@ def generate_scorecard_pdf(
     output_path: str
 ) -> str:
     """Generates an official-format PDF scorecard using PyMuPDF."""
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
     doc = fitz.open()
     page = doc.new_page(width=595, height=842) # A4 format
     
@@ -122,6 +124,7 @@ def generate_scorecard_pdf(
 
 def generate_hall_ticket_pdf(data: dict, output_path: str) -> str:
     """Generates an official Admit Card / Hall Ticket PDF with exam center details, timing, and instructions."""
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
     doc = fitz.open()
     page = doc.new_page(width=595, height=842)
     

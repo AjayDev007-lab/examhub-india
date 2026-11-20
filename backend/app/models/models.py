@@ -112,6 +112,23 @@ class Organization(Base):
     contact_phone = Column(String(50), nullable=True)
     integration_methods = Column(JSON, default=list) # ["OFFICIAL_API", "STUDENT_PORTAL_SESSION", "OFFICIAL_REDIRECT", "MANUAL_UPLOAD"]
     verification_status = Column(String(50), default="VERIFIED") # "VERIFIED", "PENDING_VERIFICATION", "UNAVAILABLE"
+    supports_results = Column(Boolean, default=True)
+    supports_hall_tickets = Column(Boolean, default=True)
+    supports_id_cards = Column(Boolean, default=True)
+    results_retrieval_mode = Column(String(50), default="OFFICIAL_REDIRECT") # "OFFICIAL_API", "INSTITUTION_INTEGRATION", "OFFICIAL_REDIRECT", "MANUAL_UPLOAD"
+    hall_tickets_retrieval_mode = Column(String(50), default="OFFICIAL_REDIRECT")
+    id_cards_retrieval_mode = Column(String(50), default="INSTITUTION_INTEGRATION")
+    approval_status = Column(String(50), default="APPROVED") # "PENDING_APPROVAL", "APPROVED", "REJECTED"
+    approved_by = Column(Integer, ForeignKey("admin_users.id"), nullable=True)
+    approved_at = Column(DateTime, nullable=True)
+    api_endpoint_url = Column(String(512), nullable=True)
+    auth_method = Column(String(50), default="NONE") # "NONE", "API_KEY", "BEARER_TOKEN", "OAUTH2", "MUTUAL_TLS"
+    encrypted_credentials = Column(Text, nullable=True)
+    health_status = Column(String(50), default="HEALTHY") # "HEALTHY", "DEGRADED", "UNREACHABLE", "UNTESTED"
+    last_latency_ms = Column(Integer, default=0)
+    last_tested_at = Column(DateTime, nullable=True)
+    error_count = Column(Integer, default=0)
+    deleted_at = Column(DateTime, nullable=True)
     last_checked_at = Column(DateTime, default=utc_now)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=utc_now)
@@ -121,6 +138,7 @@ class Organization(Base):
     state = relationship("State", back_populates="organizations")
     examinations = relationship("Examination", back_populates="organization", cascade="all, delete-orphan")
     portal_integrations = relationship("PortalIntegration", back_populates="organization", cascade="all, delete-orphan")
+    integration_logs = relationship("IntegrationLog", back_populates="organization", cascade="all, delete-orphan")
 
 # 8. EXAMINATIONS
 class Examination(Base):
@@ -264,13 +282,18 @@ class IntegrationLog(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     portal_integration_id = Column(Integer, ForeignKey("portal_integrations.id", ondelete="CASCADE"), nullable=True)
-    action = Column(String(100), nullable=False) # "CHECK_RESULT", "DOWNLOAD_HALL_TICKET", "VERIFY_PORTAL"
+    organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True)
+    action = Column(String(100), nullable=False) # "CONNECTIVITY_TEST", "CHECK_RESULT", "DOWNLOAD_HALL_TICKET", "VERIFY_PORTAL"
+    tested_url = Column(String(512), nullable=True)
     status_code = Column(Integer, default=200)
+    is_success = Column(Boolean, default=True)
     message = Column(Text, nullable=True)
     duration_ms = Column(Integer, default=0)
+    tested_by_admin_id = Column(Integer, ForeignKey("admin_users.id"), nullable=True)
     created_at = Column(DateTime, default=utc_now)
 
     portal_integration = relationship("PortalIntegration", back_populates="logs")
+    organization = relationship("Organization", back_populates="integration_logs")
 
 # 16. DOCUMENT TYPES
 class DocumentType(Base):
