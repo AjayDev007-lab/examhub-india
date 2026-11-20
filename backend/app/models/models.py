@@ -38,7 +38,7 @@ class AdminRole(Base):
     __tablename__ = "admin_roles"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(50), unique=True, nullable=False) # SUPER_ADMIN, ADMIN, SUPPORT_STAFF
+    name = Column(String(50), unique=True, nullable=False) # SUPER_ADMIN, ADMIN, FINANCE_ADMIN, SUPPORT_STAFF, INSTITUTION_MANAGER
     description = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=utc_now, nullable=False)
 
@@ -463,3 +463,17 @@ class SystemSetting(Base):
     category = Column(String(50), default="GENERAL") # "GENERAL", "SECURITY", "RETENTION", "INTEGRATION"
     description = Column(String(255), nullable=True)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+
+# 27. PASSWORD RESET TOKENS
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    reset_token = Column(String(128), unique=True, index=True, nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    is_used = Column(Boolean, default=False, nullable=False)
+    ip_address = Column(String(50), nullable=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+
+    user = relationship("User")

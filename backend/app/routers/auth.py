@@ -3,8 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.database import get_db
-from app.models.models import User, UserSession, NotificationPreference
-from app.schemas.schemas import UserRegister, UserLogin, SendOtpRequest, VerifyOtpRequest, Token, UserOut
+from app.models.models import User, UserSession, NotificationPreference, PasswordResetToken
+from app.schemas.schemas import UserRegister, UserLogin, SendOtpRequest, VerifyOtpRequest, Token, UserOut, ForgotPasswordRequest, ResetPasswordRequest
 from app.auth.security import hash_password, verify_password, create_access_token, generate_otp, verify_otp, get_current_user
 from app.services.audit_service import log_audit_event
 from datetime import datetime, timezone, timedelta
@@ -182,3 +182,103 @@ async def logout(current_user: User = Depends(get_current_user), db: AsyncSessio
         s.is_revoked = True
     await db.commit()
     return {"success": True, "message": "Successfully logged out"}
+
+@router.post("/forgot-password")
+async def forgot_password(req: ForgotPasswordRequest, request: Request, db: AsyncSession = Depends(get_db)):
+    identifier = req.identifier.strip().lower()
+    stmt = select(User).where(
+        (User.email == identifier) | (User.mobile == identifier),
+        User.is_active == True,
+        User.deleted_at.is_(None)
+    )
+    user = (await db.execute(stmt)).scalar_one_or_none()
+
+    debug_token = None
+    if user:
+        reset_token = secrets.token_urlsafe(32)
+        expires = datetime.now(timezone.utc) + timedelta(minutes=15)
+        client_ip = request.client.host if request.client else "127.0.0.1"
+
+        token_entry = PasswordResetToken(
+            user_id=user.id,
+            reset_token=reset_token,
+            expires_at=expires,
+            is_used=False,
+            ip_address=client_ip
+        )
+        db.add(token_entry)
+        await db.commit()
+        debug_token = reset_token
+
+        await log_audit_event(
+            db,
+            actor_type="USER",
+            actor_id=user.id,
+            action="PASSWORD_RESET_REQUESTED",
+            target_type="USER",
+            target_id=user.id,
+            ip_address=client_ip
+        )
+
+    # Return non-enumerating generic response
+    return {
+        "success": True,
+        "message": "If an account matches your details, recovery instructions have been dispatched.",
+        "debug_reset_token": debug_token
+    }
+
+@router.post("/reset-password")
+async def reset_password(req: ResetPasswordRequest, request: Request, db: AsyncSession = Depends(get_db)):
+    if req.new_password != req.confirm_password:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Passwords do not match")
+    if len(req.new_password) < 8:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Password must be at least 8 characters")
+
+    stmt = select(PasswordResetToken).where(
+        PasswordResetToken.reset_token == req.token.strip(),
+        PasswordResetToken.is_used == False
+    )
+    token_entry = (await db.execute(stmt)).scalar_one_or_none()
+
+    if not token_entry:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired recovery token")
+
+    now = datetime.now(timezone.utc)
+    # Check expiry
+    token_expires = token_entry.expires_at
+    if token_expires.tzinfo is None:
+        token_expires = token_expires.replace(tzinfo=timezone.utc)
+    if token_expires < now:
+        token_entry.is_used = True
+        await db.commit()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Recovery token has expired. Please request a new one.")
+
+    # Fetch user
+    user_stmt = select(User).where(User.id == token_entry.user_id)
+    user = (await db.execute(user_stmt)).scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User account not found")
+
+    user.password_hash = hash_password(req.new_password)
+    token_entry.is_used = True
+
+    # Revoke all active sessions
+    session_stmt = select(UserSession).where(UserSession.user_id == user.id, UserSession.is_revoked == False)
+    sessions = (await db.execute(session_stmt)).scalars().all()
+    for s in sessions:
+        s.is_revoked = True
+
+    await db.commit()
+
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    await log_audit_event(
+        db,
+        actor_type="USER",
+        actor_id=user.id,
+        action="PASSWORD_RESET_COMPLETED",
+        target_type="USER",
+        target_id=user.id,
+        ip_address=client_ip
+    )
+
+    return {"success": True, "message": "Password successfully reset. You may now log in with your new credentials."}

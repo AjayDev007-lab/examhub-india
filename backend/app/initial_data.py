@@ -85,8 +85,10 @@ async def seed_database():
         if not res.scalars().first():
             super_role = AdminRole(name="SUPER_ADMIN", description="Complete system administration")
             admin_role = AdminRole(name="ADMIN", description="Examination and integration management")
+            finance_role = AdminRole(name="FINANCE_ADMIN", description="Financial auditing and document billing")
             support_role = AdminRole(name="SUPPORT_STAFF", description="Student assistance and verification")
-            db.add_all([super_role, admin_role, support_role])
+            manager_role = AdminRole(name="INSTITUTION_MANAGER", description="Institutional portal management")
+            db.add_all([super_role, admin_role, finance_role, support_role, manager_role])
             await db.flush()
 
             # Seed Permissions
@@ -95,7 +97,9 @@ async def seed_database():
                 AdminPermission(role_id=admin_role.id, permission_name="exams:write"),
                 AdminPermission(role_id=admin_role.id, permission_name="results:publish"),
                 AdminPermission(role_id=admin_role.id, permission_name="integrations:manage"),
-                AdminPermission(role_id=support_role.id, permission_name="support:read_write")
+                AdminPermission(role_id=finance_role.id, permission_name="finance:audit"),
+                AdminPermission(role_id=support_role.id, permission_name="support:read_write"),
+                AdminPermission(role_id=manager_role.id, permission_name="institution:manage")
             ])
 
             # Seed SuperAdmin User

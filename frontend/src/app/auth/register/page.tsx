@@ -13,12 +13,17 @@ export default function StudentRegisterPage() {
   const [mobile, setMobile] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!termsAccepted) {
+      setErrorMsg("Please accept the terms and conditions to register");
+      return;
+    }
     if (password !== passwordConfirm) {
       setErrorMsg("Passwords do not match");
       return;
@@ -148,9 +153,25 @@ export default function StudentRegisterPage() {
             </div>
           </div>
 
-          <div className="text-[11px] text-slate-500 leading-relaxed pt-1">
-            By creating an account, you agree to ExamHub India's data isolation and privacy protection standards under applicable Indian privacy guidelines.
-          </div>
+          <label className="flex items-start space-x-2 text-xs text-slate-600 cursor-pointer pt-1">
+            <input
+              type="checkbox"
+              checked={termsAccepted}
+              onChange={(e) => setTermsAccepted(e.target.checked)}
+              className="mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span>
+              I accept the ExamHub India{" "}
+              <Link href="/terms" target="_blank" className="text-blue-600 font-semibold hover:underline">
+                Terms of Service
+              </Link>{" "}
+              and{" "}
+              <Link href="/privacy" target="_blank" className="text-blue-600 font-semibold hover:underline">
+                Privacy Policy
+              </Link>
+              .
+            </span>
+          </label>
 
           <button
             type="submit"

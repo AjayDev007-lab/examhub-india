@@ -159,9 +159,9 @@ export default function StudentLoginPage() {
             </div>
 
             <div className="flex justify-end text-xs">
-              <span className="text-blue-600 hover:underline cursor-pointer">
+              <Link href="/auth/forgot-password" className="text-blue-600 hover:underline">
                 Forgot password?
-              </span>
+              </Link>
             </div>
 
             <button

@@ -22,6 +22,14 @@ class VerifyOtpRequest(BaseModel):
     mobile: str = Field(..., pattern=r"^[6-9]\d{9}$")
     otp: str = Field(..., min_length=6, max_length=6)
 
+class ForgotPasswordRequest(BaseModel):
+    identifier: str # Email or 10-digit mobile number
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(..., min_length=8)
+    confirm_password: str = Field(..., min_length=8)
+
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
