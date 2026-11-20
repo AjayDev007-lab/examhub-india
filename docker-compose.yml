@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  # MySQL 8 Database
+  db:
+    image: mysql:8.0
+    container_name: examhub_mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: RootPassword@ExamHub2026!
+      MYSQL_DATABASE: examhub_india
+      MYSQL_USER: examhub_user
+      MYSQL_PASSWORD: ExamHubPassword2026!
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  # Redis Cache & Background Tasks
+  redis:
+    image: redis:7-alpine
+    container_name: examhub_redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: examhub_backend
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      APP_NAME: "EXAMHUB INDIA"
+      APP_ENV: production
+      DATABASE_URL: mysql+pymysql://examhub_user:ExamHubPassword2026!@db:3306/examhub_india
+      STORAGE_DIR: /app/storage
+      SECRET_KEY: examhub-india-production-jwt-secret-key-32chars
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./storage:/app/storage
+
+  # Next.js Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: examhub_frontend
+    restart: always
+    depends_on:
+      - backend
+    environment:
+      NEXT_PUBLIC_API_URL: http://backend:8000
+    ports:
+      - "3000:3000"
+
+volumes:
+  mysql_data:
