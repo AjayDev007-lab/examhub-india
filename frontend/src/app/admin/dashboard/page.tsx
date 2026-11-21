@@ -116,6 +116,22 @@ export default function AdminDashboardPage() {
   const [selectedTicketId, setSelectedTicketId] = useState<number | null>(null);
   const [replyText, setReplyText] = useState("");
 
+  // Admin Profile & Password Change states
+  const [profileName, setProfileName] = useState("ExamHub Super Administrator");
+  const [profileEmail, setProfileEmail] = useState("superadmin@examhub.gov.in");
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileSuccessMsg, setProfileSuccessMsg] = useState("");
+  const [profileErrorMsg, setProfileErrorMsg] = useState("");
+
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showCurrentPass, setShowCurrentPass] = useState(false);
+  const [showNewPass, setShowNewPass] = useState(false);
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordSuccessMsg, setPasswordSuccessMsg] = useState("");
+  const [passwordErrorMsg, setPasswordErrorMsg] = useState("");
+
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -125,11 +141,76 @@ export default function AdminDashboardPage() {
       return;
     }
     try {
-      setAdminUser(JSON.parse(adminStr));
+      const parsed = JSON.parse(adminStr);
+      setAdminUser(parsed);
+      if (parsed.full_name) setProfileName(parsed.full_name);
+      if (parsed.email) setProfileEmail(parsed.email);
     } catch (_) {}
 
     loadAdminData();
   }, []);
+
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setProfileLoading(true);
+    setProfileSuccessMsg("");
+    setProfileErrorMsg("");
+    try {
+      const res = await fetchApi("/api/admin/profile", {
+        method: "PUT",
+        body: JSON.stringify({ full_name: profileName.trim(), email: profileEmail.trim() }),
+      });
+      const updatedUser = {
+        ...(adminUser || {}),
+        full_name: res.full_name || profileName.trim(),
+        email: res.email || profileEmail.trim()
+      };
+      setAdminUser(updatedUser);
+      localStorage.setItem("examhub_admin_user", JSON.stringify(updatedUser));
+      setProfileSuccessMsg("Administrator profile & login email updated successfully!");
+    } catch (err: any) {
+      setProfileErrorMsg(err.message || "Failed to update profile details");
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordLoading(true);
+    setPasswordSuccessMsg("");
+    setPasswordErrorMsg("");
+
+    if (newPassword !== confirmPassword) {
+      setPasswordErrorMsg("New password and confirm password do not match");
+      setPasswordLoading(false);
+      return;
+    }
+    if (newPassword.length < 8) {
+      setPasswordErrorMsg("Password must be at least 8 characters long");
+      setPasswordLoading(false);
+      return;
+    }
+
+    try {
+      await fetchApi("/api/admin/change-password", {
+        method: "PUT",
+        body: JSON.stringify({
+          current_password: currentPassword,
+          new_password: newPassword,
+          confirm_password: confirmPassword
+        }),
+      });
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setPasswordSuccessMsg("Administrator security key / password changed successfully!");
+    } catch (err: any) {
+      setPasswordErrorMsg(err.message || "Failed to change password");
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
 
   async function loadAdminData() {
     setLoading(true);
@@ -1702,24 +1783,213 @@ export default function AdminDashboardPage() {
 
         {/* SETTINGS TAB */}
         {activeTab === "settings" && (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-2xl font-black text-white">System & Data Retention Settings</h2>
-              <p className="text-xs text-slate-400">Configure global parameters and student data isolation controls</p>
+          <div className="space-y-8">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-black text-white flex items-center gap-2">
+                  <ShieldCheck className="w-6 h-6 text-blue-400" />
+                  Admin Account & Security Settings
+                </h2>
+                <p className="text-xs text-slate-400">
+                  Manage your administrator identity, login username/email, security credentials, and global system configurations
+                </p>
+              </div>
+              <span className="px-3 py-1 bg-blue-950/80 border border-blue-800 text-blue-300 font-mono text-xs rounded-full flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                Role: {adminUser?.role || "SUPER_ADMIN"}
+              </span>
             </div>
 
-            <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl space-y-4 text-xs">
-              {systemSettings.map((st) => (
-                <div key={st.id} className="p-3 bg-slate-800/80 rounded-xl border border-slate-700 space-y-1">
-                  <div className="flex justify-between items-center">
-                    <span className="font-bold text-white uppercase">{st.setting_key.replace(/_/g, " ")}</span>
-                    <span className="px-2 py-0.5 rounded bg-blue-950 text-blue-300 font-mono text-[11px]">
-                      {st.setting_value}
+            {/* CREDENTIALS MANAGEMENT SECTION */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* 1. ADMIN USERNAME & PROFILE CARD */}
+              <div className="p-6 bg-slate-900 border border-slate-800 rounded-3xl space-y-5 shadow-xl">
+                <div className="flex items-center space-x-3 pb-3 border-b border-slate-800">
+                  <div className="w-10 h-10 rounded-xl bg-blue-600/20 text-blue-400 flex items-center justify-center font-bold">
+                    <Users className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-white">Administrator Identity & Email</h3>
+                    <p className="text-[11px] text-slate-400">Update your administrative display name and login username / email</p>
+                  </div>
+                </div>
+
+                {profileSuccessMsg && (
+                  <div className="p-3 bg-emerald-950/60 border border-emerald-800 text-emerald-300 text-xs rounded-xl flex items-center space-x-2">
+                    <CheckCircle className="w-4 h-4 shrink-0" />
+                    <span>{profileSuccessMsg}</span>
+                  </div>
+                )}
+
+                {profileErrorMsg && (
+                  <div className="p-3 bg-red-950/60 border border-red-800 text-red-300 text-xs rounded-xl flex items-center space-x-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{profileErrorMsg}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleUpdateProfile} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-slate-400 mb-1">Administrator Full Name</label>
+                    <input
+                      type="text"
+                      value={profileName}
+                      onChange={(e) => setProfileName(e.target.value)}
+                      required
+                      placeholder="e.g. ExamHub Super Administrator"
+                      className="w-full px-3 py-2.5 rounded-xl border border-slate-800 bg-slate-950 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-slate-400 mb-1">Admin Email / Username (Used to Sign In)</label>
+                    <input
+                      type="email"
+                      value={profileEmail}
+                      onChange={(e) => setProfileEmail(e.target.value)}
+                      required
+                      placeholder="e.g. admin@examhub.gov.in"
+                      className="w-full px-3 py-2.5 rounded-xl border border-slate-800 bg-slate-950 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium font-mono"
+                    />
+                    <span className="text-[10px] text-slate-500 mt-1 block">
+                      This address will be your primary login username for the Admin Portal.
                     </span>
                   </div>
-                  <p className="text-slate-400 text-[11px]">{st.description}</p>
+
+                  <div className="pt-2">
+                    <button
+                      type="submit"
+                      disabled={profileLoading}
+                      className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center space-x-2 text-xs"
+                    >
+                      {profileLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                      <span>Save Admin Profile & Email</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* 2. ADMIN PASSWORD CHANGE CARD */}
+              <div className="p-6 bg-slate-900 border border-slate-800 rounded-3xl space-y-5 shadow-xl">
+                <div className="flex items-center space-x-3 pb-3 border-b border-slate-800">
+                  <div className="w-10 h-10 rounded-xl bg-amber-600/20 text-amber-400 flex items-center justify-center font-bold">
+                    <Lock className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-white">Change Security Key / Password</h3>
+                    <p className="text-[11px] text-slate-400">Update the cryptographic master password for administrative access</p>
+                  </div>
                 </div>
-              ))}
+
+                {passwordSuccessMsg && (
+                  <div className="p-3 bg-emerald-950/60 border border-emerald-800 text-emerald-300 text-xs rounded-xl flex items-center space-x-2">
+                    <CheckCircle className="w-4 h-4 shrink-0" />
+                    <span>{passwordSuccessMsg}</span>
+                  </div>
+                )}
+
+                {passwordErrorMsg && (
+                  <div className="p-3 bg-red-950/60 border border-red-800 text-red-300 text-xs rounded-xl flex items-center space-x-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{passwordErrorMsg}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleChangePassword} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-slate-400 mb-1">Current Security Key / Password</label>
+                    <div className="relative">
+                      <input
+                        type={showCurrentPass ? "text" : "password"}
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        required
+                        placeholder="Enter current password"
+                        className="w-full px-3 pr-10 py-2.5 rounded-xl border border-slate-800 bg-slate-950 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowCurrentPass(!showCurrentPass)}
+                        className="absolute right-3 top-3 text-slate-500 hover:text-slate-300 text-xs"
+                      >
+                        {showCurrentPass ? <Eye className="w-4 h-4" /> : <Eye className="w-4 h-4 opacity-50" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold uppercase text-slate-400 mb-1">New Password</label>
+                      <div className="relative">
+                        <input
+                          type={showNewPass ? "text" : "password"}
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          required
+                          placeholder="Min 8 characters"
+                          className="w-full px-3 pr-10 py-2.5 rounded-xl border border-slate-800 bg-slate-950 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium font-mono"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowNewPass(!showNewPass)}
+                          className="absolute right-3 top-3 text-slate-500 hover:text-slate-300 text-xs"
+                        >
+                          {showNewPass ? <Eye className="w-4 h-4" /> : <Eye className="w-4 h-4 opacity-50" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold uppercase text-slate-400 mb-1">Confirm New Password</label>
+                      <input
+                        type={showNewPass ? "text" : "password"}
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        required
+                        placeholder="Re-enter new password"
+                        className="w-full px-3 py-2.5 rounded-xl border border-slate-800 bg-slate-950 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800 text-[11px] text-slate-400 leading-relaxed">
+                    <span className="font-semibold text-slate-300">Security Requirement:</span> Must be at least 8 characters. Any password change immediately invalidates old tokens and is recorded in the immutable audit log.
+                  </div>
+
+                  <div className="pt-2">
+                    <button
+                      type="submit"
+                      disabled={passwordLoading}
+                      className="w-full py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center space-x-2 text-xs"
+                    >
+                      {passwordLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Key className="w-4 h-4" />}
+                      <span>Update Administrator Password</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            {/* GLOBAL SYSTEM & DATA RETENTION PARAMETERS */}
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-base font-bold text-white">Platform System & Data Retention Settings</h3>
+                <p className="text-xs text-slate-400">Global retention standards and data protection parameters</p>
+              </div>
+
+              <div className="p-6 bg-slate-900 border border-slate-800 rounded-3xl max-w-4xl space-y-4 text-xs">
+                {systemSettings.map((st) => (
+                  <div key={st.id} className="p-3.5 bg-slate-800/80 rounded-2xl border border-slate-700/80 space-y-1">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-white uppercase tracking-wider">{st.setting_key.replace(/_/g, " ")}</span>
+                      <span className="px-2.5 py-0.5 rounded-lg bg-blue-950 text-blue-300 font-mono text-[11px] border border-blue-800/50">
+                        {st.setting_value}
+                      </span>
+                    </div>
+                    <p className="text-slate-400 text-[11px]">{st.description}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}

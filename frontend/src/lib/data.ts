@@ -2442,6 +2442,7 @@ declare global {
     auditLogs: any[];
     tickets: typeof initialSupportTickets;
     settings: typeof initialSystemSettings;
+    adminProfile: any;
     officialWebsites: OfficialWebsiteItem[];
     brokenReports: typeof initialBrokenReports;
     rrbGroupDResults: any[];
@@ -3397,6 +3398,13 @@ if (!global.__examhubStore) {
     auditLogs: [...initialAuditLogs],
     tickets: [...initialSupportTickets],
     settings: [...initialSystemSettings],
+    adminProfile: {
+      id: 1,
+      full_name: "ExamHub Super Administrator",
+      email: "superadmin@examhub.gov.in",
+      password: "SuperAdmin@ExamHub2026!",
+      role: "SUPER_ADMIN"
+    },
     officialWebsites: [...initialOfficialWebsites],
     brokenReports: [...initialBrokenReports],
     rrbGroupDResults: [...initialRRBGroupDResults],

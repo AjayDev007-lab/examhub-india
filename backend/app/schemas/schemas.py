@@ -53,6 +53,15 @@ class AdminLogin(BaseModel):
     email: EmailStr
     password: str
 
+class AdminProfileUpdate(BaseModel):
+    full_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+
+class AdminPasswordChange(BaseModel):
+    current_password: str
+    new_password: str
+    confirm_password: str
+
 class AdminUserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

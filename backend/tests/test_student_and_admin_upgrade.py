@@ -312,3 +312,68 @@ async def test_job_alert_subscriptions_lifecycle(client: AsyncClient, student_au
     # 4. Verify deleted
     list_after = await client.get("/api/student/job-alerts", headers=headers)
     assert not any(s["id"] == sub_id for s in list_after.json()["subscriptions"])
+
+
+# ============================================================================
+# 6. ADMIN USERNAME & PASSWORD CHANGE TESTS
+# ============================================================================
+
+@pytest.mark.asyncio
+async def test_admin_profile_and_password_update(client: AsyncClient):
+    # 1. Login with current credentials
+    login_resp = await client.post("/api/admin/login", json={
+        "email": "superadmin@examhub.gov.in",
+        "password": "SuperAdmin@ExamHub2026!"
+    })
+    assert login_resp.status_code == 200
+    token = login_resp.json()["access_token"]
+    admin_headers = {"Authorization": f"Bearer {token}"}
+
+    # 2. Update Admin Profile
+    update_resp = await client.put(
+        "/api/admin/profile",
+        headers=admin_headers,
+        json={"full_name": "Chief Administrative Officer", "email": "superadmin@examhub.gov.in"}
+    )
+    assert update_resp.status_code == 200
+    profile_data = update_resp.json()
+    assert profile_data["full_name"] == "Chief Administrative Officer"
+
+    # Verify via /me
+    me_resp = await client.get("/api/admin/me", headers=admin_headers)
+    assert me_resp.status_code == 200
+    assert me_resp.json()["full_name"] == "Chief Administrative Officer"
+
+    # 3. Change password
+    change_resp = await client.put(
+        "/api/admin/change-password",
+        headers=admin_headers,
+        json={
+            "current_password": "SuperAdmin@ExamHub2026!",
+            "new_password": "NewSecureAdmin2026!",
+            "confirm_password": "NewSecureAdmin2026!"
+        }
+    )
+    assert change_resp.status_code == 200
+    assert change_resp.json()["success"] is True
+
+    # 4. Verify login works with new password
+    new_login_resp = await client.post("/api/admin/login", json={
+        "email": "superadmin@examhub.gov.in",
+        "password": "NewSecureAdmin2026!"
+    })
+    assert new_login_resp.status_code == 200
+    new_token = new_login_resp.json()["access_token"]
+
+    # 5. Restore default password so other tests remain repeatable
+    restore_resp = await client.put(
+        "/api/admin/change-password",
+        headers={"Authorization": f"Bearer {new_token}"},
+        json={
+            "current_password": "NewSecureAdmin2026!",
+            "new_password": "SuperAdmin@ExamHub2026!",
+            "confirm_password": "SuperAdmin@ExamHub2026!"
+        }
+    )
+    assert restore_resp.status_code == 200
+

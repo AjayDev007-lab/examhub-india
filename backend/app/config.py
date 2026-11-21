@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     ALLOWED_EXTENSIONS: list[str] = [".pdf", ".jpg", ".jpeg", ".png"]
     
     # Admin Defaults
-    SUPERADMIN_EMAIL: str = "superadmin@examhub.gov.in"
-    SUPERADMIN_PASSWORD: str = "SuperAdmin@ExamHub2026!"
+    SUPERADMIN_EMAIL: str = os.getenv("SUPERADMIN_EMAIL", "ajaydevvs22102004@gmail.com")
+    SUPERADMIN_PASSWORD: str = os.getenv("SUPERADMIN_PASSWORD", "SuperAdmin@ExamHub2026!")
 
 settings = Settings()
