@@ -87,23 +87,23 @@ export default function StudentLoginPage() {
   };
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center px-4 py-12">
-      <div className="max-w-md w-full bg-white rounded-3xl border border-slate-200 shadow-xl p-8 space-y-6">
+    <div className="min-h-[80vh] flex items-center justify-center px-4 py-12 bg-slate-50/50 dark:bg-slate-950">
+      <div className="max-w-md w-full bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xl p-8 space-y-6">
         {/* Brand header */}
         <div className="text-center space-y-2">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary-950 to-primary-800 text-white flex items-center justify-center mx-auto shadow-md">
+          <div className="w-12 h-12 rounded-2xl bg-[#102D59] text-white flex items-center justify-center mx-auto shadow-md border border-blue-900/40">
             <Award className="w-6 h-6 text-amber-300" />
           </div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Student Login</h1>
-          <p className="text-xs text-slate-500">Access your saved scorecards, admit cards & documents</p>
+          <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Student Login</h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Access your saved scorecards, admit cards & documents</p>
         </div>
 
         {/* Auth method tabs */}
-        <div className="grid grid-cols-2 p-1 bg-slate-100 rounded-xl text-xs font-semibold text-slate-600">
+        <div className="grid grid-cols-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400">
           <button
             onClick={() => { setActiveTab("password"); setErrorMsg(null); }}
             className={`py-2 rounded-lg transition-all ${
-              activeTab === "password" ? "bg-white text-blue-700 shadow-sm" : "hover:text-slate-900"
+              activeTab === "password" ? "bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm" : "hover:text-slate-900 dark:hover:text-white"
             }`}
           >
             Email & Password
@@ -111,7 +111,7 @@ export default function StudentLoginPage() {
           <button
             onClick={() => { setActiveTab("otp"); setErrorMsg(null); }}
             className={`py-2 rounded-lg transition-all ${
-              activeTab === "otp" ? "bg-white text-blue-700 shadow-sm" : "hover:text-slate-900"
+              activeTab === "otp" ? "bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm" : "hover:text-slate-900 dark:hover:text-white"
             }`}
           >
             Mobile OTP
@@ -119,7 +119,7 @@ export default function StudentLoginPage() {
         </div>
 
         {errorMsg && (
-          <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center space-x-2">
+          <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-xs rounded-xl flex items-center space-x-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{errorMsg}</span>
           </div>
@@ -129,7 +129,7 @@ export default function StudentLoginPage() {
         {activeTab === "password" ? (
           <form onSubmit={handlePasswordLogin} className="space-y-4">
             <div>
-              <label className="block text-xs font-bold uppercase text-slate-700 mb-1">Email Address</label>
+              <label className="block text-xs font-bold uppercase text-slate-700 dark:text-slate-300 mb-1">Email Address</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
                 <input
@@ -138,13 +138,13 @@ export default function StudentLoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="student@examhub.in"
                   required
-                  className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 text-slate-900"
+                  className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 text-slate-900 dark:text-white"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold uppercase text-slate-700 mb-1">Password</label>
+              <label className="block text-xs font-bold uppercase text-slate-700 dark:text-slate-300 mb-1">Password</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
                 <input
@@ -153,13 +153,13 @@ export default function StudentLoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   required
-                  className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 text-slate-900"
+                  className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 text-slate-900 dark:text-white"
                 />
               </div>
             </div>
 
             <div className="flex justify-end text-xs">
-              <Link href="/auth/forgot-password" className="text-blue-600 hover:underline">
+              <Link href="/auth/forgot-password" className="text-blue-600 dark:text-blue-400 hover:underline">
                 Forgot password?
               </Link>
             </div>
@@ -167,7 +167,7 @@ export default function StudentLoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-primary-900 hover:bg-primary-800 text-white font-bold rounded-xl shadow-md transition-all flex items-center justify-center space-x-2 text-sm"
+              className="w-full py-3 bg-[#102D59] hover:bg-blue-800 text-white font-bold rounded-xl shadow-md transition-all flex items-center justify-center space-x-2 text-sm"
             >
               {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <span>Sign In to Vault</span>}
             </button>
@@ -178,9 +178,9 @@ export default function StudentLoginPage() {
             {!otpSent ? (
               <form onSubmit={handleSendOtp} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-bold uppercase text-slate-700 mb-1">Mobile Number (10 Digits)</label>
+                  <label className="block text-xs font-bold uppercase text-slate-700 dark:text-slate-300 mb-1">Mobile Number (10 Digits)</label>
                   <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-xs text-slate-500 font-bold">+91</span>
+                    <span className="absolute left-3 top-2.5 text-xs text-slate-500 dark:text-slate-400 font-bold">+91</span>
                     <input
                       type="tel"
                       value={mobile}
@@ -188,7 +188,7 @@ export default function StudentLoginPage() {
                       placeholder="9876543210"
                       maxLength={10}
                       required
-                      className="w-full pl-12 pr-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 text-slate-900 font-medium"
+                      className="w-full pl-12 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 text-slate-900 dark:text-white font-medium"
                     />
                   </div>
                 </div>
@@ -203,17 +203,17 @@ export default function StudentLoginPage() {
               </form>
             ) : (
               <form onSubmit={handleVerifyOtp} className="space-y-4">
-                <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-900">
+                <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-xl text-xs text-blue-900 dark:text-blue-200">
                   <span>OTP sent to +91 {mobile}. Valid for 5 minutes.</span>
                   {demoOtp && (
-                    <div className="mt-1 font-bold text-emerald-700">
+                    <div className="mt-1 font-bold text-emerald-700 dark:text-emerald-400">
                       Auto-filled Demo OTP: {demoOtp}
                     </div>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold uppercase text-slate-700 mb-1">Enter 6-Digit OTP</label>
+                  <label className="block text-xs font-bold uppercase text-slate-700 dark:text-slate-300 mb-1">Enter 6-Digit OTP</label>
                   <input
                     type="text"
                     value={otp}
@@ -221,7 +221,7 @@ export default function StudentLoginPage() {
                     placeholder="123456"
                     maxLength={6}
                     required
-                    className="w-full text-center tracking-widest text-lg font-bold py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                    className="w-full text-center tracking-widest text-lg font-bold py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 focus:outline-none focus:ring-2 focus:ring-blue-600 text-slate-900 dark:text-white"
                   />
                 </div>
 
@@ -236,7 +236,7 @@ export default function StudentLoginPage() {
                 <button
                   type="button"
                   onClick={() => setOtpSent(false)}
-                  className="w-full text-center text-xs text-slate-500 hover:underline"
+                  className="w-full text-center text-xs text-slate-500 dark:text-slate-400 hover:underline"
                 >
                   Change Mobile Number
                 </button>
@@ -245,9 +245,9 @@ export default function StudentLoginPage() {
           </div>
         )}
 
-        <div className="pt-4 border-t border-slate-100 text-center text-xs text-slate-500">
+        <div className="pt-4 border-t border-slate-100 dark:border-slate-800 text-center text-xs text-slate-500 dark:text-slate-400">
           <span>Don't have an account? </span>
-          <Link href="/auth/register" className="font-bold text-blue-600 hover:underline">
+          <Link href="/auth/register" className="font-bold text-blue-600 dark:text-blue-400 hover:underline">
             Register now
           </Link>
         </div>

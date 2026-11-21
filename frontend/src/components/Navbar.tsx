@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { 
   Award, FileText, CreditCard, Search, User, LogIn, Menu, X, 
   ShieldCheck, LayoutDashboard, Bell, LogOut, ExternalLink, BookOpen,
-  Globe, Sparkles, Building2, Landmark, Briefcase
+  Globe, Sparkles, Building2, Landmark, Briefcase, Moon, Sun
 } from "lucide-react";
 import { Language, translations } from "@/lib/i18n";
 
@@ -15,6 +15,7 @@ export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [currentLang, setCurrentLang] = useState<Language>("en");
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
   useEffect(() => {
     const savedLang = localStorage.getItem("examhub_lang") as Language;
@@ -27,7 +28,30 @@ export default function Navbar() {
         setCurrentUser(JSON.parse(userStr));
       } catch (_) {}
     }
+
+    // Check dark mode
+    const storedTheme = localStorage.getItem("examhub_theme");
+    const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const shouldDark = storedTheme === "dark" || (!storedTheme && prefersDark);
+    setIsDarkMode(shouldDark);
+    if (shouldDark) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
   }, [pathname]);
+
+  const toggleDarkMode = () => {
+    const next = !isDarkMode;
+    setIsDarkMode(next);
+    if (next) {
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("examhub_theme", "dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("examhub_theme", "light");
+    }
+  };
 
   const handleLanguageChange = (lang: Language) => {
     setCurrentLang(lang);
@@ -45,7 +69,7 @@ export default function Navbar() {
   const t = translations[currentLang] || translations.en;
 
   const navLinks = [
-    { name: t.officialWebsites || "Official Portals", href: "/official-websites", icon: Landmark },
+    { name: t.officialWebsites || "Official Directory", href: "/official-websites", icon: Landmark },
     { name: "Jobs & Careers", href: "/jobs", icon: Briefcase, isNew: true },
     { name: t.checkResults || "Check Results", href: "/results", icon: Award },
     { name: t.hallTickets || "Hall Tickets", href: "/hall-tickets", icon: FileText },
@@ -54,26 +78,25 @@ export default function Navbar() {
     { name: t.institutionPortal || "Institutions", href: "/institution", icon: Building2 },
   ];
 
-  const isAdminPage = pathname.startsWith("/admin");
-
   return (
-    <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200">
+    <header className="sticky top-0 z-50 bg-white/95 dark:bg-[#0B132B]/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors">
       {/* Top National Announcement Bar */}
-      <div className="bg-primary-950 text-slate-200 text-xs py-1.5 px-4">
+      <div className="bg-[#102D59] text-slate-200 text-xs py-1.5 px-4 border-b border-blue-900/40">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center space-x-2">
             <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span className="font-medium text-slate-100">National Portal:</span>
-            <span className="hidden sm:inline text-slate-300">All-India Examinations, Official Government Registry & Student Document Vault</span>
+            <span className="font-bold text-white tracking-wide">National Portal:</span>
+            <span className="hidden sm:inline text-blue-100/90">Centralized All-India Examination Results, Official Gazette Portals & Student Records</span>
           </div>
+
           <div className="flex items-center space-x-3">
             {/* Language Selector */}
             <div className="flex items-center space-x-1">
-              <Globe className="w-3.5 h-3.5 text-blue-400" />
+              <Globe className="w-3.5 h-3.5 text-blue-300" />
               <select
                 value={currentLang}
                 onChange={(e) => handleLanguageChange(e.target.value as Language)}
-                className="bg-primary-900 border border-slate-700 text-slate-200 text-[11px] font-semibold rounded px-1.5 py-0.5 focus:outline-none cursor-pointer"
+                className="bg-[#18396c] border border-blue-400/30 text-white text-[11px] font-semibold rounded px-1.5 py-0.5 focus:outline-none cursor-pointer"
               >
                 <option value="en">English</option>
                 <option value="ta">தமிழ்</option>
@@ -84,24 +107,28 @@ export default function Navbar() {
               </select>
             </div>
 
-            <span className="text-slate-700">|</span>
+            <span className="text-blue-400/40">|</span>
 
-            <Link href="/official-websites" className="hidden md:inline hover:text-white transition-colors">
-              Official Directory (36 States & UTs)
+            {/* Dark mode button */}
+            <button
+              onClick={toggleDarkMode}
+              className="p-1 rounded text-blue-200 hover:text-white transition-colors"
+              title="Toggle Light / Dark Mode"
+            >
+              {isDarkMode ? <Sun className="w-3.5 h-3.5 text-amber-300" /> : <Moon className="w-3.5 h-3.5" />}
+            </button>
+
+            <span className="text-blue-400/40">|</span>
+
+            <Link href="/official-websites" className="hidden md:inline hover:text-white transition-colors text-blue-100 font-medium">
+              Directory (36 States & UTs)
             </Link>
 
-            <span className="hidden md:inline text-slate-700">|</span>
+            <span className="hidden md:inline text-blue-400/40">|</span>
 
-            <Link href="/institution" className="flex items-center space-x-1 text-slate-300 hover:text-white transition-colors">
-              <Building2 className="w-3.5 h-3.5 text-amber-400" />
-              <span>Institutions</span>
-            </Link>
-
-            <span className="text-slate-700">|</span>
-
-            <Link href="/admin/login" className="flex items-center space-x-1 text-slate-300 hover:text-white transition-colors">
+            <Link href="/admin/login" className="flex items-center space-x-1 text-blue-200 hover:text-white transition-colors font-medium">
               <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
-              <span>Admin</span>
+              <span>Admin Portal</span>
             </Link>
           </div>
         </div>
@@ -111,22 +138,22 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo & Branding */}
-          <Link href="/" className="flex items-center space-x-3 group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-900 to-primary-700 flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform">
+          <Link href="/" className="flex items-center space-x-3 group shrink-0">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#102D59] to-[#2563EB] flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform">
               <Award className="w-6 h-6 text-amber-300" />
             </div>
             <div>
-              <span className="text-xl font-black tracking-tight text-primary-950">
-                EXAMHUB<span className="text-blue-600"> INDIA</span>
+              <span className="text-xl font-black tracking-tight text-[#102D59] dark:text-white">
+                EXAMHUB<span className="text-[#2563EB]"> INDIA</span>
               </span>
-              <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold -mt-1">
-                All Examination Documents in One Place
+              <p className="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold -mt-1">
+                National Examination & Career Hub
               </p>
             </div>
           </Link>
 
           {/* Desktop Nav Links */}
-          <nav className="hidden md:flex items-center space-x-1 lg:space-x-2">
+          <nav className="hidden lg:flex items-center space-x-1">
             {navLinks.map((link) => {
               const Icon = link.icon;
               const isActive = pathname === link.href;
@@ -134,16 +161,16 @@ export default function Navbar() {
                 <Link
                   key={link.name}
                   href={link.href}
-                  className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  className={`flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
                     isActive
-                      ? "text-blue-700 bg-blue-50/80 font-semibold"
-                      : "text-slate-700 hover:text-primary-900 hover:bg-slate-50"
+                      ? "text-[#2563EB] bg-[#EAF3FF] dark:bg-blue-950/80 font-black shadow-xs"
+                      : "text-slate-700 dark:text-slate-200 hover:text-[#2563EB] dark:hover:text-blue-400 hover:bg-slate-50 dark:hover:bg-slate-800"
                   }`}
                 >
-                  <Icon className={`w-4 h-4 ${isActive ? "text-blue-600" : "text-slate-400"}`} />
+                  <Icon className={`w-3.5 h-3.5 ${isActive ? "text-[#2563EB]" : "text-slate-400 dark:text-slate-400"}`} />
                   <span>{link.name}</span>
                   {(link as any).isNew && (
-                    <span className="px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 rounded-md">
+                    <span className="px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 rounded-md">
                       NEW
                     </span>
                   )}
@@ -153,20 +180,20 @@ export default function Navbar() {
           </nav>
 
           {/* User Auth Controls */}
-          <div className="hidden md:flex items-center space-x-3">
+          <div className="hidden sm:flex items-center space-x-3">
             {currentUser ? (
               <div className="flex items-center space-x-2">
                 <Link
                   href="/dashboard"
-                  className="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-medium transition-colors"
+                  className="flex items-center space-x-2 px-3.5 py-2 rounded-xl bg-[#EAF3FF] dark:bg-blue-950 text-[#2563EB] dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900 text-xs font-bold transition-colors"
                 >
-                  <LayoutDashboard className="w-4 h-4 text-primary-700" />
-                  <span>{currentUser.full_name?.split(" ")[0] || "Dashboard"}</span>
+                  <LayoutDashboard className="w-4 h-4" />
+                  <span>Student Dashboard</span>
                 </Link>
                 <button
                   onClick={handleLogout}
                   title="Logout"
-                  className="p-2 text-slate-500 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+                  className="p-2 text-slate-400 hover:text-red-600 rounded-xl hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
                 >
                   <LogOut className="w-4 h-4" />
                 </button>
@@ -175,13 +202,13 @@ export default function Navbar() {
               <div className="flex items-center space-x-2">
                 <Link
                   href="/auth/login"
-                  className="px-3.5 py-2 text-sm font-medium text-slate-700 hover:text-primary-950 transition-colors"
+                  className="px-3.5 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-[#2563EB] dark:hover:text-blue-400 transition-colors"
                 >
                   Student Login
                 </Link>
                 <Link
                   href="/auth/register"
-                  className="px-4 py-2 text-sm font-medium text-white bg-primary-900 hover:bg-primary-800 rounded-lg shadow-sm transition-colors"
+                  className="px-4 py-2 text-xs font-bold text-white bg-[#2563EB] hover:bg-blue-600 rounded-xl shadow-md shadow-blue-500/20 transition-all"
                 >
                   Register
                 </Link>
@@ -190,10 +217,10 @@ export default function Navbar() {
           </div>
 
           {/* Mobile Menu Toggle */}
-          <div className="flex md:hidden">
+          <div className="flex lg:hidden items-center space-x-2">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+              className="p-2 rounded-xl text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
@@ -203,7 +230,7 @@ export default function Navbar() {
 
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-b border-slate-200 bg-white px-4 pt-2 pb-6 space-y-2">
+        <div className="lg:hidden border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0B132B] px-4 pt-2 pb-6 space-y-2">
           {navLinks.map((link) => {
             const Icon = link.icon;
             const isActive = pathname === link.href;
@@ -212,12 +239,14 @@ export default function Navbar() {
                 key={link.name}
                 href={link.href}
                 onClick={() => setMobileMenuOpen(false)}
-                className={`flex items-center justify-between px-3 py-2.5 rounded-lg text-base font-medium ${
-                  isActive ? "bg-blue-50 text-blue-700 font-semibold" : "text-slate-700 hover:bg-slate-50"
+                className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-bold ${
+                  isActive
+                    ? "bg-[#EAF3FF] dark:bg-blue-950 text-[#2563EB] dark:text-blue-300"
+                    : "text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
                 }`}
               >
                 <div className="flex items-center space-x-3">
-                  <Icon className="w-5 h-5 text-slate-400" />
+                  <Icon className="w-4 h-4 text-slate-400" />
                   <span>{link.name}</span>
                 </div>
                 {(link as any).isNew && (
@@ -228,13 +257,14 @@ export default function Navbar() {
               </Link>
             );
           })}
-          <div className="pt-4 border-t border-slate-100 space-y-2">
+
+          <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-2">
             {currentUser ? (
               <>
                 <Link
                   href="/dashboard"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center space-x-2 w-full px-4 py-2.5 rounded-lg bg-blue-600 text-white font-medium justify-center"
+                  className="flex items-center space-x-2 w-full px-4 py-2.5 rounded-xl bg-[#2563EB] text-white font-bold justify-center text-xs"
                 >
                   <LayoutDashboard className="w-4 h-4" />
                   <span>Student Dashboard ({currentUser.full_name})</span>
@@ -244,7 +274,7 @@ export default function Navbar() {
                     handleLogout();
                     setMobileMenuOpen(false);
                   }}
-                  className="w-full text-center py-2 text-red-600 font-medium text-sm"
+                  className="w-full text-center py-2 text-red-600 font-bold text-xs"
                 >
                   Logout
                 </button>
@@ -254,14 +284,14 @@ export default function Navbar() {
                 <Link
                   href="/auth/login"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="text-center py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700"
+                  className="text-center py-2.5 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200"
                 >
                   Login
                 </Link>
                 <Link
                   href="/auth/register"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="text-center py-2 bg-primary-900 text-white rounded-lg text-sm font-medium"
+                  className="text-center py-2.5 bg-[#2563EB] text-white rounded-xl text-xs font-bold shadow"
                 >
                   Register
                 </Link>

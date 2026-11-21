@@ -5,7 +5,7 @@ import Link from "next/link";
 import { 
   Search, Award, FileText, CreditCard, ChevronRight, CheckCircle2, 
   Calendar, Building2, MapPin, Bell, ArrowRight, ShieldCheck, Download, 
-  Sparkles, AlertCircle, BookOpen, Clock, Users, ArrowUpRight
+  Sparkles, AlertCircle, BookOpen, Clock, Users, ArrowUpRight, Briefcase, ExternalLink
 } from "lucide-react";
 import { fetchApi } from "@/lib/api";
 
@@ -21,21 +21,24 @@ export default function HomePage() {
   const [states, setStates] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [featuredExams, setFeaturedExams] = useState<any[]>([]);
+  const [featuredJobs, setFeaturedJobs] = useState<any[]>([]);
 
   useEffect(() => {
     // Load initial reference data & announcements
     async function loadData() {
       try {
-        const [statesData, catsData, examsData, annData] = await Promise.all([
+        const [statesData, catsData, examsData, annData, jobsData] = await Promise.all([
           fetchApi("/api/states").catch(() => []),
           fetchApi("/api/categories").catch(() => []),
           fetchApi("/api/exams?limit=6").catch(() => []),
           fetchApi("/api/announcements?limit=5").catch(() => []),
+          fetchApi("/api/jobs?limit=4").catch(() => []),
         ]);
         setStates(statesData || []);
         setCategories(catsData || []);
         setFeaturedExams(examsData || []);
         setAnnouncements(annData || []);
+        setFeaturedJobs(jobsData || []);
       } catch (err) {
         console.error("Failed to load initial directory data:", err);
       }
@@ -66,26 +69,26 @@ export default function HomePage() {
   return (
     <div className="space-y-16 pb-20">
       {/* 1. HERO SECTION WITH GLOBAL EXAMINATION SEARCH */}
-      <section className="relative bg-gradient-to-b from-primary-950 via-primary-900 to-slate-900 text-white pt-16 pb-24 px-4 sm:px-6 lg:px-8 overflow-hidden">
+      <section className="relative bg-gradient-to-b from-[#102D59] via-[#0D2344] to-[#0A1A33] text-white pt-16 pb-24 px-4 sm:px-6 lg:px-8 overflow-hidden">
         {/* Subtle grid pattern background */}
         <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#387ec4_1px,transparent_1px)] [background-size:16px_16px]"></div>
         
         <div className="relative max-w-5xl mx-auto text-center space-y-6">
           <div className="inline-flex items-center space-x-2 px-3 py-1.5 rounded-full bg-blue-500/10 border border-blue-400/20 text-blue-300 text-xs font-semibold tracking-wide">
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span>Centralized Educational Platform for Indian Students</span>
+            <span>Centralized Educational & Career Platform for Indian Students</span>
           </div>
 
           <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white leading-tight">
-            All Your Examination Documents & Results in <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300">One Place.</span>
+            All Your Examination Documents & Results in <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-sky-300 to-cyan-300">One Place.</span>
           </h1>
 
           <p className="text-base sm:text-lg text-slate-300 max-w-2xl mx-auto leading-relaxed">
-            Discover and retrieve your officially published examination scorecards, verified admit cards, and legitimate student identity cards across all Indian states and institutions.
+            Discover and retrieve officially published examination scorecards, verified admit cards, real-time job alerts, and legitimate credentials across all Indian states and institutions.
           </p>
 
           {/* Global Search Box */}
-          <div className="max-w-4xl mx-auto bg-white rounded-2xl p-3 sm:p-4 shadow-2xl text-slate-800 text-left mt-8 border border-slate-100">
+          <div className="max-w-4xl mx-auto bg-white dark:bg-slate-900 rounded-2xl p-3 sm:p-4 shadow-2xl text-slate-800 dark:text-slate-100 text-left mt-8 border border-slate-100 dark:border-slate-800">
             <form onSubmit={handleSearch} className="space-y-3">
               <div className="flex flex-col md:flex-row gap-3">
                 {/* Search Input */}
@@ -96,7 +99,7 @@ export default function HomePage() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search by Exam Name (e.g., NEET, UPSC CSE, JEE, CGL, Semester VI)..."
-                    className="w-full pl-11 pr-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white text-slate-900 font-medium placeholder-slate-400"
+                    className="w-full pl-11 pr-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white dark:focus:bg-slate-800 text-slate-900 dark:text-white font-medium placeholder-slate-400"
                   />
                 </div>
 
@@ -105,7 +108,7 @@ export default function HomePage() {
                   <select
                     value={selectedCategory}
                     onChange={(e) => setSelectedCategory(e.target.value)}
-                    className="w-full py-3 px-3 rounded-xl bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 text-slate-700 font-medium"
+                    className="w-full py-3 px-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 text-slate-700 dark:text-slate-200 font-medium"
                   >
                     <option value="">All Categories</option>
                     {categories.map((c) => (
@@ -119,7 +122,7 @@ export default function HomePage() {
                   <select
                     value={selectedState}
                     onChange={(e) => setSelectedState(e.target.value)}
-                    className="w-full py-3 px-3 rounded-xl bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 text-slate-700 font-medium"
+                    className="w-full py-3 px-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 text-slate-700 dark:text-slate-200 font-medium"
                   >
                     <option value="">All 36 States/UTs</option>
                     {states.map((s) => (
@@ -141,8 +144,8 @@ export default function HomePage() {
             </form>
 
             {/* Quick tags */}
-            <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-slate-100 text-xs text-slate-500 mt-2">
-              <span className="font-semibold text-slate-700">Popular Searches:</span>
+            <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400 mt-2">
+              <span className="font-semibold text-slate-700 dark:text-slate-300">Popular Searches:</span>
               {["NEET UG 2026", "UPSC Civil Services", "SSC CGL", "JEE Main", "Delhi University", "RRB NTPC"].map((tag) => (
                 <button
                   key={tag}
@@ -155,7 +158,7 @@ export default function HomePage() {
                       setIsSearching(false);
                     });
                   }}
-                  className="px-2.5 py-1 rounded-md bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 font-medium transition-colors"
+                  className="px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-slate-700 hover:text-blue-700 dark:hover:text-blue-300 text-slate-600 dark:text-slate-300 font-medium transition-colors"
                 >
                   {tag}
                 </button>
@@ -168,21 +171,21 @@ export default function HomePage() {
       {/* SEARCH RESULTS DROPDOWN / LISTING (if searched) */}
       {hasSearched && (
         <section className="max-w-6xl mx-auto px-4 -mt-10">
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-6">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 p-6">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-bold text-slate-900">
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white">
                 Search Results ({searchResults.length})
               </h2>
               <button 
                 onClick={() => setHasSearched(false)}
-                className="text-xs text-slate-500 hover:text-slate-800 underline"
+                className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 underline"
               >
                 Clear Search
               </button>
             </div>
 
             {searchResults.length === 0 ? (
-              <div className="text-center py-8 text-slate-500">
+              <div className="text-center py-8 text-slate-500 dark:text-slate-400">
                 <AlertCircle className="w-8 h-8 text-slate-400 mx-auto mb-2" />
                 <p className="font-medium">No matching examinations found.</p>
                 <p className="text-xs text-slate-400">Try searching with a broader keyword or browse the full All-India directory.</p>
@@ -190,26 +193,26 @@ export default function HomePage() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {searchResults.map((exam) => (
-                  <div key={exam.id} className="p-4 rounded-xl border border-slate-200 hover:border-blue-400 hover:shadow-md transition-all flex flex-col justify-between">
+                  <div key={exam.id} className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-md transition-all flex flex-col justify-between">
                     <div>
-                      <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
-                        <span className="font-semibold text-blue-700">{exam.organization_code}</span>
+                      <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-1">
+                        <span className="font-semibold text-blue-700 dark:text-blue-400">{exam.organization_code}</span>
                         <span>{exam.year} ({exam.cycle})</span>
                       </div>
-                      <h3 className="font-bold text-slate-900 text-base line-clamp-1">{exam.name}</h3>
-                      <p className="text-xs text-slate-500 mt-1">{exam.organization_name}</p>
+                      <h3 className="font-bold text-slate-900 dark:text-white text-base line-clamp-1">{exam.name}</h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{exam.organization_name}</p>
                     </div>
 
-                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                    <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
                       <Link
                         href={`/results?exam_id=${exam.id}`}
-                        className="flex-1 text-center py-1.5 px-2 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold rounded-lg transition-colors"
+                        className="flex-1 text-center py-1.5 px-2 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-semibold rounded-lg transition-colors"
                       >
                         Check Result
                       </Link>
                       <Link
                         href={`/hall-tickets?exam_id=${exam.id}`}
-                        className="flex-1 text-center py-1.5 px-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold rounded-lg transition-colors"
+                        className="flex-1 text-center py-1.5 px-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-semibold rounded-lg transition-colors"
                       >
                         Hall Ticket
                       </Link>
@@ -225,44 +228,44 @@ export default function HomePage() {
       {/* 2. THREE MAIN CORE SERVICES */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center space-y-2 mb-10">
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">
             Three Dedicated Examination Engines
           </h2>
-          <p className="text-sm text-slate-500 max-w-xl mx-auto">
+          <p className="text-sm text-slate-500 dark:text-slate-400 max-w-xl mx-auto">
             Direct, official and authorized retrieval pathways built specifically for Indian students.
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
           {/* Service 1: Results */}
-          <div className="group relative bg-white rounded-2xl p-6 sm:p-8 border border-slate-200/80 shadow-sm hover:shadow-xl hover:border-blue-300 transition-all">
-            <div className="w-12 h-12 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+          <div className="group relative bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-8 border border-slate-200/80 dark:border-slate-800 shadow-sm hover:shadow-xl hover:border-blue-300 dark:hover:border-blue-500 transition-all">
+            <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
               <Award className="w-6 h-6" />
             </div>
-            <span className="text-xs font-bold tracking-wider uppercase text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full">
+            <span className="text-xs font-bold tracking-wider uppercase text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/40 px-2.5 py-1 rounded-full">
               SERVICE 1
             </span>
-            <h3 className="text-xl font-bold text-slate-900 mt-3 mb-2">Examination Result Checker</h3>
-            <p className="text-xs text-slate-500 leading-relaxed mb-6">
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white mt-3 mb-2">Examination Result Checker</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-6">
               Search by exam, university, college, or state. View authentic marks, percentages, grades, ranks, and qualifying statuses. Download official PDF scorecards directly into personal vault.
             </p>
-            <ul className="text-xs text-slate-600 space-y-2 mb-6">
+            <ul className="text-xs text-slate-600 dark:text-slate-300 space-y-2 mb-6">
               <li className="flex items-center space-x-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                 <span>UPSC, SSC, RRB & State PSC Results</span>
               </li>
               <li className="flex items-center space-x-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                 <span>NEET, JEE & CUET National Scorecards</span>
               </li>
               <li className="flex items-center space-x-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                 <span>University Semester Marksheets & CGPA</span>
               </li>
             </ul>
             <Link
               href="/results"
-              className="inline-flex items-center space-x-2 text-sm font-semibold text-blue-600 hover:text-blue-800"
+              className="inline-flex items-center space-x-2 text-sm font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
             >
               <span>Check Results Now</span>
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -270,34 +273,34 @@ export default function HomePage() {
           </div>
 
           {/* Service 2: Hall Tickets */}
-          <div className="group relative bg-white rounded-2xl p-6 sm:p-8 border border-slate-200/80 shadow-sm hover:shadow-xl hover:border-emerald-300 transition-all">
-            <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+          <div className="group relative bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-8 border border-slate-200/80 dark:border-slate-800 shadow-sm hover:shadow-xl hover:border-emerald-300 dark:hover:border-emerald-500 transition-all">
+            <div className="w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
               <FileText className="w-6 h-6" />
             </div>
-            <span className="text-xs font-bold tracking-wider uppercase text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full">
+            <span className="text-xs font-bold tracking-wider uppercase text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/40 px-2.5 py-1 rounded-full">
               SERVICE 2
             </span>
-            <h3 className="text-xl font-bold text-slate-900 mt-3 mb-2">Hall Ticket Download</h3>
-            <p className="text-xs text-slate-500 leading-relaxed mb-6">
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white mt-3 mb-2">Hall Ticket Download</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-6">
               Retrieve newly released e-Admit cards for recruitment and entrance exams. Check venue addresses, shift reporting times, rules and generate high-resolution PDF printouts.
             </p>
-            <ul className="text-xs text-slate-600 space-y-2 mb-6">
+            <ul className="text-xs text-slate-600 dark:text-slate-300 space-y-2 mb-6">
               <li className="flex items-center space-x-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                 <span>Central & State Recruitment Admit Cards</span>
               </li>
               <li className="flex items-center space-x-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                 <span>Entrance Exam Hall Tickets with Center Code</span>
               </li>
               <li className="flex items-center space-x-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                 <span>PDF Preview, Barcode & Instructions</span>
               </li>
             </ul>
             <Link
               href="/hall-tickets"
-              className="inline-flex items-center space-x-2 text-sm font-semibold text-emerald-700 hover:text-emerald-900"
+              className="inline-flex items-center space-x-2 text-sm font-semibold text-emerald-700 dark:text-emerald-400 hover:text-emerald-900 dark:hover:text-emerald-300"
             >
               <span>Download Admit Cards</span>
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -305,34 +308,34 @@ export default function HomePage() {
           </div>
 
           {/* Service 3: Student ID Cards */}
-          <div className="group relative bg-white rounded-2xl p-6 sm:p-8 border border-slate-200/80 shadow-sm hover:shadow-xl hover:border-purple-300 transition-all">
-            <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+          <div className="group relative bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-8 border border-slate-200/80 dark:border-slate-800 shadow-sm hover:shadow-xl hover:border-purple-300 dark:hover:border-purple-500 transition-all">
+            <div className="w-12 h-12 rounded-xl bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
               <CreditCard className="w-6 h-6" />
             </div>
-            <span className="text-xs font-bold tracking-wider uppercase text-purple-700 bg-purple-50 px-2.5 py-1 rounded-full">
+            <span className="text-xs font-bold tracking-wider uppercase text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/40 px-2.5 py-1 rounded-full">
               SERVICE 3
             </span>
-            <h3 className="text-xl font-bold text-slate-900 mt-3 mb-2">Student ID Card Download</h3>
-            <p className="text-xs text-slate-500 leading-relaxed mb-6">
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white mt-3 mb-2">Student ID Card Download</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-6">
               Access institution-issued student digital identity credentials or securely archive legitimate scans in your personal document library with zero forgery tolerance.
             </p>
-            <ul className="text-xs text-slate-600 space-y-2 mb-6">
+            <ul className="text-xs text-slate-600 dark:text-slate-300 space-y-2 mb-6">
               <li className="flex items-center space-x-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                 <span>Government & Central University ID Portals</span>
               </li>
               <li className="flex items-center space-x-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                 <span>Autonomous & Private College ERP Sync</span>
               </li>
               <li className="flex items-center space-x-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                 <span>Malware Scanned & Signed Encrypted Vault</span>
               </li>
             </ul>
             <Link
               href="/id-cards"
-              className="inline-flex items-center space-x-2 text-sm font-semibold text-purple-700 hover:text-purple-900"
+              className="inline-flex items-center space-x-2 text-sm font-semibold text-purple-700 dark:text-purple-400 hover:text-purple-900 dark:hover:text-purple-300"
             >
               <span>Access Student ID Cards</span>
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -345,31 +348,31 @@ export default function HomePage() {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Recently Announced Results & Hall Tickets */}
-          <div className="lg:col-span-2 bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-sm">
+          <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-8 border border-slate-200 dark:border-slate-800 shadow-sm">
             <div className="flex justify-between items-center mb-6">
               <div>
-                <h3 className="text-xl font-bold text-slate-900">Active Indian Examinations</h3>
-                <p className="text-xs text-slate-500">Live indexed examination scorecards and entry passes</p>
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white">Active Indian Examinations</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Live indexed examination scorecards and entry passes</p>
               </div>
-              <Link href="/directory" className="text-xs font-semibold text-blue-600 hover:text-blue-800">
+              <Link href="/directory" className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-800">
                 View Full Directory →
               </Link>
             </div>
 
             <div className="space-y-3">
               {featuredExams.map((exam) => (
-                <div key={exam.id} className="p-4 rounded-xl bg-slate-50 border border-slate-100 hover:border-slate-300 transition-all flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+                <div key={exam.id} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60 hover:border-slate-300 dark:hover:border-slate-600 transition-all flex flex-col sm:flex-row justify-between sm:items-center gap-3">
                   <div className="space-y-1">
                     <div className="flex items-center space-x-2">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-300">
                         {exam.organization_code}
                       </span>
-                      <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
+                      <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded">
                         Verified Available
                       </span>
                     </div>
-                    <h4 className="font-bold text-slate-900 text-sm">{exam.name}</h4>
-                    <p className="text-xs text-slate-500">{exam.organization_name} • Cycle: {exam.cycle} ({exam.year})</p>
+                    <h4 className="font-bold text-slate-900 dark:text-white text-sm">{exam.name}</h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">{exam.organization_name} • Cycle: {exam.cycle} ({exam.year})</p>
                   </div>
 
                   <div className="flex items-center space-x-2 shrink-0">
@@ -381,7 +384,7 @@ export default function HomePage() {
                     </Link>
                     <Link
                       href={`/hall-tickets?exam_id=${exam.id}`}
-                      className="px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-medium transition-colors"
+                      className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium transition-colors"
                     >
                       Admit Card
                     </Link>
@@ -392,30 +395,30 @@ export default function HomePage() {
           </div>
 
           {/* Official Announcement Feed */}
-          <div className="bg-slate-900 text-slate-200 rounded-2xl p-6 sm:p-8 border border-slate-800 flex flex-col justify-between">
+          <div className="bg-[#102D59] text-slate-200 rounded-2xl p-6 sm:p-8 border border-blue-950 flex flex-col justify-between shadow-lg">
             <div>
               <div className="flex items-center space-x-2 mb-4">
                 <Bell className="w-5 h-5 text-amber-400" />
                 <h3 className="text-lg font-bold text-white">Official Bulletins</h3>
               </div>
-              <p className="text-xs text-slate-400 mb-6 leading-relaxed">
+              <p className="text-xs text-blue-200/80 mb-6 leading-relaxed">
                 Live verified circulars published by national councils, commissions, and universities.
               </p>
 
               <div className="space-y-4">
                 {announcements.map((ann) => (
-                  <div key={ann.id} className="p-3.5 rounded-xl bg-slate-800/80 border border-slate-700/60 text-xs space-y-1.5">
-                    <span className="inline-block px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-semibold text-[10px]">
-                      {ann.announcement_type.replace(/_/g, " ")}
+                  <div key={ann.id} className="p-3.5 rounded-xl bg-white/10 border border-white/10 text-xs space-y-1.5">
+                    <span className="inline-block px-2 py-0.5 rounded bg-blue-400/20 text-blue-200 font-semibold text-[10px]">
+                      {ann.announcement_type?.replace(/_/g, " ")}
                     </span>
                     <h4 className="font-semibold text-white leading-snug">{ann.title}</h4>
-                    <p className="text-slate-400 text-[11px] line-clamp-2">{ann.announcement_text}</p>
+                    <p className="text-blue-100/70 text-[11px] line-clamp-2">{ann.announcement_text}</p>
                     {ann.circular_url && (
                       <a
                         href={ann.circular_url}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center space-x-1 text-blue-400 hover:text-blue-300 text-[11px] font-medium pt-1"
+                        className="inline-flex items-center space-x-1 text-sky-300 hover:text-white text-[11px] font-medium pt-1"
                       >
                         <span>View Official Circular</span>
                         <ArrowUpRight className="w-3 h-3" />
@@ -426,9 +429,9 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div className="mt-6 pt-4 border-t border-slate-800 text-[11px] text-slate-400 flex items-center justify-between">
+            <div className="mt-6 pt-4 border-t border-white/15 text-[11px] text-blue-200 flex items-center justify-between">
               <span>Updated automatically</span>
-              <Link href="/dashboard" className="text-blue-400 hover:underline">
+              <Link href="/dashboard" className="text-sky-300 hover:underline">
                 Get Notifications →
               </Link>
             </div>
@@ -436,30 +439,172 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 4. INDIA-WIDE DIRECTORY HIGHLIGHTS */}
+      {/* 4. VERIFIED JOB VACANCIES & CAREER OPPORTUNITIES */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-gradient-to-r from-primary-950 via-primary-900 to-blue-950 rounded-3xl p-8 sm:p-12 text-white relative overflow-hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+          <div>
+            <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-bold uppercase tracking-wider mb-2">
+              <Briefcase className="w-3.5 h-3.5" />
+              <span>Official Recruitment Desk</span>
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">
+              Latest Verified Job Notifications
+            </h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Government ministries, public sector undertakings, and verified openings with confirmed source gazettes.
+            </p>
+          </div>
+          <Link
+            href="/jobs"
+            className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-md transition-all shrink-0 self-start sm:self-auto"
+          >
+            <span>Explore All Jobs</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {featuredJobs && featuredJobs.length > 0 ? (
+            featuredJobs.map((job) => (
+              <div
+                key={job.id}
+                className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-xl hover:border-blue-400 dark:hover:border-blue-500 transition-all flex flex-col justify-between"
+              >
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
+                      {job.category || "Government"}
+                    </span>
+                    <span className="inline-flex items-center space-x-1 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded">
+                      <ShieldCheck className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                      <span>Verified</span>
+                    </span>
+                  </div>
+
+                  <div>
+                    <h3 className="font-bold text-slate-900 dark:text-white text-sm line-clamp-2 leading-snug">
+                      {job.title}
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center space-x-1">
+                      <Building2 className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                      <span className="truncate">{job.organization}</span>
+                    </p>
+                  </div>
+
+                  <div className="space-y-1.5 text-xs text-slate-600 dark:text-slate-300 pt-2 border-t border-slate-100 dark:border-slate-800">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400 text-[11px]">Vacancies</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">{job.vacancies || "Open"} Posts</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400 text-[11px]">Salary</span>
+                      <span className="font-semibold text-emerald-600 dark:text-emerald-400">{job.salary || "As per norms"}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400 text-[11px]">Last Date</span>
+                      <span className="font-semibold text-rose-600 dark:text-rose-400">{job.last_date || "Rolling"}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800">
+                  <Link
+                    href={`/jobs/${job.slug || job.id}`}
+                    className="w-full py-2 px-3 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:text-blue-700 font-semibold text-xs transition-colors flex items-center justify-center space-x-1.5"
+                  >
+                    <span>View Eligibility & Apply</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
+              </div>
+            ))
+          ) : (
+            [
+              { id: 1, title: "UPSC Civil Services Examination 2026", org: "Union Public Service Commission", cat: "Central Gov", posts: "1,056", salary: "Level 10 (₹56,100)", lastDate: "05 Mar 2026", slug: "upsc-cse-2026" },
+              { id: 2, title: "RRB Assistant Loco Pilot & Tech Grade 1", org: "Railway Recruitment Control Board", cat: "Railway", posts: "18,799", salary: "Level 2 (₹19,900)", lastDate: "18 Mar 2026", slug: "rrb-alp-2026" },
+              { id: 3, title: "SBI Probationary Officer (PO) Scale I", org: "State Bank of India", cat: "Banking", posts: "2,000", salary: "₹41,960 + Allowances", lastDate: "28 Feb 2026", slug: "sbi-po-2026" },
+              { id: 4, title: "ISRO Scientist/Engineer 'SC' Recruitment", org: "Indian Space Research Organisation", cat: "Defence & Research", posts: "85", salary: "Level 10 (₹56,100)", lastDate: "12 Apr 2026", slug: "isro-scientist-sc" },
+            ].map((j) => (
+              <div
+                key={j.id}
+                className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-xl hover:border-blue-400 dark:hover:border-blue-500 transition-all flex flex-col justify-between"
+              >
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
+                      {j.cat}
+                    </span>
+                    <span className="inline-flex items-center space-x-1 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded">
+                      <ShieldCheck className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                      <span>Verified</span>
+                    </span>
+                  </div>
+
+                  <div>
+                    <h3 className="font-bold text-slate-900 dark:text-white text-sm line-clamp-2 leading-snug">
+                      {j.title}
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center space-x-1">
+                      <Building2 className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                      <span className="truncate">{j.org}</span>
+                    </p>
+                  </div>
+
+                  <div className="space-y-1.5 text-xs text-slate-600 dark:text-slate-300 pt-2 border-t border-slate-100 dark:border-slate-800">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400 text-[11px]">Vacancies</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">{j.posts} Posts</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400 text-[11px]">Salary</span>
+                      <span className="font-semibold text-emerald-600 dark:text-emerald-400">{j.salary}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400 text-[11px]">Last Date</span>
+                      <span className="font-semibold text-rose-600 dark:text-rose-400">{j.lastDate}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800">
+                  <Link
+                    href={`/jobs/${j.slug}`}
+                    className="w-full py-2 px-3 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:text-blue-700 font-semibold text-xs transition-colors flex items-center justify-center space-x-1.5"
+                  >
+                    <span>View Eligibility & Apply</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+
+      {/* 5. INDIA-WIDE DIRECTORY HIGHLIGHTS */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="bg-gradient-to-r from-[#102D59] via-[#0E284E] to-[#1D4ED8] rounded-3xl p-8 sm:p-12 text-white relative overflow-hidden shadow-2xl">
           <div className="relative z-10 max-w-3xl space-y-4">
-            <span className="px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 font-bold text-xs uppercase tracking-wider">
+            <span className="px-3 py-1 rounded-full bg-blue-500/20 text-blue-200 font-bold text-xs uppercase tracking-wider">
               PAN-INDIA DIRECTORY
             </span>
             <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight">
               Coverage Across All 28 States & 8 Union Territories
             </h2>
-            <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
+            <p className="text-blue-100/90 text-sm sm:text-base leading-relaxed">
               From central recruitment boards to state public service commissions, deemed universities, and autonomous colleges, ExamHub India connects verified access pathways with official institutional portals.
             </p>
             <div className="pt-4 flex flex-wrap gap-3">
               <Link
                 href="/directory"
-                className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm transition-all shadow-md flex items-center space-x-2"
+                className="px-6 py-3 rounded-xl bg-white text-blue-900 hover:bg-blue-50 font-semibold text-sm transition-all shadow-md flex items-center space-x-2"
               >
                 <span>Browse All-India Directory</span>
                 <ArrowRight className="w-4 h-4" />
               </Link>
               <Link
                 href="/auth/register"
-                className="px-6 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-sm backdrop-blur-sm transition-all border border-white/10"
+                className="px-6 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-sm backdrop-blur-sm transition-all border border-white/20"
               >
                 Create Student Vault
               </Link>
@@ -468,11 +613,11 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 5. FREQUENTLY ASKED QUESTIONS */}
+      {/* 6. FREQUENTLY ASKED QUESTIONS */}
       <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center space-y-2 mb-8">
-          <h2 className="text-2xl font-bold text-slate-900">Frequently Asked Questions</h2>
-          <p className="text-xs text-slate-500">Everything you need to know about ExamHub India verification</p>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Frequently Asked Questions</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Everything you need to know about ExamHub India verification</p>
         </div>
 
         <div className="space-y-4 text-sm">
@@ -494,9 +639,9 @@ export default function HomePage() {
               a: "ExamHub India provides direct, verified portal links and exact step-by-step instructions for all unsupported institutions. Administrators regularly add new verified institutions to the registry without modifying system code."
             }
           ].map((faq, i) => (
-            <div key={i} className="p-5 rounded-xl bg-white border border-slate-200">
-              <h4 className="font-bold text-slate-900 mb-2">{faq.q}</h4>
-              <p className="text-slate-600 text-xs leading-relaxed">{faq.a}</p>
+            <div key={i} className="p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+              <h4 className="font-bold text-slate-900 dark:text-white mb-2">{faq.q}</h4>
+              <p className="text-slate-600 dark:text-slate-300 text-xs leading-relaxed">{faq.a}</p>
             </div>
           ))}
         </div>

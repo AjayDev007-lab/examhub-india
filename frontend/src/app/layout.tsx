@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import FloatingAIAssistant from "@/components/FloatingAIAssistant";
 
 export const metadata: Metadata = {
   title: "EXAMHUB INDIA | All Your Examination Documents and Results in One Place",
@@ -16,10 +17,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="min-h-screen flex flex-col bg-slate-50 text-slate-900 selection:bg-blue-600 selection:text-white">
+      <body className="min-h-screen flex flex-col bg-brand-bg dark:bg-[#0B132B] text-brand-text dark:text-slate-100 selection:bg-brand-blue selection:text-white transition-colors duration-200">
         <Navbar />
         <main className="flex-1">{children}</main>
         <Footer />
+        <FloatingAIAssistant />
       </body>
     </html>
   );
