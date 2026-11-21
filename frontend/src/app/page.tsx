@@ -40,7 +40,8 @@ export default function HomePage() {
         setCategories(catsData || []);
         setFeaturedExams(examsData || []);
         setAnnouncements(annData || []);
-        setFeaturedJobs(jobsData || []);
+        const rawJobs = Array.isArray(jobsData) ? jobsData : (jobsData?.jobs || []);
+        setFeaturedJobs(rawJobs);
       } catch (err) {
         console.error("Failed to load initial directory data:", err);
       }
@@ -467,65 +468,90 @@ export default function HomePage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {featuredJobs && featuredJobs.length > 0 ? (
-            featuredJobs.map((job) => (
-              <div
-                key={job.id}
-                className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-xl hover:border-blue-400 dark:hover:border-blue-500 transition-all flex flex-col justify-between"
-              >
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
-                      {job.category || "Government"}
-                    </span>
-                    <span className="inline-flex items-center space-x-1 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded">
-                      <ShieldCheck className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
-                      <span>Verified</span>
-                    </span>
+            featuredJobs.map((job) => {
+              const endDateStr = job.application_end_date || job.last_date;
+              const endDate = endDateStr ? new Date(endDateStr) : null;
+              const now = new Date();
+              const isExpired = endDate ? endDate < now : false;
+              const daysLeft = endDate ? Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))) : null;
+
+              return (
+                <div
+                  key={job.id}
+                  className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-xl hover:border-blue-400 dark:hover:border-blue-500 transition-all flex flex-col justify-between"
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
+                        {job.category || job.sector || "Government"}
+                      </span>
+                      {isExpired ? (
+                        <span className="inline-flex items-center space-x-1 text-[10px] font-semibold text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
+                          <span>Window Closed</span>
+                        </span>
+                      ) : daysLeft !== null && daysLeft <= 7 ? (
+                        <span className="inline-flex items-center space-x-1 text-[10px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded animate-pulse">
+                          <Clock className="w-3 h-3 text-amber-500" />
+                          <span>Closing in {daysLeft}d</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center space-x-1 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded">
+                          <ShieldCheck className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                          <span>Active & Verified</span>
+                        </span>
+                      )}
+                    </div>
+
+                    <div>
+                      <h3 className="font-bold text-slate-900 dark:text-white text-sm line-clamp-2 leading-snug">
+                        {job.title}
+                      </h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center space-x-1">
+                        <Building2 className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                        <span className="truncate">{job.organization_name || job.organization || "Official Organization"}</span>
+                      </p>
+                    </div>
+
+                    <div className="space-y-1.5 text-xs text-slate-600 dark:text-slate-300 pt-2 border-t border-slate-100 dark:border-slate-800">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400 text-[11px]">Vacancies</span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">
+                          {job.vacancies_count ? `${Number(job.vacancies_count).toLocaleString("en-IN")} Posts` : (job.vacancies || "Open")}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400 text-[11px]">Salary</span>
+                        <span className="font-semibold text-emerald-600 dark:text-emerald-400 truncate max-w-[160px] text-right">
+                          {job.salary_range || job.salary || "As per Pay Commission"}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400 text-[11px]">Closing Date</span>
+                        <span className={`font-semibold ${isExpired ? "text-slate-400 line-through" : daysLeft !== null && daysLeft <= 7 ? "text-amber-500 font-bold" : "text-rose-600 dark:text-rose-400"}`}>
+                          {endDate ? endDate.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : (job.last_date || "Rolling Verification")}
+                        </span>
+                      </div>
+                    </div>
                   </div>
 
-                  <div>
-                    <h3 className="font-bold text-slate-900 dark:text-white text-sm line-clamp-2 leading-snug">
-                      {job.title}
-                    </h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center space-x-1">
-                      <Building2 className="w-3.5 h-3.5 shrink-0 text-slate-400" />
-                      <span className="truncate">{job.organization}</span>
-                    </p>
-                  </div>
-
-                  <div className="space-y-1.5 text-xs text-slate-600 dark:text-slate-300 pt-2 border-t border-slate-100 dark:border-slate-800">
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400 text-[11px]">Vacancies</span>
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">{job.vacancies || "Open"} Posts</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400 text-[11px]">Salary</span>
-                      <span className="font-semibold text-emerald-600 dark:text-emerald-400">{job.salary || "As per norms"}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400 text-[11px]">Last Date</span>
-                      <span className="font-semibold text-rose-600 dark:text-rose-400">{job.last_date || "Rolling"}</span>
-                    </div>
+                  <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800">
+                    <Link
+                      href={`/jobs/${job.slug || job.id}`}
+                      className="w-full py-2 px-3 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:text-blue-700 font-semibold text-xs transition-colors flex items-center justify-center space-x-1.5"
+                    >
+                      <span>View Eligibility & Apply</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
                   </div>
                 </div>
-
-                <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800">
-                  <Link
-                    href={`/jobs/${job.slug || job.id}`}
-                    className="w-full py-2 px-3 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:text-blue-700 font-semibold text-xs transition-colors flex items-center justify-center space-x-1.5"
-                  >
-                    <span>View Eligibility & Apply</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </Link>
-                </div>
-              </div>
-            ))
+              );
+            })
           ) : (
             [
-              { id: 1, title: "UPSC Civil Services Examination 2026", org: "Union Public Service Commission", cat: "Central Gov", posts: "1,056", salary: "Level 10 (₹56,100)", lastDate: "05 Mar 2026", slug: "upsc-cse-2026" },
-              { id: 2, title: "RRB Assistant Loco Pilot & Tech Grade 1", org: "Railway Recruitment Control Board", cat: "Railway", posts: "18,799", salary: "Level 2 (₹19,900)", lastDate: "18 Mar 2026", slug: "rrb-alp-2026" },
-              { id: 3, title: "SBI Probationary Officer (PO) Scale I", org: "State Bank of India", cat: "Banking", posts: "2,000", salary: "₹41,960 + Allowances", lastDate: "28 Feb 2026", slug: "sbi-po-2026" },
-              { id: 4, title: "ISRO Scientist/Engineer 'SC' Recruitment", org: "Indian Space Research Organisation", cat: "Defence & Research", posts: "85", salary: "Level 10 (₹56,100)", lastDate: "12 Apr 2026", slug: "isro-scientist-sc" },
+              { id: 1, title: "SSC Combined Graduate Level (CGL) 2026-2027", org: "Staff Selection Commission", cat: "Central Gov", posts: "17,727", salary: "Level-4 to Level-8", lastDate: "28 Dec 2026", slug: "ssc-cgl-examination-2026" },
+              { id: 2, title: "RRB NTPC & Group D Technical Posts 2026", org: "Railway Recruitment Control Board", cat: "Railway", posts: "18,799", salary: "Level-2 (₹19,900+)", lastDate: "31 Dec 2026", slug: "rrb-assistant-loco-pilot-alp-2026" },
+              { id: 3, title: "SBI Specialist & Probationary Officer 2026-27", org: "State Bank of India", cat: "Banking", posts: "2,000", salary: "₹41,960 + DA", lastDate: "15 Jan 2027", slug: "sbi-probationary-officers-po-2026" },
+              { id: 4, title: "India Post Gramin Dak Sevaks (GDS) 2026-27", org: "Department of Posts", cat: "Postal / Central", posts: "44,228", salary: "TRCA Slab System", lastDate: "22 Dec 2026", slug: "india-post-gramin-dak-sevak-gds-2026" },
             ].map((j) => (
               <div
                 key={j.id}
@@ -538,7 +564,7 @@ export default function HomePage() {
                     </span>
                     <span className="inline-flex items-center space-x-1 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded">
                       <ShieldCheck className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
-                      <span>Verified</span>
+                      <span>Active Verified</span>
                     </span>
                   </div>
 
@@ -562,7 +588,7 @@ export default function HomePage() {
                       <span className="font-semibold text-emerald-600 dark:text-emerald-400">{j.salary}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-slate-400 text-[11px]">Last Date</span>
+                      <span className="text-slate-400 text-[11px]">Closing Date</span>
                       <span className="font-semibold text-rose-600 dark:text-rose-400">{j.lastDate}</span>
                     </div>
                   </div>

@@ -3,6 +3,36 @@ const backendUrl = process.env.NEXT_PUBLIC_API_URL;
 
 const nextConfig = {
   reactStrictMode: true,
+  async headers() {
+    return [
+      {
+        source: '/auth/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+          },
+          {
+            key: 'Surrogate-Control',
+            value: 'no-store',
+          },
+        ],
+      },
+      {
+        source: '/student/login',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+          },
+          {
+            key: 'Surrogate-Control',
+            value: 'no-store',
+          },
+        ],
+      },
+    ];
+  },
   async redirects() {
     return [
       {

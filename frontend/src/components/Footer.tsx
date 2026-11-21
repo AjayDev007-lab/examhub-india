@@ -131,8 +131,16 @@ export default function Footer() {
                 </Link>
               </li>
               <li><Link href="/dashboard" className="hover:text-white">Help & Support Tickets</Link></li>
-              <li><span className="text-slate-500">Privacy Policy (DPDP Act)</span></li>
-              <li><span className="text-slate-500">Terms of Service</span></li>
+              <li>
+                <Link href="/privacy" className="hover:text-cyan-400 transition-colors">
+                  Privacy Policy (DPDP Act)
+                </Link>
+              </li>
+              <li>
+                <Link href="/terms" className="hover:text-cyan-400 transition-colors">
+                  Terms of Service
+                </Link>
+              </li>
             </ul>
           </div>
         </div>
