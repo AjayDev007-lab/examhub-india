@@ -8,7 +8,7 @@ import { fetchApi } from "@/lib/api";
 
 export default function AdminLoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("superadmin@examhub.gov.in");
+  const [email, setEmail] = useState("ajaydevvs22102004@gmail.com");
   const [password, setPassword] = useState("SuperAdmin@ExamHub2026!");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);

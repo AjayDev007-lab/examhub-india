@@ -3401,7 +3401,7 @@ if (!global.__examhubStore) {
     adminProfile: {
       id: 1,
       full_name: "ExamHub Super Administrator",
-      email: "superadmin@examhub.gov.in",
+      email: "ajaydevvs22102004@gmail.com",
       password: "SuperAdmin@ExamHub2026!",
       role: "SUPER_ADMIN"
     },
