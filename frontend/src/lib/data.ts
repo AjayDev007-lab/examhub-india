@@ -1,5 +1,7 @@
 // Comprehensive shared data store for Vercel deployment and local Next.js API route handlers
 
+import { initialExamApplications, initialStudentApplications, initialCountdowns } from "./examApplications";
+
 export interface OrganizationItem {
   id: number;
   name: string;
@@ -2465,6 +2467,9 @@ declare global {
     jobAlertSubscriptions: any[];
     adminAlerts: any[];
     scheduledTaskLogs: any[];
+    examApplications: any[];
+    studentApplications: any[];
+    countdowns: any[];
     logs: any[];
   } | undefined;
 }
@@ -3426,6 +3431,9 @@ if (!global.__examhubStore) {
     jobAlertSubscriptions: [...initialJobAlertSubscriptions],
     adminAlerts: [...initialAdminAlerts],
     scheduledTaskLogs: [...initialScheduledTaskLogs],
+    examApplications: [...initialExamApplications],
+    studentApplications: [...initialStudentApplications],
+    countdowns: [...initialCountdowns],
     savedWebsites: [
       { userId: 1, websiteId: 11, createdAt: new Date().toISOString() }, // UPSC saved by default student
       { userId: 1, websiteId: 25, createdAt: new Date().toISOString() }  // NTA saved by default student

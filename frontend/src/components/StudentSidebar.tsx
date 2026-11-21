@@ -21,7 +21,9 @@ import {
   LogOut,
   Zap,
   Menu,
-  X
+  X,
+  FileText,
+  Clock
 } from "lucide-react";
 
 interface StudentSidebarProps {
@@ -61,13 +63,15 @@ export default function StudentSidebar({ unreadNotifsCount = 3, activeExamsCount
 
   const navItems = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { name: "My Exams", href: "/student/my-exams", icon: BookOpen, badge: activeExamsCount },
-    { name: "Job Alerts", href: "/student/job-alerts", icon: Briefcase, isNew: true },
+    { name: "Apply for Exams", href: "/apply", icon: BookOpen, isNew: true },
+    { name: "My Applications", href: "/student/my-applications", icon: FileText },
+    { name: "Countdowns", href: "/student/countdown", icon: Clock },
+    { name: "My Exams", href: "/student/my-exams", icon: ShieldCheck, badge: activeExamsCount },
+    { name: "Job Alerts", href: "/student/job-alerts", icon: Briefcase },
     { name: "My Calendar", href: "/student/calendar", icon: Calendar },
     { name: "Check Results", href: "/results", icon: Award },
     { name: "Scholarships", href: "/dashboard?tab=scholarships", icon: GraduationCap },
-    { name: "Exam Directory", href: "/student/examinations", icon: ShieldCheck },
-    { name: "Saved Jobs", href: "/student/saved-jobs", icon: Bookmark },
+    { name: "Official Directory", href: "/official-websites", icon: Bookmark },
     { name: "Notifications", href: "/student/notifications", icon: Bell, badge: unreadNotifsCount },
     { name: "AI Assistant", href: "/assistant", icon: Sparkles, highlight: true },
     { name: "Settings", href: "/student/settings", icon: Settings },

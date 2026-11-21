@@ -8,7 +8,7 @@ import {
   AlertCircle, RefreshCw, LogOut, Search, ExternalLink, Save,
   Check, X, Lock, Key, Wifi, WifiOff, Clock, Trash2, Edit3, Eye,
   History, Globe, Server, CheckCircle, AlertTriangle, ChevronRight, Zap,
-  Train, GraduationCap, Award, Bot, CreditCard, ShieldAlert, Sliders, DollarSign, Download, Briefcase, BarChart3
+  Train, GraduationCap, Award, Bot, CreditCard, ShieldAlert, Sliders, DollarSign, Download, Briefcase, BarChart3, Database
 } from "lucide-react";
 import { fetchApi } from "@/lib/api";
 
@@ -628,6 +628,10 @@ export default function AdminDashboardPage() {
 
   const tabs = [
     { id: "overview", label: "Dashboard Overview", icon: LayoutDashboard },
+    { id: "exam_directory", label: "Exam Directory & Links", icon: BookOpen, href: "/admin/exam-directory" },
+    { id: "student_applications", label: "Student Applications", icon: BarChart3, href: "/admin/applications" },
+    { id: "countdowns", label: "Countdown Clocks", icon: Clock, href: "/admin/countdowns" },
+    { id: "backups", label: "Backups & Recovery", icon: Database, href: "/admin/backups" },
     { id: "analytics", label: "Advanced Analytics", icon: BarChart3, href: "/admin/analytics" },
     { id: "jobs", label: "Job Notifications", icon: Briefcase, href: "/admin/jobs" },
     { id: "exam_registrations", label: "Exam Registrations", icon: BookOpen, href: "/admin/exam-registrations" },
