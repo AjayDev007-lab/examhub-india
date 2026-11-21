@@ -9,7 +9,7 @@ from app.models.models import (
     MonitoringSource, MonitoringSchedule, MonitoringRun, DetectedUpdate,
     UpdateVerificationLog, StudentUpdateBookmark, StudentUpdatePreference,
     MaintenanceTask, WebsiteHealthCheck, DatabaseHealthLog, BackupRecord,
-    ApplicationErrorLog, DailyAdminReport
+    ApplicationErrorLog, DailyAdminReport, WebsiteOperatingControl, WebsiteStatusHistory
 )
 
 __all__ = [
@@ -23,5 +23,5 @@ __all__ = [
     "MonitoringSource", "MonitoringSchedule", "MonitoringRun", "DetectedUpdate",
     "UpdateVerificationLog", "StudentUpdateBookmark", "StudentUpdatePreference",
     "MaintenanceTask", "WebsiteHealthCheck", "DatabaseHealthLog", "BackupRecord",
-    "ApplicationErrorLog", "DailyAdminReport"
+    "ApplicationErrorLog", "DailyAdminReport", "WebsiteOperatingControl", "WebsiteStatusHistory"
 ]

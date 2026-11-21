@@ -1223,6 +1223,39 @@ class DailyAdminReport(Base):
     generated_at = Column(DateTime, default=utc_now, nullable=False)
 
 
+# 66. WEBSITE OPERATING CONTROL (Online / Maintenance / Offline Modes)
+class WebsiteOperatingControl(Base):
+    __tablename__ = "website_operating_control"
+
+    id = Column(Integer, primary_key=True, index=True)
+    mode = Column(String(50), default="ONLINE", nullable=False, index=True) # "ONLINE", "MAINTENANCE", "OFFLINE"
+    maintenance_message = Column(Text, default="ExamHub India is currently undergoing scheduled platform upgrades to serve you better. We will be back online shortly.")
+    estimated_return_time = Column(String(100), default="Tonight by 23:00 IST")
+    scheduled_start_time = Column(DateTime, nullable=True)
+    scheduled_end_time = Column(DateTime, nullable=True)
+    auto_online_enabled = Column(Boolean, default=True)
+    allowed_admin_ips = Column(Text, nullable=True)
+    emergency_recovery_token = Column(String(255), nullable=True)
+    bypass_secret_key = Column(String(255), default="examhub-admin-secure-maintenance-bypass")
+    updated_by_admin_id = Column(Integer, ForeignKey("admin_users.id", ondelete="SET NULL"), nullable=True)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+
+# 67. WEBSITE STATUS HISTORY (Audit Trail)
+class WebsiteStatusHistory(Base):
+    __tablename__ = "website_status_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    previous_mode = Column(String(50), nullable=False)
+    new_mode = Column(String(50), nullable=False)
+    reason = Column(Text, nullable=False)
+    changed_by_admin_id = Column(Integer, ForeignKey("admin_users.id", ondelete="SET NULL"), nullable=True)
+    admin_email = Column(String(255), nullable=True)
+    ip_address = Column(String(100), default="127.0.0.1")
+    timestamp = Column(DateTime, default=utc_now, nullable=False, index=True)
+
+
+
 
 
 

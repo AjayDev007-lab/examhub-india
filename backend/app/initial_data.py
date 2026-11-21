@@ -15,7 +15,8 @@ from app.models.models import (
     NotificationDeliveryLog, AdminAlert, AnalyticsEvent, ScheduledTaskLog,
     MonitoringSource, MonitoringSchedule, MonitoringRun, DetectedUpdate,
     UpdateVerificationLog, MaintenanceTask, WebsiteHealthCheck,
-    DatabaseHealthLog, BackupRecord, ApplicationErrorLog, DailyAdminReport
+    DatabaseHealthLog, BackupRecord, ApplicationErrorLog, DailyAdminReport,
+    WebsiteOperatingControl, WebsiteStatusHistory
 )
 from app.auth.security import hash_password
 from app.config import settings
@@ -3093,6 +3094,28 @@ async def seed_database():
                     security_alerts_count=0,
                     maintenance_tasks_completed=2,
                     outstanding_issues_count=1
+                ))
+
+            # 35. Seed Website Operating Control (Online / Maintenance / Offline Modes)
+            ctrl_stmt = select(WebsiteOperatingControl)
+            ctrl_res = await db.execute(ctrl_stmt)
+            if not ctrl_res.scalars().first():
+                control_entry = WebsiteOperatingControl(
+                    mode="ONLINE",
+                    maintenance_message="ExamHub India is currently undergoing scheduled platform upgrades to serve you better. We will be back online shortly.",
+                    estimated_return_time="Tonight by 23:00 IST",
+                    auto_online_enabled=True,
+                    bypass_secret_key="examhub-admin-secure-maintenance-bypass"
+                )
+                db.add(control_entry)
+                await db.flush()
+
+                db.add(WebsiteStatusHistory(
+                    previous_mode="INITIALIZING",
+                    new_mode="ONLINE",
+                    reason="Platform operational readiness confirmed on deployment initialization.",
+                    admin_email="superadmin@examhub.gov.in",
+                    ip_address="127.0.0.1"
                 ))
 
             await db.commit()
