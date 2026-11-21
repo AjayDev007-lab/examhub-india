@@ -186,26 +186,15 @@ export default function StudentSidebar({ unreadNotifsCount = 3, activeExamsCount
           })}
         </div>
 
-        {/* Pro Plan Upgrade Card */}
-        <div className="p-3 mx-3 mb-3 rounded-2xl bg-gradient-to-br from-[#1a3f7c] to-[#122e5a] border border-blue-400/20 text-white shadow-xl">
-          <div className="flex items-center justify-between mb-2">
-            <span className="inline-flex items-center space-x-1 text-[10px] font-black tracking-wider text-amber-300 uppercase">
-              <Zap className="w-3 h-3 text-amber-300 fill-amber-300" />
-              <span>ExamHub Pro</span>
-            </span>
-            <span className="px-1.5 py-0.5 rounded bg-blue-500/30 text-[9px] font-semibold text-blue-200">
-              Free Trial
-            </span>
+        {/* 100% Free Public Education Badge */}
+        <div className="p-3.5 mx-3 mb-3 rounded-2xl bg-gradient-to-br from-[#102D59] to-[#0A1A33] border border-blue-400/20 text-white shadow-md">
+          <div className="flex items-center space-x-1.5 mb-1 text-[11px] font-bold text-emerald-400">
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>100% Free Public Portal</span>
           </div>
-          <p className="text-[11px] text-blue-100/90 leading-tight mb-2.5">
-            Auto Admit Card SMS, priority AI mock solutions & vacancy instant push.
+          <p className="text-[10px] text-blue-200/90 leading-tight">
+            All examinations, application tracking, countdowns, and alerts are completely free for all Indian students.
           </p>
-          <Link
-            href="/pricing"
-            className="block text-center w-full py-1.5 bg-[#2563EB] hover:bg-blue-500 text-white text-[11px] font-bold rounded-lg shadow transition-all"
-          >
-            Upgrade Account
-          </Link>
         </div>
 
         {/* Footer with Dark Mode Toggle & Sign Out */}

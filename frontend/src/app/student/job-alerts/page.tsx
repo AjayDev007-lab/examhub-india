@@ -150,12 +150,12 @@ export default function StudentJobAlertsPage() {
           </div>
         )}
 
-        {/* Active Alert Subscriptions Bar */}
+        {/* Active Job Alert Feeds Bar */}
         <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm space-y-3">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-2">
               <Bell className="w-4 h-4 text-blue-600" />
-              <h3 className="text-sm font-bold text-slate-900">Active Alert Subscriptions ({subscriptions.length})</h3>
+              <h3 className="text-sm font-bold text-slate-900">Active Job Alert Feeds (100% Free) ({subscriptions.length})</h3>
             </div>
           </div>
 
@@ -172,7 +172,7 @@ export default function StudentJobAlertsPage() {
                 <button
                   onClick={() => handleDeleteSubscription(sub.id)}
                   className="text-slate-400 hover:text-red-600 transition-colors"
-                  title="Remove alert subscription"
+                  title="Remove alert feed"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>

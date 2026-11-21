@@ -2450,7 +2450,6 @@ declare global {
     rrbGroupDResults: any[];
     aiSettings: any;
     scholarships: any[];
-    payments: any[];
     securityIncidents: any[];
     faculty: any[];
     moderationItems: any[];
@@ -2610,50 +2609,6 @@ export const initialScholarships = [
     application_portal_url: "https://scholarships.gov.in",
     status: "PUBLISHED",
     deadline_date: "2026-12-31"
-  }
-];
-
-export const initialPayments = [
-  {
-    id: 1,
-    order_id: "order_PRO_8841",
-    payment_id: "pay_RAZOR_8841",
-    user_id: 1,
-    student_name: "Rahul Sharma",
-    student_email: "student@examhub.gov.in",
-    tier: "STUDENT_PRO",
-    amount: 9900, // ₹99
-    currency: "INR",
-    status: "COMPLETED",
-    created_at: new Date(Date.now() - 3600000 * 4).toISOString()
-  },
-  {
-    id: 2,
-    order_id: "order_INST_9921",
-    payment_id: "pay_RAZOR_9921",
-    user_id: 2,
-    student_name: "Delhi University Admin Desk",
-    student_email: "admin@du.ac.in",
-    tier: "INSTITUTION_VERIFIED",
-    amount: 1499900, // ₹14,999
-    currency: "INR",
-    status: "COMPLETED",
-    created_at: new Date(Date.now() - 86400000 * 2).toISOString()
-  },
-  {
-    id: 3,
-    order_id: "order_PRO_8892",
-    payment_id: "pay_RAZOR_8892",
-    user_id: 1,
-    student_name: "Priya Nair",
-    student_email: "priya.nair@example.com",
-    tier: "STUDENT_PRO",
-    amount: 9900, // ₹99
-    currency: "INR",
-    status: "REFUNDED",
-    refund_reason: "Student requested cancellation within 24h",
-    refund_amount: 9900,
-    created_at: new Date(Date.now() - 86400000 * 4).toISOString()
   }
 ];
 
@@ -3084,17 +3039,17 @@ export const initialJobs = [
     id: 12,
     title: "Remote Full Stack Software Engineer (Golang & Next.js)",
     slug: "remote-software-engineer-golang-react-2026",
-    organization_name: "Razorpay / NeoBank FinTech Technologies",
-    organization_logo_url: "https://razorpay.com/favicon.png",
+    organization_name: "Infosys Cloud & Digital Systems",
+    organization_logo_url: "https://www.infosys.com/favicon.ico",
     sector: "PRIVATE",
     category: "REMOTE",
-    job_description: "Building scalable payments infrastructure, developer APIs, and financial checkout web applications handling millions of transactions daily.",
+    job_description: "Building scalable distributed systems, developer APIs, and cloud applications handling enterprise workloads.",
     vacancies_count: 25,
     qualification: "B.Tech / B.E / B.Sc / BCA in Computer Science or self-taught developer with strong portfolio",
     required_skills: "Golang or Node.js, React / Next.js, PostgreSQL, Docker, Redis",
     age_limit: "18+ (No upper age limit)",
     experience_required: "1-3",
-    salary_range: "₹14,00,000 - ₹24,00,000 per annum + ESOPs",
+    salary_range: "₹14,00,000 - ₹24,00,000 per annum + Benefits",
     location: "Remote (Anywhere in India)",
     work_mode: "REMOTE",
     application_start_date: "2026-02-01T00:00:00Z",
@@ -3102,9 +3057,9 @@ export const initialJobs = [
     application_fee: "Free",
     selection_process: "Resume Screening -> Take-home Coding Assignment -> System Design Round -> Culture Fit",
     syllabus_details: "Practical software engineering assessment evaluating concurrent programming and clean architecture.",
-    official_notification_pdf: "https://razorpay.com/careers/JD_SWE_2026.pdf",
-    official_application_url: "https://razorpay.com/careers/",
-    source_website_url: "https://razorpay.com/careers/",
+    official_notification_pdf: "https://career.infosys.com/job/SWE_2026.pdf",
+    official_application_url: "https://career.infosys.com",
+    source_website_url: "https://career.infosys.com",
     verification_source: "Official Company Career Portal",
     status: "PUBLISHED",
     is_featured: false,
@@ -3415,7 +3370,6 @@ if (!global.__examhubStore) {
     rrbGroupDResults: [...initialRRBGroupDResults],
     aiSettings: { ...initialAISettings },
     scholarships: [...initialScholarships],
-    payments: [...initialPayments],
     securityIncidents: [...initialSecurityIncidents],
     faculty: [...initialFaculty],
     moderationItems: [...initialModerationItems],

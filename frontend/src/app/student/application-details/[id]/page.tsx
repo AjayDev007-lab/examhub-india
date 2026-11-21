@@ -246,7 +246,7 @@ export default function SingleStudentApplicationDetailPage() {
                     <option value="INTERESTED">Interested</option>
                     <option value="NOT_STARTED">Not Started</option>
                     <option value="APPLICATION_STARTED">Application In Progress</option>
-                    <option value="PAYMENT_PENDING">Payment Pending</option>
+                    <option value="PAYMENT_PENDING">Official Commission Fee Pending (On Gov Portal)</option>
                     <option value="SUBMITTED">Submitted</option>
                     <option value="CONFIRMATION_RECEIVED">Confirmation Received</option>
                     <option value="ADMIT_CARD_RELEASED">Admit Card Released</option>

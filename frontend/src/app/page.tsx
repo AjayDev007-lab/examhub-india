@@ -78,7 +78,7 @@ export default function HomePage() {
         <div className="relative max-w-5xl mx-auto text-center space-y-6">
           <div className="inline-flex items-center space-x-2 px-3 py-1.5 rounded-full bg-blue-500/10 border border-blue-400/20 text-blue-300 text-xs font-semibold tracking-wide">
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span>Centralized Educational & Career Platform for Indian Students</span>
+            <span>100% Free Public Portal • Centralized Educational & Career Platform for Indian Students</span>
           </div>
 
           <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white leading-tight">

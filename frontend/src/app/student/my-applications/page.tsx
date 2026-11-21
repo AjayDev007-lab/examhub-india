@@ -13,7 +13,7 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   INTERESTED: { label: "Interested", color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" },
   NOT_STARTED: { label: "Not Started", color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" },
   APPLICATION_STARTED: { label: "Form In Progress", color: "bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800" },
-  PAYMENT_PENDING: { label: "Payment Pending", color: "bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800" },
+  PAYMENT_PENDING: { label: "Commission Fee Pending (On Gov Portal)", color: "bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800" },
   SUBMITTED: { label: "Form Submitted", color: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800" },
   CONFIRMATION_RECEIVED: { label: "Confirmation Slip", color: "bg-teal-50 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300 border border-teal-200 dark:border-teal-800" },
   ADMIT_CARD_RELEASED: { label: "Admit Card Out", color: "bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800 animate-pulse" },
@@ -384,7 +384,7 @@ export default function StudentMyApplicationsPage() {
                   <option value="INTERESTED">Interested / Shortlisted</option>
                   <option value="NOT_STARTED">Not Started Yet</option>
                   <option value="APPLICATION_STARTED">Application Form In Progress</option>
-                  <option value="PAYMENT_PENDING">Payment Pending</option>
+                  <option value="PAYMENT_PENDING">Official Commission Fee Pending (On Gov Portal)</option>
                   <option value="SUBMITTED">Form Submitted Successfully</option>
                   <option value="CONFIRMATION_RECEIVED">Confirmation Slip Received</option>
                   <option value="ADMIT_CARD_RELEASED">Admit Card Released / Downloaded</option>

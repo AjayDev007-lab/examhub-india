@@ -1578,37 +1578,6 @@ async def seed_database():
                     )
                 ])
 
-            # Seed initial sample Payment Transactions for financial analytics
-            pay_check = await db.execute(select(PaymentTransaction))
-            if not pay_check.scalars().first():
-                admin_user_res = await db.execute(select(AdminUser).where(AdminUser.email == settings.SUPERADMIN_EMAIL))
-                super_admin = admin_user_res.scalars().first()
-                std_user_res = await db.execute(select(User))
-                first_student = std_user_res.scalars().first()
-                if first_student:
-                    db.add_all([
-                        PaymentTransaction(
-                            order_id="order_TEST_1001",
-                            payment_id="pay_TEST_1001",
-                            user_id=first_student.id,
-                            tier="STUDENT_PRO",
-                            amount=9900,
-                            currency="INR",
-                            status="COMPLETED",
-                            hmac_signature="simulated_hmac_sha256_verified_sig_001"
-                        ),
-                        PaymentTransaction(
-                            order_id="order_TEST_1002",
-                            payment_id="pay_TEST_1002",
-                            user_id=first_student.id,
-                            tier="INSTITUTION_VERIFIED",
-                            amount=1499900,
-                            currency="INR",
-                            status="COMPLETED",
-                            hmac_signature="simulated_hmac_sha256_verified_sig_002"
-                        )
-                    ])
-
             # Seed initial Security Incident Audit
             sec_check = await db.execute(select(SecurityIncident))
             if not sec_check.scalars().first():

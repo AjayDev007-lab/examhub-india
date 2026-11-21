@@ -21,8 +21,9 @@ export default function Footer() {
             <p className="text-slate-400 text-xs leading-relaxed max-w-sm">
               All Your Examination Documents and Results in One Place. Centralized access for Indian students covering Central & State Government examinations, national entrance tests, government and private universities.
             </p>
-            <div className="p-3 bg-slate-900/80 rounded-lg border border-slate-800 text-[11px] leading-relaxed text-slate-400">
-              <span className="font-semibold text-slate-300">Official Notice:</span> Integrations are progressive and permitted. Unsupported examination bodies feature verified links and retrieval instructions.
+            <div className="p-3 bg-slate-900/80 rounded-lg border border-slate-800 text-[11px] leading-relaxed text-slate-400 space-y-1">
+              <p><span className="font-semibold text-emerald-400">100% Payment-Free Public Portal:</span> All examination directory, application tracking, countdowns, and student services are completely free. No subscription or payment is ever charged.</p>
+              <p><span className="font-semibold text-slate-300">Official Notice:</span> Integrations are progressive and permitted. Unsupported examination bodies feature verified links and retrieval instructions.</p>
             </div>
 
             {/* Official Instagram Profile Badge */}

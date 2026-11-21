@@ -31,8 +31,6 @@ export default function AdminDashboardPage() {
   const [rrbList, setRrbList] = useState<any[]>([]);
   const [aiConfig, setAiConfig] = useState<any>(null);
   const [securityData, setSecurityData] = useState<any>(null);
-  const [paymentsList, setPaymentsList] = useState<any[]>([]);
-  const [paymentMetrics, setPaymentMetrics] = useState<any>(null);
   const [scholarshipsList, setScholarshipsList] = useState<any[]>([]);
   const [facultyList, setFacultyList] = useState<any[]>([]);
   const [studentSearch, setStudentSearch] = useState("");
@@ -215,7 +213,7 @@ export default function AdminDashboardPage() {
   async function loadAdminData() {
     setLoading(true);
     try {
-      const [dashStats, orgs, exams, stds, logs, tcks, sttings, cats, sts, dirWebs, dirReports, rrbs, aiRes, secRes, payRes, schRes, facRes] = await Promise.all([
+      const [dashStats, orgs, exams, stds, logs, tcks, sttings, cats, sts, dirWebs, dirReports, rrbs, aiRes, secRes, schRes, facRes] = await Promise.all([
         fetchApi("/api/admin/dashboard").catch(() => null),
         fetchApi("/api/admin/institutions").catch(() => []),
         fetchApi("/api/exams?limit=50").catch(() => []),
@@ -230,7 +228,6 @@ export default function AdminDashboardPage() {
         fetchApi("/api/admin/rrb-group-d").catch(() => null),
         fetchApi("/api/admin/ai").catch(() => null),
         fetchApi("/api/admin/security").catch(() => null),
-        fetchApi("/api/admin/payments").catch(() => null),
         fetchApi("/api/admin/scholarships").catch(() => null),
         fetchApi("/api/admin/faculty").catch(() => null)
       ]);
@@ -248,8 +245,6 @@ export default function AdminDashboardPage() {
       setRrbList(rrbs?.results || []);
       setAiConfig(aiRes?.config || null);
       setSecurityData(secRes || null);
-      setPaymentsList(payRes?.payments || []);
-      setPaymentMetrics(payRes?.metrics || null);
       setScholarshipsList(schRes?.scholarships || []);
       setFacultyList(facRes?.faculty || []);
       if (cats && cats.length > 0) {
@@ -645,7 +640,6 @@ export default function AdminDashboardPage() {
     { id: "faculty", label: "Faculty & Staff", icon: GraduationCap, count: facultyList.length },
     { id: "scholarships", label: "Scholarships", icon: Award, count: scholarshipsList.length },
     { id: "ai", label: "AI Assistant Centre", icon: Bot },
-    { id: "payments", label: "Payments & Revenue", icon: CreditCard },
     { id: "security", label: "Security & Threat Log", icon: ShieldCheck, count: securityData?.unresolvedAlerts || 0 },
     { id: "tickets", label: "Support Tickets", icon: HelpCircle, count: tickets.filter(t => t.status === "OPEN").length },
     { id: "audit", label: "Tamper-Evident Audit", icon: FileText, href: "/admin/audit-logs" },
@@ -2220,74 +2214,7 @@ export default function AdminDashboardPage() {
           </div>
         )}
 
-        {/* PAYMENTS & REVENUE TAB */}
-        {activeTab === "payments" && (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-2xl font-black text-white flex items-center gap-2">
-                <CreditCard className="w-6 h-6 text-emerald-400" />
-                Payments, Subscriptions & Revenue
-              </h2>
-              <p className="text-xs text-slate-400">Cryptographically verified transactions ledger, Student Pro alerts, and Institution memberships</p>
-            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-              <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
-                <span className="text-[11px] text-slate-400 font-semibold block">Total Revenue</span>
-                <span className="text-2xl font-black text-emerald-400 mt-1 block">
-                  ₹{paymentMetrics?.totalRevenueInr?.toLocaleString() || "15,098"}
-                </span>
-              </div>
-              <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
-                <span className="text-[11px] text-slate-400 font-semibold block">Student Pro Subscribers</span>
-                <span className="text-2xl font-black text-white mt-1 block">
-                  {paymentMetrics?.activeProSubscribers || 1}
-                </span>
-              </div>
-              <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
-                <span className="text-[11px] text-slate-400 font-semibold block">Institution Subscribers</span>
-                <span className="text-2xl font-black text-blue-400 mt-1 block">
-                  {paymentMetrics?.activeInstitutionSubscribers || 1}
-                </span>
-              </div>
-              <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
-                <span className="text-[11px] text-slate-400 font-semibold block">Refunded Count</span>
-                <span className="text-2xl font-black text-slate-400 mt-1 block">
-                  {paymentMetrics?.refundedTransactions || 1}
-                </span>
-              </div>
-            </div>
-
-            <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl space-y-3">
-              <h3 className="font-bold text-white text-sm">Recent Transactions Ledger</h3>
-              <div className="divide-y divide-slate-800 text-xs font-mono">
-                {paymentsList.map((p) => (
-                  <div key={p.id} className="py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                    <div>
-                      <div className="flex items-center space-x-2">
-                        <span className="font-bold text-white font-sans">{p.student_name}</span>
-                        <span className="text-[10px] text-slate-400 font-sans">({p.student_email})</span>
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-950 text-blue-300 font-sans">
-                          {p.tier}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 mt-0.5">Order: {p.order_id} • Pay ID: {p.payment_id}</p>
-                    </div>
-
-                    <div className="flex items-center space-x-3">
-                      <span className="font-bold text-white text-sm font-sans">₹{p.amount / 100}</span>
-                      <span className={`px-2.5 py-0.5 rounded text-[10px] font-bold font-sans ${
-                        p.status === "COMPLETED" ? "bg-emerald-950 text-emerald-300" : "bg-amber-950 text-amber-300"
-                      }`}>
-                        {p.status}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* SECURITY & THREAT LOG TAB */}
         {activeTab === "security" && (

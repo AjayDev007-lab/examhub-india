@@ -172,7 +172,7 @@ export default function AdminSystemHealthPage() {
               className="p-4 bg-slate-950 hover:bg-slate-800/80 border border-slate-800 rounded-2xl text-left transition-all disabled:opacity-50"
             >
               <div className="text-xs font-bold text-white">Dispatch Job Alerts</div>
-              <div className="text-[11px] text-slate-400 mt-1">Evaluate student subscriptions against new gazettes.</div>
+              <div className="text-[11px] text-slate-400 mt-1">Evaluate student alert preferences against new gazettes.</div>
               <div className="text-[10px] font-bold text-blue-400 mt-3 flex items-center space-x-1">
                 <Play className="w-3 h-3" />
                 <span>{runningTask === "DISPATCH_JOB_ALERTS" ? "Running..." : "Run Task"}</span>

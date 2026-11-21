@@ -304,10 +304,13 @@ export default function SingleExamApplicationDetailPage() {
             <div className="space-y-4 text-sm">
               <div className="p-3.5 bg-blue-50/50 dark:bg-blue-950/30 rounded-2xl border border-blue-100 dark:border-blue-900/40">
                 <span className="text-xs font-semibold text-blue-700 dark:text-blue-400 uppercase tracking-wider block">
-                  Official Application Fee:
+                  Official Application Fee (Informational Only):
                 </span>
                 <p className="font-bold text-slate-800 dark:text-slate-100 mt-0.5">
                   {exam.application_fee}
+                </p>
+                <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-2 leading-relaxed bg-white/70 dark:bg-slate-900/70 p-2.5 rounded-xl border border-blue-100 dark:border-blue-900/50">
+                  <strong className="text-slate-800 dark:text-slate-200">Payment Notice:</strong> Application fees are determined and collected solely by the conducting commission ({exam.conducting_authority}) on their official government portal. ExamHub India is completely payment-free and never charges fees or collects card, UPI, or banking credentials.
                 </p>
               </div>
 

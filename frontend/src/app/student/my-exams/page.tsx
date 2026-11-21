@@ -540,7 +540,7 @@ export default function MyExamsPage() {
                 >
                   <option value="ADDED_TO_MY_EXAMS">Added to My Exams (Planning)</option>
                   <option value="REGISTRATION_STARTED">Registration Started (Portal visited)</option>
-                  <option value="APPLICATION_SUBMITTED">Application Submitted (Fee paid)</option>
+                  <option value="APPLICATION_SUBMITTED">Application Submitted (On Gov Portal)</option>
                   <option value="APPLICATION_CONFIRMED">Application Confirmed (Hall ticket issued)</option>
                 </select>
               </div>
