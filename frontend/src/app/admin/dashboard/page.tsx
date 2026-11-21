@@ -8,7 +8,7 @@ import {
   AlertCircle, RefreshCw, LogOut, Search, ExternalLink, Save,
   Check, X, Lock, Key, Wifi, WifiOff, Clock, Trash2, Edit3, Eye,
   History, Globe, Server, CheckCircle, AlertTriangle, ChevronRight, Zap,
-  Train, GraduationCap, Award, Bot, CreditCard, ShieldAlert, Sliders, DollarSign, Download, Briefcase
+  Train, GraduationCap, Award, Bot, CreditCard, ShieldAlert, Sliders, DollarSign, Download, Briefcase, BarChart3
 } from "lucide-react";
 import { fetchApi } from "@/lib/api";
 
@@ -547,19 +547,23 @@ export default function AdminDashboardPage() {
 
   const tabs = [
     { id: "overview", label: "Dashboard Overview", icon: LayoutDashboard },
+    { id: "analytics", label: "Advanced Analytics", icon: BarChart3, href: "/admin/analytics" },
     { id: "jobs", label: "Job Notifications", icon: Briefcase, href: "/admin/jobs" },
+    { id: "exam_registrations", label: "Exam Registrations", icon: BookOpen, href: "/admin/exam-registrations" },
+    { id: "alerts", label: "Admin Alert Centre", icon: Bell, href: "/admin/notifications" },
+    { id: "automation", label: "Automation & Health", icon: Activity, href: "/admin/system-health" },
     { id: "rrb_results", label: "RRB Group D Results", icon: Train, count: rrbList.filter(r => r.status === "PENDING_VERIFICATION").length },
     { id: "institutions", label: "Institutions & Boards", icon: Building2, count: pendingApprovalsCount > 0 ? pendingApprovalsCount : organizations.length },
-    { id: "directory", label: "Gov Directory & Portals", icon: Globe, count: brokenReports.filter(r => r.status === "PENDING").length },
+    { id: "directory", label: "Gov Directory & Portals", icon: Globe, href: "/admin/official-websites" },
     { id: "exams", label: "Examinations & Dates", icon: BookOpen, count: examinations.length },
-    { id: "students", label: "Students & Accounts", icon: Users, count: students.length },
+    { id: "students", label: "Students & Accounts", icon: Users, href: "/admin/students" },
     { id: "faculty", label: "Faculty & Staff", icon: GraduationCap, count: facultyList.length },
     { id: "scholarships", label: "Scholarships", icon: Award, count: scholarshipsList.length },
     { id: "ai", label: "AI Assistant Centre", icon: Bot },
     { id: "payments", label: "Payments & Revenue", icon: CreditCard },
     { id: "security", label: "Security & Threat Log", icon: ShieldCheck, count: securityData?.unresolvedAlerts || 0 },
     { id: "tickets", label: "Support Tickets", icon: HelpCircle, count: tickets.filter(t => t.status === "OPEN").length },
-    { id: "audit", label: "Tamper-Evident Audit", icon: FileText },
+    { id: "audit", label: "Tamper-Evident Audit", icon: FileText, href: "/admin/audit-logs" },
     { id: "settings", label: "System Health & Settings", icon: Settings },
   ];
 

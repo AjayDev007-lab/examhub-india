@@ -2457,6 +2457,13 @@ declare global {
     jobApplications: any[];
     jobReports: any[];
     savedWebsites: { userId: number; websiteId: number; createdAt: string }[];
+    studentExamRegistrations: any[];
+    studentCalendarEvents: any[];
+    examReminders: any[];
+    studentJobPreferences: any[];
+    jobAlertSubscriptions: any[];
+    adminAlerts: any[];
+    scheduledTaskLogs: any[];
     logs: any[];
   } | undefined;
 }
@@ -3138,6 +3145,248 @@ export const initialJobApplications = [
   }
 ];
 
+export const initialStudentExamRegistrations = [
+  {
+    id: 1,
+    userId: 1,
+    examinationId: 1,
+    status: "APPLICATION_CONFIRMED",
+    application_number: "UPSC/CSE/2026/894102",
+    registration_date: "2026-02-10T09:00:00Z",
+    official_portal_url: "https://upsconline.nic.in",
+    notes: "Targeting IAS & IFS cadre. Prelims mock tests ongoing.",
+    is_external: false,
+    createdAt: "2026-02-10T09:00:00Z"
+  },
+  {
+    id: 2,
+    userId: 1,
+    examinationId: 2,
+    status: "APPLICATION_SUBMITTED",
+    application_number: "SSC/CGL/2026/512903",
+    registration_date: "2026-02-14T11:30:00Z",
+    official_portal_url: "https://ssc.gov.in",
+    notes: "Tier 1 exam center: Chennai Main",
+    is_external: false,
+    createdAt: "2026-02-14T11:30:00Z"
+  },
+  {
+    id: 3,
+    userId: 1,
+    examinationId: null,
+    status: "APPLICATION_CONFIRMED",
+    application_number: "TNPSC/2026/G2/771829",
+    registration_date: "2026-02-01T10:00:00Z",
+    notes: "Applied on official tnpscexams.in portal directly.",
+    is_external: true,
+    external_exam_name: "Tamil Nadu Group 2 Combined Services",
+    external_authority: "Tamil Nadu Public Service Commission (TNPSC)",
+    external_exam_date: "2026-05-24T09:30:00Z",
+    external_application_deadline: "2026-03-20T23:59:00Z",
+    createdAt: "2026-02-01T10:00:00Z"
+  }
+];
+
+export const initialStudentCalendarEvents = [
+  {
+    id: 1,
+    userId: 1,
+    registrationId: 1,
+    examinationId: 1,
+    title: "Civil Services (Preliminary) Examination 2026",
+    eventType: "EXAM_DATE",
+    eventDate: "2026-05-25T09:30:00Z",
+    location: "All India Designated Test Centers",
+    notes: "GS Paper I (09:30 - 11:30) & CSAT Paper II (14:30 - 16:30)",
+    status: "SCHEDULED",
+    isCustom: false
+  },
+  {
+    id: 2,
+    userId: 1,
+    registrationId: 1,
+    examinationId: 1,
+    title: "UPSC CSE 2026 e-Admit Card Release",
+    eventType: "ADMIT_CARD",
+    eventDate: "2026-05-01T10:00:00Z",
+    location: "UPSC Online Portal",
+    notes: "Download official hall ticket from upsconline.nic.in",
+    status: "SCHEDULED",
+    isCustom: false
+  },
+  {
+    id: 3,
+    userId: 1,
+    registrationId: 2,
+    examinationId: 2,
+    title: "SSC Combined Graduate Level (CGL) 2026 - Tier 1",
+    eventType: "EXAM_DATE",
+    eventDate: "2026-06-12T10:00:00Z",
+    location: "TCS iON Digital Zone",
+    status: "SCHEDULED",
+    isCustom: false
+  },
+  {
+    id: 4,
+    userId: 1,
+    registrationId: 3,
+    examinationId: null,
+    title: "TNPSC Group 2 Preliminary Examination",
+    eventType: "EXAM_DATE",
+    eventDate: "2026-05-24T09:30:00Z",
+    location: "Chennai District Center",
+    status: "SCHEDULED",
+    isCustom: true
+  }
+];
+
+export const initialExamReminders = [
+  {
+    id: 1,
+    userId: 1,
+    registrationId: 1,
+    examinationId: 1,
+    reminderType: "EXAM_30D",
+    title: "30-Day Reminder: UPSC Civil Services 2026",
+    message: "30 days left before UPSC Prelims 2026. Review CSAT and current affairs mocks.",
+    scheduledFor: "2026-04-25T09:00:00Z",
+    status: "PENDING",
+    deliveryChannel: "IN_APP"
+  },
+  {
+    id: 2,
+    userId: 1,
+    registrationId: 1,
+    examinationId: 1,
+    reminderType: "EXAM_7D",
+    title: "7-Day Notice: UPSC Civil Services 2026",
+    message: "7 days remaining. Print your admit card and verify travel route.",
+    scheduledFor: "2026-05-18T09:00:00Z",
+    status: "PENDING",
+    deliveryChannel: "IN_APP"
+  },
+  {
+    id: 3,
+    userId: 1,
+    registrationId: 2,
+    examinationId: 2,
+    reminderType: "EXAM_30D",
+    title: "30-Day Reminder: SSC CGL 2026 Tier 1",
+    message: "Your SSC CGL Tier 1 examination is approaching in 30 days.",
+    scheduledFor: "2026-05-13T09:00:00Z",
+    status: "PENDING",
+    deliveryChannel: "IN_APP"
+  }
+];
+
+export const initialStudentJobPreferences = [
+  {
+    id: 1,
+    userId: 1,
+    qualification: "GRADUATION",
+    degreeDepartment: "B.E. Computer Science & Engineering",
+    graduationYear: 2025,
+    skills: "Python, SQL, FastApi, Machine Learning, Problem Solving, Data Structures",
+    experienceLevel: "FRESHER",
+    preferredRoles: "Software Engineer, Bank PO, Civil Services Officer, Systems Engineer",
+    preferredLocations: "Chennai, Bangalore, Hyderabad, All India",
+    expectedSalaryMin: "₹6,00,000",
+    sectorPreference: "ALL",
+    employmentTypePreference: "FULL_TIME",
+    jobAlertsEnabled: true,
+    emailAlertsEnabled: true,
+    pushAlertsEnabled: false
+  }
+];
+
+export const initialJobAlertSubscriptions = [
+  {
+    id: 1,
+    userId: 1,
+    keyword: "Software Engineer",
+    sector: "ALL",
+    category: "IT",
+    qualification: "GRADUATION",
+    frequency: "INSTANT",
+    isActive: true
+  },
+  {
+    id: 2,
+    userId: 1,
+    keyword: "Civil Services",
+    sector: "CENTRAL_GOVT",
+    category: "GOVERNMENT",
+    qualification: "GRADUATION",
+    frequency: "DAILY",
+    isActive: true
+  }
+];
+
+export const initialAdminAlerts = [
+  {
+    id: 1,
+    alertType: "NEW_INSTITUTION",
+    severity: "INFO",
+    title: "New Institution Verification Request",
+    message: "National Institute of Technology Trichy has submitted credentials for direct result portal integration.",
+    status: "OPEN",
+    createdAt: new Date(Date.now() - 3600000 * 2).toISOString()
+  },
+  {
+    id: 2,
+    alertType: "JOB_PENDING_VERIFICATION",
+    severity: "WARNING",
+    title: "Gazette Notification Verification Required",
+    message: "ISRO Scientist/Engineer 'SC' Recruitment notice uploaded by operator; pending gazette approval.",
+    status: "OPEN",
+    createdAt: new Date(Date.now() - 3600000 * 5).toISOString()
+  },
+  {
+    id: 3,
+    alertType: "WEBSITE_PROBE_NOTICE",
+    severity: "INFO",
+    title: "Official Directory Health Check Active",
+    message: "Scheduled probe tested 67 official government and state recruitment endpoints. All operational.",
+    status: "RESOLVED",
+    createdAt: new Date(Date.now() - 3600000 * 24).toISOString()
+  }
+];
+
+export const initialScheduledTaskLogs = [
+  {
+    id: 1,
+    taskName: "RECALCULATE_EXAM_REMINDERS",
+    status: "COMPLETED",
+    recordsProcessed: 142,
+    startedAt: new Date(Date.now() - 3600000 * 4).toISOString(),
+    completedAt: new Date(Date.now() - 3600000 * 4 + 1000 * 15).toISOString()
+  },
+  {
+    id: 2,
+    taskName: "PROBE_GOV_WEBSITES",
+    status: "COMPLETED",
+    recordsProcessed: 67,
+    startedAt: new Date(Date.now() - 3600000 * 12).toISOString(),
+    completedAt: new Date(Date.now() - 3600000 * 12 + 1000 * 42).toISOString()
+  },
+  {
+    id: 3,
+    taskName: "EXPIRE_OLD_VACANCIES",
+    status: "COMPLETED",
+    recordsProcessed: 8,
+    startedAt: new Date(Date.now() - 3600000 * 24).toISOString(),
+    completedAt: new Date(Date.now() - 3600000 * 24 + 1000 * 8).toISOString()
+  },
+  {
+    id: 4,
+    taskName: "DISPATCH_MATCHING_JOB_ALERTS",
+    status: "COMPLETED",
+    recordsProcessed: 86,
+    startedAt: new Date(Date.now() - 3600000 * 1).toISOString(),
+    completedAt: new Date(Date.now() - 3600000 * 1 + 1000 * 20).toISOString()
+  }
+];
+
 if (!global.__examhubStore) {
   global.__examhubStore = {
     organizations: [...initialOrganizations],
@@ -3162,6 +3411,13 @@ if (!global.__examhubStore) {
     savedJobs: [...initialSavedJobs],
     jobApplications: [...initialJobApplications],
     jobReports: [],
+    studentExamRegistrations: [...initialStudentExamRegistrations],
+    studentCalendarEvents: [...initialStudentCalendarEvents],
+    examReminders: [...initialExamReminders],
+    studentJobPreferences: [...initialStudentJobPreferences],
+    jobAlertSubscriptions: [...initialJobAlertSubscriptions],
+    adminAlerts: [...initialAdminAlerts],
+    scheduledTaskLogs: [...initialScheduledTaskLogs],
     savedWebsites: [
       { userId: 1, websiteId: 11, createdAt: new Date().toISOString() }, // UPSC saved by default student
       { userId: 1, websiteId: 25, createdAt: new Date().toISOString() }  // NTA saved by default student

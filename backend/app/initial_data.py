@@ -9,7 +9,10 @@ from app.models.models import (
     ResultAnnouncement, ExamResult, PortalIntegration, User,
     OfficialWebsite, WebsiteVerificationLog, SavedWebsite, BrokenLinkReport,
     RRBGroupDResult, AISetting, Scholarship, PaymentTransaction, SecurityIncident,
-    JobNotification, JobSource, SavedJob, JobApplication
+    JobNotification, JobSource, SavedJob, JobApplication,
+    StudentExamRegistration, StudentCalendarEvent, ExamReminder,
+    StudentJobPreference, JobAlertSubscription, NotificationTemplate,
+    NotificationDeliveryLog, AdminAlert, AnalyticsEvent, ScheduledTaskLog
 )
 from app.auth.security import hash_password
 from app.config import settings
@@ -1943,6 +1946,286 @@ async def seed_database():
                         status="PUBLISHED",
                         is_featured=False,
                         view_count=18200
+                    )
+                ])
+
+            # 24. Seed Notification Templates
+            tpl_stmt = select(NotificationTemplate)
+            res = await db.execute(tpl_stmt)
+            if not res.scalars().first():
+                db.add_all([
+                    NotificationTemplate(
+                        template_code="EXAM_REMINDER_30D",
+                        category="EXAMINATION",
+                        title_template="30-Day Examination Alert: {exam_name}",
+                        body_template="Your registered examination {exam_name} is scheduled on {exam_date}. Please review the official syllabus and complete exam preparation.",
+                        channels="IN_APP,EMAIL"
+                    ),
+                    NotificationTemplate(
+                        template_code="EXAM_REMINDER_7D",
+                        category="EXAMINATION",
+                        title_template="7-Day Final Notice: {exam_name}",
+                        body_template="Only 7 days remaining for {exam_name} on {exam_date}. Verify your exam center and print your official hall ticket.",
+                        channels="IN_APP,EMAIL,PUSH"
+                    ),
+                    NotificationTemplate(
+                        template_code="EXAM_REMINDER_1D",
+                        category="EXAMINATION",
+                        title_template="24-Hour Urgent Alert: {exam_name} Tomorrow",
+                        body_template="Tomorrow is your {exam_name} examination. Ensure you carry your printed Admit Card and original Government Photo ID.",
+                        channels="IN_APP,EMAIL,PUSH"
+                    ),
+                    NotificationTemplate(
+                        template_code="APP_DEADLINE_3D",
+                        category="DEADLINE",
+                        title_template="Application Closing in 3 Days: {exam_name}",
+                        body_template="The official application portal for {exam_name} closes on {closing_date}. Submit your application before the server rush.",
+                        channels="IN_APP,EMAIL"
+                    ),
+                    NotificationTemplate(
+                        template_code="ADMIT_CARD_RELEASED",
+                        category="EXAMINATION",
+                        title_template="Official Admit Card Released: {exam_name}",
+                        body_template="The examination board has released the official Hall Ticket / Admit Card for {exam_name}. Download now via ExamHub India.",
+                        channels="IN_APP,EMAIL,PUSH"
+                    ),
+                    NotificationTemplate(
+                        template_code="NEW_JOB_MATCH",
+                        category="JOB",
+                        title_template="Matching Career Opportunity: {job_title}",
+                        body_template="A new verified recruitment notice matching your profile was published by {org_name} with {vacancies} vacancies. Apply before {deadline}.",
+                        channels="IN_APP,EMAIL"
+                    )
+                ])
+                await db.flush()
+
+            # 25. Seed Demo Student Registrations, Calendar Events & Reminders
+            student_res = await db.execute(select(User).where(User.email == "student@examhub.in"))
+            demo_user = student_res.scalar_one_or_none()
+            
+            if demo_user:
+                # Check student exam registrations
+                reg_stmt = select(StudentExamRegistration).where(StudentExamRegistration.user_id == demo_user.id)
+                reg_res = await db.execute(reg_stmt)
+                if not reg_res.scalars().first():
+                    # Fetch seeded exams
+                    exam_res = await db.execute(select(Examination).limit(3))
+                    exam_list = exam_res.scalars().all()
+                    
+                    if exam_list:
+                        exam1 = exam_list[0]
+                        exam2 = exam_list[1] if len(exam_list) > 1 else exam1
+                        
+                        reg1 = StudentExamRegistration(
+                            user_id=demo_user.id,
+                            examination_id=exam1.id,
+                            status="APPLICATION_CONFIRMED",
+                            application_number="UPSC/CSE/2026/894102",
+                            registration_date=datetime(2026, 2, 10, tzinfo=timezone.utc),
+                            official_portal_url="https://upsconline.nic.in",
+                            notes="Targeting IAS & IFS cadre. Prelims revision in progress."
+                        )
+                        reg2 = StudentExamRegistration(
+                            user_id=demo_user.id,
+                            examination_id=exam2.id,
+                            status="APPLICATION_SUBMITTED",
+                            application_number="SSC/CGL/2026/512903",
+                            registration_date=datetime(2026, 2, 14, tzinfo=timezone.utc),
+                            official_portal_url="https://ssc.gov.in",
+                            notes="Tier 1 exam center: Chennai Main Center"
+                        )
+                        # External manual entry exam
+                        reg3 = StudentExamRegistration(
+                            user_id=demo_user.id,
+                            examination_id=None,
+                            is_external=True,
+                            external_exam_name="Tamil Nadu Group 2 Combined Services",
+                            external_authority="Tamil Nadu Public Service Commission (TNPSC)",
+                            external_exam_date=datetime(2026, 5, 24, 9, 30, tzinfo=timezone.utc),
+                            external_application_deadline=datetime(2026, 3, 20, 23, 59, tzinfo=timezone.utc),
+                            status="APPLICATION_CONFIRMED",
+                            application_number="TNPSC/2026/G2/771829",
+                            notes="Applied on official tnpscexams.in portal directly."
+                        )
+                        db.add_all([reg1, reg2, reg3])
+                        await db.flush()
+
+                        # Add Calendar Events
+                        db.add_all([
+                            StudentCalendarEvent(
+                                user_id=demo_user.id,
+                                registration_id=reg1.id,
+                                examination_id=exam1.id,
+                                title=f"{exam1.name} - Preliminary Exam",
+                                event_type="EXAM_DATE",
+                                event_date=datetime(2026, 5, 25, 9, 30, tzinfo=timezone.utc),
+                                location="All India Designated Test Centers",
+                                notes="Session 1: GS Paper I (09:30 - 11:30), Session 2: CSAT (14:30 - 16:30)"
+                            ),
+                            StudentCalendarEvent(
+                                user_id=demo_user.id,
+                                registration_id=reg1.id,
+                                examination_id=exam1.id,
+                                title=f"{exam1.name} - Hall Ticket Release",
+                                event_type="ADMIT_CARD",
+                                event_date=datetime(2026, 5, 1, 10, 0, tzinfo=timezone.utc),
+                                notes="Download e-Admit card from upsconline.nic.in"
+                            ),
+                            StudentCalendarEvent(
+                                user_id=demo_user.id,
+                                registration_id=reg2.id,
+                                examination_id=exam2.id,
+                                title=f"{exam2.name} - Tier 1 Exam",
+                                event_type="EXAM_DATE",
+                                event_date=datetime(2026, 6, 12, 10, 0, tzinfo=timezone.utc),
+                                location="Computer Based Test (CBT) Center"
+                            ),
+                            StudentCalendarEvent(
+                                user_id=demo_user.id,
+                                registration_id=reg3.id,
+                                title="TNPSC Group 2 Preliminary Examination",
+                                event_type="EXAM_DATE",
+                                event_date=datetime(2026, 5, 24, 9, 30, tzinfo=timezone.utc),
+                                location="Chennai District Center",
+                                is_custom=True
+                            )
+                        ])
+
+                        # Add Exam Reminders
+                        db.add_all([
+                            ExamReminder(
+                                user_id=demo_user.id,
+                                registration_id=reg1.id,
+                                examination_id=exam1.id,
+                                reminder_type="EXAM_30D",
+                                title=f"30-Day Reminder: {exam1.name}",
+                                message=f"Only 30 days left until {exam1.name}. Review mock tests and previous question papers.",
+                                scheduled_for=datetime(2026, 4, 25, 9, 0, tzinfo=timezone.utc),
+                                status="PENDING",
+                                delivery_channel="IN_APP"
+                            ),
+                            ExamReminder(
+                                user_id=demo_user.id,
+                                registration_id=reg1.id,
+                                examination_id=exam1.id,
+                                reminder_type="EXAM_7D",
+                                title=f"7-Day Alert: {exam1.name}",
+                                message=f"7 days to go for {exam1.name}. Ensure you have printed your admit card.",
+                                scheduled_for=datetime(2026, 5, 18, 9, 0, tzinfo=timezone.utc),
+                                status="PENDING",
+                                delivery_channel="IN_APP"
+                            ),
+                            ExamReminder(
+                                user_id=demo_user.id,
+                                registration_id=reg2.id,
+                                examination_id=exam2.id,
+                                reminder_type="EXAM_30D",
+                                title=f"30-Day Reminder: {exam2.name}",
+                                message=f"Your {exam2.name} Tier 1 examination is in 30 days.",
+                                scheduled_for=datetime(2026, 5, 13, 9, 0, tzinfo=timezone.utc),
+                                status="PENDING",
+                                delivery_channel="IN_APP"
+                            )
+                        ])
+
+                # Seed Student Job Preference & Subscriptions
+                pref_stmt = select(StudentJobPreference).where(StudentJobPreference.user_id == demo_user.id)
+                pref_res = await db.execute(pref_stmt)
+                if not pref_res.scalars().first():
+                    db.add(StudentJobPreference(
+                        user_id=demo_user.id,
+                        qualification="GRADUATION",
+                        degree_department="B.E. Computer Science & Engineering",
+                        graduation_year=2025,
+                        skills="Python, SQL, FastApi, Machine Learning, Problem Solving, Data Structures",
+                        experience_level="FRESHER",
+                        preferred_roles="Software Engineer, Bank PO, Civil Services Officer, Systems Engineer",
+                        preferred_locations="Chennai, Bangalore, Hyderabad, All India",
+                        expected_salary_min="₹6,00,000",
+                        sector_preference="ALL",
+                        job_alerts_enabled=True,
+                        email_alerts_enabled=True
+                    ))
+                    
+                    db.add_all([
+                        JobAlertSubscription(
+                            user_id=demo_user.id,
+                            keyword="Software Engineer",
+                            sector="ALL",
+                            category="IT",
+                            qualification="GRADUATION",
+                            frequency="INSTANT"
+                        ),
+                        JobAlertSubscription(
+                            user_id=demo_user.id,
+                            keyword="Civil Services",
+                            sector="CENTRAL_GOVT",
+                            category="GOVERNMENT",
+                            qualification="GRADUATION",
+                            frequency="DAILY"
+                        )
+                    ])
+
+            # 26. Seed Admin Alerts
+            alert_stmt = select(AdminAlert)
+            alert_res = await db.execute(alert_stmt)
+            if not alert_res.scalars().first():
+                db.add_all([
+                    AdminAlert(
+                        alert_type="NEW_INSTITUTION",
+                        severity="INFO",
+                        title="New Institution Verification Request",
+                        message="National Institute of Technology Trichy has submitted credentials for direct result portal integration.",
+                        status="OPEN"
+                    ),
+                    AdminAlert(
+                        alert_type="JOB_PENDING_VERIFICATION",
+                        severity="WARNING",
+                        title="Gazette Notification Verification Required",
+                        message="ISRO Scientist/Engineer 'SC' Recruitment notice uploaded by operator; pending gazette approval.",
+                        status="OPEN"
+                    ),
+                    AdminAlert(
+                        alert_type="WEBSITE_PROBE_NOTICE",
+                        severity="INFO",
+                        title="Official Directory Health Check Active",
+                        message="Scheduled probe tested 67 official government and state recruitment endpoints. All operational.",
+                        status="RESOLVED"
+                    )
+                ])
+
+            # 27. Seed Scheduled Automation Task Logs
+            task_stmt = select(ScheduledTaskLog)
+            task_res = await db.execute(task_stmt)
+            if not task_res.scalars().first():
+                db.add_all([
+                    ScheduledTaskLog(
+                        task_name="RECALCULATE_EXAM_REMINDERS",
+                        status="COMPLETED",
+                        records_processed=142,
+                        started_at=datetime(2026, 2, 20, 6, 0, tzinfo=timezone.utc),
+                        completed_at=datetime(2026, 2, 20, 6, 1, tzinfo=timezone.utc)
+                    ),
+                    ScheduledTaskLog(
+                        task_name="PROBE_GOV_WEBSITES",
+                        status="COMPLETED",
+                        records_processed=67,
+                        started_at=datetime(2026, 2, 20, 5, 0, tzinfo=timezone.utc),
+                        completed_at=datetime(2026, 2, 20, 5, 4, tzinfo=timezone.utc)
+                    ),
+                    ScheduledTaskLog(
+                        task_name="EXPIRE_OLD_VACANCIES",
+                        status="COMPLETED",
+                        records_processed=8,
+                        started_at=datetime(2026, 2, 20, 0, 0, tzinfo=timezone.utc),
+                        completed_at=datetime(2026, 2, 20, 0, 1, tzinfo=timezone.utc)
+                    ),
+                    ScheduledTaskLog(
+                        task_name="DISPATCH_MATCHING_JOB_ALERTS",
+                        status="COMPLETED",
+                        records_processed=86,
+                        started_at=datetime(2026, 2, 20, 7, 0, tzinfo=timezone.utc),
+                        completed_at=datetime(2026, 2, 20, 7, 2, tzinfo=timezone.utc)
                     )
                 ])
 

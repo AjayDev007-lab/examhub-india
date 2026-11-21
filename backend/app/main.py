@@ -6,7 +6,10 @@ from fastapi.staticfiles import StaticFiles
 from app.config import settings
 from app.database import engine, Base
 from app.initial_data import seed_database
-from app.routers import auth, exams, results, hall_tickets, id_cards, documents, notifications, admin, admin_institutions, directory, jobs
+from app.routers import (
+    auth, exams, results, hall_tickets, id_cards, documents, notifications,
+    admin, admin_institutions, directory, jobs, student_exams, job_alerts, analytics
+)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -55,6 +58,9 @@ app.include_router(admin_institutions.public_router)
 app.include_router(directory.router)
 app.include_router(directory.admin_router)
 app.include_router(jobs.router)
+app.include_router(student_exams.router)
+app.include_router(job_alerts.router)
+app.include_router(analytics.router)
 
 @app.get("/api/health")
 async def health_check():

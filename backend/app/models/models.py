@@ -772,4 +772,206 @@ class JobReport(Base):
     created_at = Column(DateTime, default=utc_now, nullable=False)
 
 
+# 43. STUDENT EXAMINATION REGISTRATIONS
+class StudentExamRegistration(Base):
+    __tablename__ = "student_exam_registrations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    examination_id = Column(Integer, ForeignKey("examinations.id", ondelete="SET NULL"), nullable=True, index=True)
+    schedule_id = Column(Integer, ForeignKey("exam_schedules.id", ondelete="SET NULL"), nullable=True)
+    
+    # Distinction between registration states:
+    # "ADDED_TO_MY_EXAMS": Tracked on ExamHub India
+    # "REGISTRATION_STARTED": Student clicked official link and began
+    # "APPLICATION_SUBMITTED": Application marked as submitted with ack/app number
+    # "APPLICATION_CONFIRMED": Verified with hall ticket or official confirmation
+    status = Column(String(50), default="ADDED_TO_MY_EXAMS", index=True)
+    
+    application_number = Column(String(100), nullable=True)
+    registration_date = Column(DateTime, nullable=True)
+    official_portal_url = Column(String(512), nullable=True)
+    confirmation_proof_url = Column(String(512), nullable=True)
+    notes = Column(Text, nullable=True)
+    
+    # External exam support (manually entered by student)
+    is_external = Column(Boolean, default=False)
+    external_exam_name = Column(String(255), nullable=True)
+    external_authority = Column(String(255), nullable=True)
+    external_exam_date = Column(DateTime, nullable=True)
+    external_application_deadline = Column(DateTime, nullable=True)
+    
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+    user = relationship("User")
+    examination = relationship("Examination")
+    schedule = relationship("ExamSchedule")
+
+
+# 44. STUDENT CALENDAR EVENTS
+class StudentCalendarEvent(Base):
+    __tablename__ = "student_calendar_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    registration_id = Column(Integer, ForeignKey("student_exam_registrations.id", ondelete="CASCADE"), nullable=True, index=True)
+    examination_id = Column(Integer, ForeignKey("examinations.id", ondelete="SET NULL"), nullable=True, index=True)
+    
+    title = Column(String(255), nullable=False)
+    # Event types: "APPLICATION_START", "APPLICATION_END", "ADMIT_CARD", "EXAM_DATE", "RESULT_DATE", "CUSTOM"
+    event_type = Column(String(50), nullable=False, index=True)
+    event_date = Column(DateTime, nullable=False, index=True)
+    end_date = Column(DateTime, nullable=True)
+    is_all_day = Column(Boolean, default=True)
+    location = Column(String(255), nullable=True)
+    notes = Column(Text, nullable=True)
+    # Status: "SCHEDULED", "POSTPONED", "CANCELLED", "COMPLETED"
+    status = Column(String(50), default="SCHEDULED")
+    is_custom = Column(Boolean, default=False)
+    
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+
+# 45. AUTOMATED EXAMINATION REMINDERS
+class ExamReminder(Base):
+    __tablename__ = "exam_reminders"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    registration_id = Column(Integer, ForeignKey("student_exam_registrations.id", ondelete="CASCADE"), nullable=True)
+    calendar_event_id = Column(Integer, ForeignKey("student_calendar_events.id", ondelete="CASCADE"), nullable=True)
+    examination_id = Column(Integer, ForeignKey("examinations.id", ondelete="CASCADE"), nullable=True)
+    
+    # Reminder types: "EXAM_30D", "EXAM_15D", "EXAM_7D", "EXAM_3D", "EXAM_1D", "EXAM_DAY",
+    # "APP_CLOSING_7D", "APP_CLOSING_3D", "APP_CLOSING_1D", "APP_CLOSING_DAY",
+    # "DATE_CHANGED", "ADMIT_CARD_RELEASED", "RESULT_PUBLISHED", "CUSTOM"
+    reminder_type = Column(String(50), nullable=False, index=True)
+    title = Column(String(255), nullable=False)
+    message = Column(Text, nullable=False)
+    scheduled_for = Column(DateTime, nullable=False, index=True)
+    sent_at = Column(DateTime, nullable=True)
+    status = Column(String(50), default="PENDING", index=True) # "PENDING", "SENT", "FAILED", "CANCELLED"
+    delivery_channel = Column(String(50), default="IN_APP") # "IN_APP", "EMAIL", "PUSH"
+    
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+
+
+# 46. STUDENT JOB PREFERENCES & PROFILE
+class StudentJobPreference(Base):
+    __tablename__ = "student_job_preferences"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False, index=True)
+    
+    qualification = Column(String(100), default="GRADUATION")
+    degree_department = Column(String(255), nullable=True)
+    graduation_year = Column(Integer, nullable=True)
+    skills = Column(Text, nullable=True) # comma-separated keywords: Python, SQL, Banking, Reasoning
+    experience_level = Column(String(50), default="FRESHER") # "FRESHER", "0-1", "1-3", "3-5", "5+"
+    preferred_roles = Column(Text, nullable=True) # "Software Engineer, Bank PO, Civil Services"
+    preferred_locations = Column(Text, nullable=True) # "Tamil Nadu, Karnataka, Delhi, All India"
+    expected_salary_min = Column(String(50), nullable=True)
+    sector_preference = Column(String(50), default="ALL") # "ALL", "GOVERNMENT", "PRIVATE"
+    employment_type_preference = Column(String(50), default="FULL_TIME") # "FULL_TIME", "INTERNSHIP", "REMOTE"
+    
+    job_alerts_enabled = Column(Boolean, default=True)
+    email_alerts_enabled = Column(Boolean, default=True)
+    push_alerts_enabled = Column(Boolean, default=False)
+    
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+
+# 47. JOB ALERT SUBSCRIPTIONS
+class JobAlertSubscription(Base):
+    __tablename__ = "job_alert_subscriptions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    keyword = Column(String(255), nullable=True)
+    sector = Column(String(50), nullable=True)
+    category = Column(String(50), nullable=True)
+    qualification = Column(String(50), nullable=True)
+    is_active = Column(Boolean, default=True)
+    frequency = Column(String(50), default="INSTANT") # "INSTANT", "DAILY", "WEEKLY"
+    last_triggered_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+
+
+# 48. NOTIFICATION TEMPLATES
+class NotificationTemplate(Base):
+    __tablename__ = "notification_templates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    template_code = Column(String(100), unique=True, index=True, nullable=False)
+    category = Column(String(50), nullable=False) # "EXAMINATION", "JOB", "DEADLINE", "SYSTEM"
+    title_template = Column(String(255), nullable=False)
+    body_template = Column(Text, nullable=False)
+    channels = Column(String(100), default="IN_APP,EMAIL")
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+
+
+# 49. NOTIFICATION DELIVERY LOGS
+class NotificationDeliveryLog(Base):
+    __tablename__ = "notification_delivery_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    notification_id = Column(Integer, nullable=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    channel = Column(String(50), nullable=False) # "IN_APP", "EMAIL", "PUSH", "SMS"
+    recipient = Column(String(255), nullable=True)
+    status = Column(String(50), default="DELIVERED") # "QUEUED", "DELIVERED", "FAILED", "BOUNCED"
+    provider = Column(String(50), default="SYSTEM_IN_APP")
+    provider_message_id = Column(String(255), nullable=True)
+    error_message = Column(Text, nullable=True)
+    sent_at = Column(DateTime, default=utc_now, nullable=False)
+
+
+# 50. ADMIN ALERTS & NOTIFICATION CENTRE
+class AdminAlert(Base):
+    __tablename__ = "admin_alerts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    alert_type = Column(String(100), nullable=False, index=True) # "NEW_STUDENT", "NEW_INSTITUTION", "EXAM_DATE_CHANGE", "JOB_PENDING_VERIFICATION", "WEBSITE_UNAVAILABLE", "FAILED_TASK", "SECURITY_ALERT"
+    severity = Column(String(50), default="INFO", index=True) # "INFO", "WARNING", "CRITICAL"
+    title = Column(String(255), nullable=False)
+    message = Column(Text, nullable=False)
+    status = Column(String(50), default="OPEN", index=True) # "OPEN", "ACKNOWLEDGED", "RESOLVED"
+    assigned_admin_id = Column(Integer, ForeignKey("admin_users.id", ondelete="SET NULL"), nullable=True)
+    metadata_json = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    resolved_at = Column(DateTime, nullable=True)
+
+
+# 51. PLATFORM ANALYTICS EVENTS
+class AnalyticsEvent(Base):
+    __tablename__ = "analytics_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    event_name = Column(String(100), nullable=False, index=True) # "PAGE_VIEW", "EXAM_VIEW", "EXAM_REGISTER", "CALENDAR_ADD", "JOB_VIEW", "JOB_APPLY_CLICK", "WEBSITE_CLICK", "LOGIN"
+    entity_type = Column(String(50), nullable=True) # "EXAM", "JOB", "WEBSITE", "STUDENT"
+    entity_id = Column(String(100), nullable=True)
+    user_id = Column(Integer, nullable=True, index=True)
+    session_id = Column(String(100), nullable=True)
+    metadata_json = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False, index=True)
+
+
+# 52. SCHEDULED AUTOMATION TASK LOGS
+class ScheduledTaskLog(Base):
+    __tablename__ = "scheduled_task_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    task_name = Column(String(100), nullable=False, index=True) # "RECALCULATE_REMINDERS", "CHECK_EXAM_DATES", "EXPIRE_OLD_JOBS", "DISPATCH_JOB_ALERTS", "PROBE_GOV_WEBSITES", "CLEANUP_SESSIONS"
+    status = Column(String(50), default="COMPLETED") # "RUNNING", "COMPLETED", "FAILED"
+    records_processed = Column(Integer, default=0)
+    error_message = Column(Text, nullable=True)
+    started_at = Column(DateTime, default=utc_now, nullable=False)
+    completed_at = Column(DateTime, default=utc_now, nullable=False)
+
+
+
 
