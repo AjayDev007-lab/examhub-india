@@ -3,10 +3,11 @@ import { dbStore } from "@/lib/data";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const identifier = params.id.toLowerCase().trim();
+    const { id: rawId } = await params;
+    const identifier = rawId.toLowerCase().trim();
     const isNum = !isNaN(Number(identifier));
     const targetId = isNum ? Number(identifier) : null;
 

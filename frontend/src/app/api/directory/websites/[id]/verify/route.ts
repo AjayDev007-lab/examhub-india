@@ -3,10 +3,11 @@ import { dbStore } from "@/lib/data";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = parseInt(params.id, 10);
+    const { id: rawId } = await params;
+    const id = parseInt(rawId, 10);
     const website = (dbStore?.officialWebsites || []).find((w) => w.id === id);
 
     if (!website) {

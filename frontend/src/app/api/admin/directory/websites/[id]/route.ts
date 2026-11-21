@@ -3,10 +3,11 @@ import { dbStore } from "@/lib/data";
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = parseInt(params.id, 10);
+    const { id: rawId } = await params;
+    const id = parseInt(rawId, 10);
     const body = await request.json();
 
     const website = (dbStore?.officialWebsites || []).find((w) => w.id === id);
@@ -28,10 +29,11 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = parseInt(params.id, 10);
+    const { id: rawId } = await params;
+    const id = parseInt(rawId, 10);
     const website = (dbStore?.officialWebsites || []).find((w) => w.id === id);
     if (!website) {
       return NextResponse.json({ error: "Website not found" }, { status: 404 });
