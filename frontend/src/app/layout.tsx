@@ -3,6 +3,7 @@ import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import FloatingAIAssistant from "@/components/FloatingAIAssistant";
+import VisitorTrackerClient from "@/components/VisitorTrackerClient";
 
 export const metadata: Metadata = {
   title: "EXAMHUB INDIA | All Your Examination Documents and Results in One Place",
@@ -22,6 +23,7 @@ export default function RootLayout({
         <main className="flex-1">{children}</main>
         <Footer />
         <FloatingAIAssistant />
+        <VisitorTrackerClient />
       </body>
     </html>
   );
