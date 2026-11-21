@@ -23,7 +23,8 @@ import {
   Menu,
   X,
   FileText,
-  Clock
+  Clock,
+  Radio
 } from "lucide-react";
 
 interface StudentSidebarProps {
@@ -63,6 +64,7 @@ export default function StudentSidebar({ unreadNotifsCount = 3, activeExamsCount
 
   const navItems = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+    { name: "Daily Updates", href: "/updates", icon: Radio, isNew: true },
     { name: "School Education", href: "/school", icon: GraduationCap, isNew: true },
     { name: "School Textbooks", href: "/school/books", icon: BookOpen },
     { name: "Apply for Exams", href: "/apply", icon: BookOpen },

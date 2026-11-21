@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { 
   Award, FileText, CreditCard, Search, User, LogIn, Menu, X, 
   ShieldCheck, LayoutDashboard, Bell, LogOut, ExternalLink, BookOpen,
-  Globe, Sparkles, Building2, Landmark, Briefcase, Moon, Sun, Instagram, Phone, Clock, GraduationCap
+  Globe, Sparkles, Building2, Landmark, Briefcase, Moon, Sun, Instagram, Phone, Clock, GraduationCap, Radio
 } from "lucide-react";
 import { Language, translations } from "@/lib/i18n";
 import { SITE_CONFIG } from "@/config/site";
@@ -70,6 +70,7 @@ export default function Navbar() {
   const t = translations[currentLang] || translations.en;
 
   const navLinks = [
+    { name: "Daily Updates", href: "/updates", icon: Radio, isNew: true },
     { name: "School Education", href: "/school", icon: GraduationCap, isNew: true },
     { name: "Apply Online", href: "/apply", icon: BookOpen },
     { name: "Countdowns", href: "/student/countdown", icon: Clock },

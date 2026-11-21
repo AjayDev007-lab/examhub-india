@@ -5,7 +5,11 @@ from app.models.models import (
     ResultIntegration, ResultAnnouncement, PortalIntegration, IntegrationLog,
     DocumentType, StudentDocument, ResultDocument, StudentResultRequest,
     DocumentDownload, Notification, NotificationPreference, SupportTicket,
-    AuditLog, UserSession, SystemSetting
+    AuditLog, UserSession, SystemSetting,
+    MonitoringSource, MonitoringSchedule, MonitoringRun, DetectedUpdate,
+    UpdateVerificationLog, StudentUpdateBookmark, StudentUpdatePreference,
+    MaintenanceTask, WebsiteHealthCheck, DatabaseHealthLog, BackupRecord,
+    ApplicationErrorLog, DailyAdminReport
 )
 
 __all__ = [
@@ -15,5 +19,9 @@ __all__ = [
     "ResultIntegration", "ResultAnnouncement", "PortalIntegration", "IntegrationLog",
     "DocumentType", "StudentDocument", "ResultDocument", "StudentResultRequest",
     "DocumentDownload", "Notification", "NotificationPreference", "SupportTicket",
-    "AuditLog", "UserSession", "SystemSetting"
+    "AuditLog", "UserSession", "SystemSetting",
+    "MonitoringSource", "MonitoringSchedule", "MonitoringRun", "DetectedUpdate",
+    "UpdateVerificationLog", "StudentUpdateBookmark", "StudentUpdatePreference",
+    "MaintenanceTask", "WebsiteHealthCheck", "DatabaseHealthLog", "BackupRecord",
+    "ApplicationErrorLog", "DailyAdminReport"
 ]

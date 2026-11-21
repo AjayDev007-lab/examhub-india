@@ -8,11 +8,14 @@ from app.models.models import (
     AdminRole, AdminUser, AdminPermission, DocumentType, SystemSetting,
     ResultAnnouncement, ExamResult, PortalIntegration, User,
     OfficialWebsite, WebsiteVerificationLog, SavedWebsite, BrokenLinkReport,
-    RRBGroupDResult, AISetting, Scholarship, PaymentTransaction, SecurityIncident,
+    RRBGroupDResult, AISetting, Scholarship, SecurityIncident,
     JobNotification, JobSource, SavedJob, JobApplication,
     StudentExamRegistration, StudentCalendarEvent, ExamReminder,
     StudentJobPreference, JobAlertSubscription, NotificationTemplate,
-    NotificationDeliveryLog, AdminAlert, AnalyticsEvent, ScheduledTaskLog
+    NotificationDeliveryLog, AdminAlert, AnalyticsEvent, ScheduledTaskLog,
+    MonitoringSource, MonitoringSchedule, MonitoringRun, DetectedUpdate,
+    UpdateVerificationLog, MaintenanceTask, WebsiteHealthCheck,
+    DatabaseHealthLog, BackupRecord, ApplicationErrorLog, DailyAdminReport
 )
 from app.auth.security import hash_password
 from app.config import settings
@@ -2197,6 +2200,900 @@ async def seed_database():
                         completed_at=datetime(2026, 2, 20, 7, 2, tzinfo=timezone.utc)
                     )
                 ])
+
+        # 28. Seed Monitoring Sources
+        src_stmt = select(MonitoringSource)
+        src_res = await db.execute(src_stmt)
+        if not src_res.scalars().first():
+            db.add_all([
+                MonitoringSource(
+                    name="Union Public Service Commission (UPSC) Recruitment & Notices",
+                    organization_code="UPSC",
+                    organization_name="Union Public Service Commission",
+                    category="GOVT_JOB",
+                    state_code="ALL",
+                    source_type="OFFICIAL_GOVT",
+                    official_website_url="https://upsc.gov.in",
+                    notification_url="https://upsc.gov.in/examinations/active-examinations",
+                    verification_status="VERIFIED",
+                    check_frequency="DAILY",
+                    is_enabled=True,
+                    priority=1,
+                    last_checked_at=datetime.now(timezone.utc),
+                    last_successful_check_at=datetime.now(timezone.utc)
+                ),
+                MonitoringSource(
+                    name="Staff Selection Commission (SSC) Examination Portal",
+                    organization_code="SSC",
+                    organization_name="Staff Selection Commission",
+                    category="GOVT_JOB",
+                    state_code="ALL",
+                    source_type="OFFICIAL_GOVT",
+                    official_website_url="https://ssc.gov.in",
+                    notification_url="https://ssc.gov.in/candidate-portal/notices",
+                    verification_status="VERIFIED",
+                    check_frequency="DAILY",
+                    is_enabled=True,
+                    priority=1,
+                    last_checked_at=datetime.now(timezone.utc),
+                    last_successful_check_at=datetime.now(timezone.utc)
+                ),
+                MonitoringSource(
+                    name="Railway Recruitment Control Board (RRCB)",
+                    organization_code="RRB",
+                    organization_name="Railway Recruitment Control Board",
+                    category="GOVT_JOB",
+                    state_code="ALL",
+                    source_type="OFFICIAL_GOVT",
+                    official_website_url="https://indianrailways.gov.in",
+                    notification_url="https://rrcb.gov.in/recruitment.html",
+                    verification_status="VERIFIED",
+                    check_frequency="DAILY",
+                    is_enabled=True,
+                    priority=1,
+                    last_checked_at=datetime.now(timezone.utc),
+                    last_successful_check_at=datetime.now(timezone.utc)
+                ),
+                MonitoringSource(
+                    name="Institute of Banking Personnel Selection (IBPS)",
+                    organization_code="IBPS",
+                    organization_name="Institute of Banking Personnel Selection",
+                    category="GOVT_JOB",
+                    state_code="ALL",
+                    source_type="OFFICIAL_GOVT",
+                    official_website_url="https://www.ibps.in",
+                    notification_url="https://www.ibps.in/current-vacancies",
+                    verification_status="VERIFIED",
+                    check_frequency="DAILY",
+                    is_enabled=True,
+                    priority=1,
+                    last_checked_at=datetime.now(timezone.utc),
+                    last_successful_check_at=datetime.now(timezone.utc)
+                ),
+                MonitoringSource(
+                    name="Tamil Nadu Public Service Commission (TNPSC)",
+                    organization_code="TNPSC",
+                    organization_name="Tamil Nadu Public Service Commission",
+                    category="GOVT_JOB",
+                    state_code="TN",
+                    source_type="OFFICIAL_GOVT",
+                    official_website_url="https://www.tnpsc.gov.in",
+                    notification_url="https://www.tnpsc.gov.in/english/notifications.aspx",
+                    verification_status="VERIFIED",
+                    check_frequency="DAILY",
+                    is_enabled=True,
+                    priority=2,
+                    last_checked_at=datetime.now(timezone.utc),
+                    last_successful_check_at=datetime.now(timezone.utc)
+                ),
+                MonitoringSource(
+                    name="Central Board of Secondary Education (CBSE) Results & Exam Notices",
+                    organization_code="CBSE",
+                    organization_name="Central Board of Secondary Education",
+                    category="SCHOOL_RESULT",
+                    state_code="ALL",
+                    source_type="EDUCATION_BOARD",
+                    official_website_url="https://cbse.gov.in",
+                    notification_url="https://cbseresults.nic.in",
+                    verification_status="VERIFIED",
+                    check_frequency="DAILY",
+                    is_enabled=True,
+                    priority=1,
+                    last_checked_at=datetime.now(timezone.utc),
+                    last_successful_check_at=datetime.now(timezone.utc)
+                ),
+                MonitoringSource(
+                    name="National Institute of Open Schooling (NIOS)",
+                    organization_code="NIOS",
+                    organization_name="National Institute of Open Schooling",
+                    category="SCHOOL_RESULT",
+                    state_code="ALL",
+                    source_type="EDUCATION_BOARD",
+                    official_website_url="https://nios.ac.in",
+                    notification_url="https://results.nios.ac.in",
+                    verification_status="VERIFIED",
+                    check_frequency="DAILY",
+                    is_enabled=True,
+                    priority=1,
+                    last_checked_at=datetime.now(timezone.utc),
+                    last_successful_check_at=datetime.now(timezone.utc)
+                ),
+                MonitoringSource(
+                    name="National Scholarship Portal (NSP)",
+                    organization_code="NSP",
+                    organization_name="Ministry of Electronics and Information Technology",
+                    category="SCHOLARSHIP",
+                    state_code="ALL",
+                    source_type="OFFICIAL_GOVT",
+                    official_website_url="https://scholarships.gov.in",
+                    notification_url="https://scholarships.gov.in/public/schemeGuidelines",
+                    verification_status="VERIFIED",
+                    check_frequency="DAILY",
+                    is_enabled=True,
+                    priority=1,
+                    last_checked_at=datetime.now(timezone.utc),
+                    last_successful_check_at=datetime.now(timezone.utc)
+                ),
+                MonitoringSource(
+                    name="Joint Seat Allocation Authority (JoSAA)",
+                    organization_code="JOSAA",
+                    organization_name="Ministry of Education (MoE)",
+                    category="ADMISSION",
+                    state_code="ALL",
+                    source_type="OFFICIAL_GOVT",
+                    official_website_url="https://josaa.nic.in",
+                    notification_url="https://josaa.nic.in/counselling-schedule",
+                    verification_status="VERIFIED",
+                    check_frequency="DAILY",
+                    is_enabled=True,
+                    priority=1,
+                    last_checked_at=datetime.now(timezone.utc),
+                    last_successful_check_at=datetime.now(timezone.utc)
+                ),
+                MonitoringSource(
+                    name="Infosys Careers Official Talent Portal",
+                    organization_code="INFOSYS",
+                    organization_name="Infosys Limited",
+                    category="PRIVATE_JOB",
+                    state_code="ALL",
+                    source_type="EMPLOYER_CAREER",
+                    official_website_url="https://www.infosys.com",
+                    notification_url="https://career.infosys.com/joblist",
+                    verification_status="VERIFIED",
+                    check_frequency="DAILY",
+                    is_enabled=True,
+                    priority=3,
+                    last_checked_at=datetime.now(timezone.utc),
+                    last_successful_check_at=datetime.now(timezone.utc)
+                )
+            ])
+
+        # 29. Seed Monitoring Schedules (Asia/Kolkata 4 Slots)
+        sched_stmt = select(MonitoringSchedule)
+        sched_res = await db.execute(sched_stmt)
+        if not sched_res.scalars().first():
+            db.add_all([
+                MonitoringSchedule(slot_name="Morning Source Check", time_slot="06:00", timezone="Asia/Kolkata", is_active=True, category_scope="ALL"),
+                MonitoringSchedule(slot_name="Midday Source Check", time_slot="12:00", timezone="Asia/Kolkata", is_active=True, category_scope="ALL"),
+                MonitoringSchedule(slot_name="Evening Source Check", time_slot="18:00", timezone="Asia/Kolkata", is_active=True, category_scope="ALL"),
+                MonitoringSchedule(slot_name="Nightly Verification & Summary", time_slot="22:00", timezone="Asia/Kolkata", is_active=True, category_scope="ALL")
+            ])
+
+        # 30. Seed Detected Updates
+        det_stmt = select(DetectedUpdate)
+        det_res = await db.execute(det_stmt)
+        if not det_res.scalars().first():
+            db.add_all([
+                DetectedUpdate(
+                    title="UPSC Civil Services (Preliminary) Examination 2026 Notification Released",
+                    organization="Union Public Service Commission",
+                    category="EXAM",
+                    state="All India",
+                    description="UPSC has published official notification for Civil Services Examination (CSE) 2026 and Indian Forest Service (IFS) 2026 for approximately 1,100 administrative vacancies across India.",
+                    qualification="Bachelor's Degree in any discipline from a recognized University",
+                    vacancies_count=1100,
+                    official_notification_url="https://upsc.gov.in/examinations/active-examinations",
+                    application_url="https://upsconline.nic.in",
+                    source_url="https://upsc.gov.in",
+                    important_dates={"application_start": "2026-02-14", "application_end": "2026-03-05", "exam_date": "2026-05-24", "result_date": "Date Not Announced"},
+                    publication_date=datetime(2026, 2, 14, 10, 0, tzinfo=timezone.utc),
+                    verification_status="PUBLISHED",
+                    change_type="NEW",
+                    is_officially_verified=True,
+                    verification_badge="OFFICIALLY_VERIFIED",
+                    is_featured=True,
+                    is_closing_soon=False,
+                    published_at=datetime.now(timezone.utc)
+                ),
+                DetectedUpdate(
+                    title="SSC Combined Graduate Level (CGL) 2026 Tier-1 Exam Dates Announced",
+                    organization="Staff Selection Commission",
+                    category="EXAM",
+                    state="All India",
+                    description="Staff Selection Commission has announced the schedule for CGL 2026 Computer Based Examination Tier-1. Admit cards will be released 4 days prior to exam dates on regional portals.",
+                    qualification="Graduation Degree",
+                    vacancies_count=14500,
+                    official_notification_url="https://ssc.gov.in",
+                    application_url="https://ssc.gov.in",
+                    source_url="https://ssc.gov.in",
+                    important_dates={"exam_date": "2026-09-12", "result_date": "Date Not Announced"},
+                    publication_date=datetime(2026, 2, 18, 12, 0, tzinfo=timezone.utc),
+                    verification_status="PUBLISHED",
+                    change_type="DATE_CHANGED",
+                    is_officially_verified=True,
+                    verification_badge="OFFICIALLY_VERIFIED",
+                    is_featured=True,
+                    published_at=datetime.now(timezone.utc)
+                ),
+                DetectedUpdate(
+                    title="RRB Group D CEN 02/2024 Final Scorecard & Cutoff Marks Notice",
+                    organization="Railway Recruitment Control Board",
+                    category="RESULT",
+                    state="All India",
+                    description="Railway Recruitment Boards across 21 zones have issued notice regarding normalisation formula and CEN 02/2024 Level 1 final scorecards. Students can access verified scorecards solely on official RRB regional portals.",
+                    qualification="10th Pass / ITI",
+                    vacancies_count=103769,
+                    official_notification_url="https://indianrailways.gov.in",
+                    application_url="https://rrcb.gov.in",
+                    source_url="https://indianrailways.gov.in",
+                    important_dates={"result_date": "2026-02-28 (Expected - Official Confirmation Pending)"},
+                    publication_date=datetime(2026, 2, 19, 14, 0, tzinfo=timezone.utc),
+                    verification_status="PUBLISHED",
+                    change_type="UPDATED",
+                    is_officially_verified=True,
+                    verification_badge="EXPECTED_UNOFFICIAL",
+                    published_at=datetime.now(timezone.utc)
+                ),
+                DetectedUpdate(
+                    title="CBSE Class 10 & 12 Board Results 2026 – Official Verification Portal Readiness",
+                    organization="Central Board of Secondary Education",
+                    category="SCHOOL_RESULT",
+                    state="All India",
+                    description="CBSE has issued security circular instructing schools regarding DigiLocker security PIN distribution for Class 10 and 12 results. Official result release date has not yet been declared by the Controller of Examinations.",
+                    qualification="Class 10 / Class 12 Appearing",
+                    official_notification_url="https://cbse.gov.in",
+                    application_url="https://cbseresults.nic.in",
+                    source_url="https://cbse.gov.in",
+                    important_dates={"result_date": "Date Not Announced"},
+                    publication_date=datetime(2026, 2, 20, 11, 0, tzinfo=timezone.utc),
+                    verification_status="PUBLISHED",
+                    change_type="UPDATED",
+                    is_officially_verified=True,
+                    verification_badge="OFFICIALLY_VERIFIED",
+                    published_at=datetime.now(timezone.utc)
+                ),
+                DetectedUpdate(
+                    title="TNPSC Combined Civil Services Examination - IV (Group 4) 2026 Notification",
+                    organization="Tamil Nadu Public Service Commission",
+                    category="GOVT_JOB",
+                    state="Tamil Nadu",
+                    description="Direct recruitment to Village Administrative Officer (VAO), Junior Assistant, Bill Collector, Typist, and Steno-Typist posts under Tamil Nadu Ministerial & Judicial Services.",
+                    qualification="SSLC (10th Standard) Passed with Tamil as one of the subjects",
+                    vacancies_count=7382,
+                    official_notification_url="https://www.tnpsc.gov.in",
+                    application_url="https://apply.tnpscexams.in",
+                    source_url="https://www.tnpsc.gov.in",
+                    important_dates={"application_start": "2026-01-30", "application_end": "2026-02-28", "exam_date": "2026-06-09"},
+                    publication_date=datetime(2026, 1, 30, 9, 0, tzinfo=timezone.utc),
+                    verification_status="PUBLISHED",
+                    change_type="NEW",
+                    is_officially_verified=True,
+                    verification_badge="OFFICIALLY_VERIFIED",
+                    is_closing_soon=True,
+                    published_at=datetime.now(timezone.utc)
+                ),
+                DetectedUpdate(
+                    title="Infosys Specialist Programmer & Digital Specialist Engineer 2026 Batch",
+                    organization="Infosys Limited",
+                    category="PRIVATE_JOB",
+                    state="All India",
+                    description="Off-campus recruitment drive for 2025 and 2026 batch engineering graduates. Hands-on coding assessment in Data Structures, Algorithms, and System Design.",
+                    qualification="B.E. / B.Tech / M.E. / M.Tech / MCA / M.Sc (Computer Science / IT)",
+                    vacancies_count=2500,
+                    official_notification_url="https://career.infosys.com",
+                    application_url="https://career.infosys.com/joblist",
+                    source_url="https://career.infosys.com",
+                    important_dates={"application_end": "2026-03-15"},
+                    publication_date=datetime(2026, 2, 10, 15, 0, tzinfo=timezone.utc),
+                    verification_status="PUBLISHED",
+                    change_type="NEW",
+                    is_officially_verified=True,
+                    verification_badge="THIRD_PARTY",
+                    published_at=datetime.now(timezone.utc)
+                ),
+                DetectedUpdate(
+                    title="NSP National Means-cum-Merit Scholarship Scheme (NMMSS) 2026 Renewal",
+                    organization="Department of School Education & Literacy, MoE",
+                    category="SCHOLARSHIP",
+                    state="All India",
+                    description="National Scholarship Portal has opened renewal applications for Class 10, 11, and 12 eligible students under NMMSS scheme offering INR 12,000 per annum financial grant.",
+                    qualification="Class 9 to 12 students with minimum 55% aggregate",
+                    official_notification_url="https://scholarships.gov.in",
+                    application_url="https://scholarships.gov.in",
+                    source_url="https://scholarships.gov.in",
+                    important_dates={"application_end": "2026-03-31"},
+                    publication_date=datetime(2026, 2, 1, 10, 0, tzinfo=timezone.utc),
+                    verification_status="PUBLISHED",
+                    change_type="NEW",
+                    is_officially_verified=True,
+                    verification_badge="OFFICIALLY_VERIFIED",
+                    published_at=datetime.now(timezone.utc)
+                ),
+                DetectedUpdate(
+                    title="JEE Main Session 2 Examination City Intimation Slip Release Notice",
+                    organization="National Testing Agency (NTA)",
+                    category="ADMIT_CARD",
+                    state="All India",
+                    description="NTA will release exam city advance allotment slips for JEE Main Session 2 on the official exam portal. Admit cards with roll numbers and venue addresses will follow 3 days prior.",
+                    qualification="Class 12 / Appearing with PCM",
+                    official_notification_url="https://jeemain.nta.ac.in",
+                    application_url="https://jeemain.nta.ac.in",
+                    source_url="https://jeemain.nta.ac.in",
+                    important_dates={"exam_date": "2026-04-04"},
+                    publication_date=datetime(2026, 2, 21, 9, 30, tzinfo=timezone.utc),
+                    verification_status="PUBLISHED",
+                    change_type="NEW",
+                    is_officially_verified=True,
+                    verification_badge="OFFICIALLY_VERIFIED",
+                    published_at=datetime.now(timezone.utc)
+                )
+            ])
+
+        # 31. Seed Website Health Checks
+        hlth_stmt = select(WebsiteHealthCheck)
+        hlth_res = await db.execute(hlth_stmt)
+        if not hlth_res.scalars().first():
+            db.add_all([
+                WebsiteHealthCheck(component_name="HOMEPAGE", route_path="/", status="HEALTHY", latency_ms=42.5, http_status=200),
+                WebsiteHealthCheck(component_name="EXAMS_PORTAL", route_path="/apply", status="HEALTHY", latency_ms=68.2, http_status=200),
+                WebsiteHealthCheck(component_name="JOBS_PORTAL", route_path="/jobs", status="HEALTHY", latency_ms=54.1, http_status=200),
+                WebsiteHealthCheck(component_name="RESULTS_CHECKER", route_path="/results", status="HEALTHY", latency_ms=39.8, http_status=200),
+                WebsiteHealthCheck(component_name="SCHOOL_PORTAL", route_path="/school", status="HEALTHY", latency_ms=48.6, http_status=200),
+                WebsiteHealthCheck(component_name="STUDENT_DASHBOARD", route_path="/dashboard", status="HEALTHY", latency_ms=61.0, http_status=200),
+                WebsiteHealthCheck(component_name="ADMIN_PORTAL", route_path="/admin/dashboard", status="HEALTHY", latency_ms=75.3, http_status=200),
+                WebsiteHealthCheck(component_name="API_GATEWAY", route_path="/api/health", status="HEALTHY", latency_ms=12.4, http_status=200),
+                WebsiteHealthCheck(component_name="AUTH_SERVICE", route_path="/api/auth/login", status="HEALTHY", latency_ms=28.7, http_status=200),
+                WebsiteHealthCheck(component_name="DATABASE", route_path="sqlite:///examhub.db", status="HEALTHY", latency_ms=3.2, http_status=200)
+            ])
+
+        # 32. Seed Maintenance Tasks
+        task_m_stmt = select(MaintenanceTask)
+        task_m_res = await db.execute(task_m_stmt)
+        if not task_m_res.scalars().first():
+            db.add_all([
+                MaintenanceTask(
+                    title="Verify TNPSC Group 4 One-Time Registration Gateway Response",
+                    description="Ensure redirected OTR links to apply.tnpscexams.in respond within 3000ms during peak application deadlines.",
+                    category="BROKEN_LINK",
+                    priority="HIGH",
+                    status="IN_PROGRESS",
+                    reported_by="AUTOMATED_MONITOR",
+                    deadline=datetime(2026, 2, 28, 18, 0, tzinfo=timezone.utc)
+                ),
+                MaintenanceTask(
+                    title="Audit Content Freshness for Expired State Police Jobs",
+                    description="Scan recruitment database and archive notifications whose application closing date was before February 15, 2026.",
+                    category="CONTENT_UPDATE",
+                    priority="MEDIUM",
+                    status="RESOLVED",
+                    reported_by="SUPER_ADMIN",
+                    resolution_notes="Archived 4 expired police recruitment notices automatically.",
+                    resolved_at=datetime.now(timezone.utc)
+                ),
+                MaintenanceTask(
+                    title="Verify CSP & Security Headers Compliance across All School Routes",
+                    description="Check Content-Security-Policy headers on /school/books/reader to guarantee sandboxed iframe protections.",
+                    category="SECURITY_ISSUE",
+                    priority="URGENT",
+                    status="RESOLVED",
+                    reported_by="SECURITY_AUDIT",
+                    resolution_notes="Confirmed X-Frame-Options: DENY and strict referrer policies active.",
+                    resolved_at=datetime.now(timezone.utc)
+                )
+            ])
+
+        # 33. Seed Backup Records
+        bkp_stmt = select(BackupRecord)
+        bkp_res = await db.execute(bkp_stmt)
+        if not bkp_res.scalars().first():
+            db.add_all([
+                BackupRecord(
+                    backup_type="DAILY",
+                    file_name="examhub_backup_20260220_020000.sql.gz",
+                    file_size_kb=14280,
+                    status="SUCCESS",
+                    integrity_checksum="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                    storage_path="/var/backups/examhub/daily/examhub_backup_20260220.sql.gz",
+                    retention_days=30,
+                    last_verified_at=datetime.now(timezone.utc)
+                ),
+                BackupRecord(
+                    backup_type="WEEKLY",
+                    file_name="examhub_backup_week07_2026.sql.gz",
+                    file_size_kb=13920,
+                    status="SUCCESS",
+                    integrity_checksum="ca978112ca1bbdcafac231b39a23dc4da7860814416067137f828062ec85a218",
+                    storage_path="/var/backups/examhub/weekly/examhub_backup_week07_2026.sql.gz",
+                    retention_days=90,
+                    last_verified_at=datetime.now(timezone.utc)
+                )
+            ])
+
+        # 34. Seed Daily Admin Report
+        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        rep_stmt = select(DailyAdminReport).where(DailyAdminReport.report_date == today_str)
+        rep_res = await db.execute(rep_stmt)
+        if not rep_res.scalars().first():
+            db.add(DailyAdminReport(
+                report_date=today_str,
+                sources_checked_count=24,
+                new_govt_jobs=5,
+                new_private_jobs=3,
+                new_exam_notices=2,
+                new_results_announced=1,
+                school_results_updated=1,
+                new_admit_cards=2,
+                scholarships_updated=1,
+                deadlines_updated=3,
+                broken_links_found=0,
+                failed_sources_count=0,
+                pending_verifications=1,
+                failed_notifications=0,
+                website_health_status="HEALTHY",
+                api_health_status="HEALTHY",
+                db_health_status="HEALTHY",
+                backup_status="SUCCESS",
+                security_alerts_count=0,
+                maintenance_tasks_completed=2,
+                outstanding_issues_count=1
+            ))
+
+            # 28. Seed Monitoring Sources
+            src_stmt = select(MonitoringSource)
+            src_res = await db.execute(src_stmt)
+            if not src_res.scalars().first():
+                db.add_all([
+                    MonitoringSource(
+                        name="Union Public Service Commission (UPSC) Recruitment & Notices",
+                        organization_code="UPSC",
+                        organization_name="Union Public Service Commission",
+                        category="GOVT_JOB",
+                        state_code="ALL",
+                        source_type="OFFICIAL_GOVT",
+                        official_website_url="https://upsc.gov.in",
+                        notification_url="https://upsc.gov.in/examinations/active-examinations",
+                        verification_status="VERIFIED",
+                        check_frequency="DAILY",
+                        is_enabled=True,
+                        priority=1,
+                        last_checked_at=datetime.now(timezone.utc),
+                        last_successful_check_at=datetime.now(timezone.utc)
+                    ),
+                    MonitoringSource(
+                        name="Staff Selection Commission (SSC) Examination Portal",
+                        organization_code="SSC",
+                        organization_name="Staff Selection Commission",
+                        category="GOVT_JOB",
+                        state_code="ALL",
+                        source_type="OFFICIAL_GOVT",
+                        official_website_url="https://ssc.gov.in",
+                        notification_url="https://ssc.gov.in/candidate-portal/notices",
+                        verification_status="VERIFIED",
+                        check_frequency="DAILY",
+                        is_enabled=True,
+                        priority=1,
+                        last_checked_at=datetime.now(timezone.utc),
+                        last_successful_check_at=datetime.now(timezone.utc)
+                    ),
+                    MonitoringSource(
+                        name="Railway Recruitment Control Board (RRCB)",
+                        organization_code="RRB",
+                        organization_name="Railway Recruitment Control Board",
+                        category="GOVT_JOB",
+                        state_code="ALL",
+                        source_type="OFFICIAL_GOVT",
+                        official_website_url="https://indianrailways.gov.in",
+                        notification_url="https://rrcb.gov.in/recruitment.html",
+                        verification_status="VERIFIED",
+                        check_frequency="DAILY",
+                        is_enabled=True,
+                        priority=1,
+                        last_checked_at=datetime.now(timezone.utc),
+                        last_successful_check_at=datetime.now(timezone.utc)
+                    ),
+                    MonitoringSource(
+                        name="Institute of Banking Personnel Selection (IBPS)",
+                        organization_code="IBPS",
+                        organization_name="Institute of Banking Personnel Selection",
+                        category="GOVT_JOB",
+                        state_code="ALL",
+                        source_type="OFFICIAL_GOVT",
+                        official_website_url="https://www.ibps.in",
+                        notification_url="https://www.ibps.in/current-vacancies",
+                        verification_status="VERIFIED",
+                        check_frequency="DAILY",
+                        is_enabled=True,
+                        priority=1,
+                        last_checked_at=datetime.now(timezone.utc),
+                        last_successful_check_at=datetime.now(timezone.utc)
+                    ),
+                    MonitoringSource(
+                        name="Tamil Nadu Public Service Commission (TNPSC)",
+                        organization_code="TNPSC",
+                        organization_name="Tamil Nadu Public Service Commission",
+                        category="GOVT_JOB",
+                        state_code="TN",
+                        source_type="OFFICIAL_GOVT",
+                        official_website_url="https://www.tnpsc.gov.in",
+                        notification_url="https://www.tnpsc.gov.in/english/notifications.aspx",
+                        verification_status="VERIFIED",
+                        check_frequency="DAILY",
+                        is_enabled=True,
+                        priority=2,
+                        last_checked_at=datetime.now(timezone.utc),
+                        last_successful_check_at=datetime.now(timezone.utc)
+                    ),
+                    MonitoringSource(
+                        name="Central Board of Secondary Education (CBSE) Results & Exam Notices",
+                        organization_code="CBSE",
+                        organization_name="Central Board of Secondary Education",
+                        category="SCHOOL_RESULT",
+                        state_code="ALL",
+                        source_type="EDUCATION_BOARD",
+                        official_website_url="https://cbse.gov.in",
+                        notification_url="https://cbseresults.nic.in",
+                        verification_status="VERIFIED",
+                        check_frequency="DAILY",
+                        is_enabled=True,
+                        priority=1,
+                        last_checked_at=datetime.now(timezone.utc),
+                        last_successful_check_at=datetime.now(timezone.utc)
+                    ),
+                    MonitoringSource(
+                        name="National Institute of Open Schooling (NIOS)",
+                        organization_code="NIOS",
+                        organization_name="National Institute of Open Schooling",
+                        category="SCHOOL_RESULT",
+                        state_code="ALL",
+                        source_type="EDUCATION_BOARD",
+                        official_website_url="https://nios.ac.in",
+                        notification_url="https://results.nios.ac.in",
+                        verification_status="VERIFIED",
+                        check_frequency="DAILY",
+                        is_enabled=True,
+                        priority=1,
+                        last_checked_at=datetime.now(timezone.utc),
+                        last_successful_check_at=datetime.now(timezone.utc)
+                    ),
+                    MonitoringSource(
+                        name="National Scholarship Portal (NSP)",
+                        organization_code="NSP",
+                        organization_name="Ministry of Electronics and Information Technology",
+                        category="SCHOLARSHIP",
+                        state_code="ALL",
+                        source_type="OFFICIAL_GOVT",
+                        official_website_url="https://scholarships.gov.in",
+                        notification_url="https://scholarships.gov.in/public/schemeGuidelines",
+                        verification_status="VERIFIED",
+                        check_frequency="DAILY",
+                        is_enabled=True,
+                        priority=1,
+                        last_checked_at=datetime.now(timezone.utc),
+                        last_successful_check_at=datetime.now(timezone.utc)
+                    ),
+                    MonitoringSource(
+                        name="Joint Seat Allocation Authority (JoSAA)",
+                        organization_code="JOSAA",
+                        organization_name="Ministry of Education (MoE)",
+                        category="ADMISSION",
+                        state_code="ALL",
+                        source_type="OFFICIAL_GOVT",
+                        official_website_url="https://josaa.nic.in",
+                        notification_url="https://josaa.nic.in/counselling-schedule",
+                        verification_status="VERIFIED",
+                        check_frequency="DAILY",
+                        is_enabled=True,
+                        priority=1,
+                        last_checked_at=datetime.now(timezone.utc),
+                        last_successful_check_at=datetime.now(timezone.utc)
+                    ),
+                    MonitoringSource(
+                        name="Infosys Careers Official Talent Portal",
+                        organization_code="INFOSYS",
+                        organization_name="Infosys Limited",
+                        category="PRIVATE_JOB",
+                        state_code="ALL",
+                        source_type="EMPLOYER_CAREER",
+                        official_website_url="https://www.infosys.com",
+                        notification_url="https://career.infosys.com/joblist",
+                        verification_status="VERIFIED",
+                        check_frequency="DAILY",
+                        is_enabled=True,
+                        priority=3,
+                        last_checked_at=datetime.now(timezone.utc),
+                        last_successful_check_at=datetime.now(timezone.utc)
+                    )
+                ])
+
+            # 29. Seed Monitoring Schedules (Asia/Kolkata 4 Slots)
+            sched_stmt = select(MonitoringSchedule)
+            sched_res = await db.execute(sched_stmt)
+            if not sched_res.scalars().first():
+                db.add_all([
+                    MonitoringSchedule(slot_name="Morning Source Check", time_slot="06:00", timezone="Asia/Kolkata", is_active=True, category_scope="ALL"),
+                    MonitoringSchedule(slot_name="Midday Source Check", time_slot="12:00", timezone="Asia/Kolkata", is_active=True, category_scope="ALL"),
+                    MonitoringSchedule(slot_name="Evening Source Check", time_slot="18:00", timezone="Asia/Kolkata", is_active=True, category_scope="ALL"),
+                    MonitoringSchedule(slot_name="Nightly Verification & Summary", time_slot="22:00", timezone="Asia/Kolkata", is_active=True, category_scope="ALL")
+                ])
+
+            # 30. Seed Detected Updates
+            det_stmt = select(DetectedUpdate)
+            det_res = await db.execute(det_stmt)
+            if not det_res.scalars().first():
+                db.add_all([
+                    DetectedUpdate(
+                        title="UPSC Civil Services (Preliminary) Examination 2026 Notification Released",
+                        organization="Union Public Service Commission",
+                        category="EXAM",
+                        state="All India",
+                        description="UPSC has published official notification for Civil Services Examination (CSE) 2026 and Indian Forest Service (IFS) 2026 for approximately 1,100 administrative vacancies across India.",
+                        qualification="Bachelor's Degree in any discipline from a recognized University",
+                        vacancies_count=1100,
+                        official_notification_url="https://upsc.gov.in/examinations/active-examinations",
+                        application_url="https://upsconline.nic.in",
+                        source_url="https://upsc.gov.in",
+                        important_dates={"application_start": "2026-02-14", "application_end": "2026-03-05", "exam_date": "2026-05-24", "result_date": "Date Not Announced"},
+                        publication_date=datetime(2026, 2, 14, 10, 0, tzinfo=timezone.utc),
+                        verification_status="PUBLISHED",
+                        change_type="NEW",
+                        is_officially_verified=True,
+                        verification_badge="OFFICIALLY_VERIFIED",
+                        is_featured=True,
+                        is_closing_soon=False,
+                        published_at=datetime.now(timezone.utc)
+                    ),
+                    DetectedUpdate(
+                        title="SSC Combined Graduate Level (CGL) 2026 Tier-1 Exam Dates Announced",
+                        organization="Staff Selection Commission",
+                        category="EXAM",
+                        state="All India",
+                        description="Staff Selection Commission has announced the schedule for CGL 2026 Computer Based Examination Tier-1. Admit cards will be released 4 days prior to exam dates on regional portals.",
+                        qualification="Graduation Degree",
+                        vacancies_count=14500,
+                        official_notification_url="https://ssc.gov.in",
+                        application_url="https://ssc.gov.in",
+                        source_url="https://ssc.gov.in",
+                        important_dates={"exam_date": "2026-09-12", "result_date": "Date Not Announced"},
+                        publication_date=datetime(2026, 2, 18, 12, 0, tzinfo=timezone.utc),
+                        verification_status="PUBLISHED",
+                        change_type="DATE_CHANGED",
+                        is_officially_verified=True,
+                        verification_badge="OFFICIALLY_VERIFIED",
+                        is_featured=True,
+                        published_at=datetime.now(timezone.utc)
+                    ),
+                    DetectedUpdate(
+                        title="RRB Group D CEN 02/2024 Final Scorecard & Cutoff Marks Notice",
+                        organization="Railway Recruitment Control Board",
+                        category="RESULT",
+                        state="All India",
+                        description="Railway Recruitment Boards across 21 zones have issued notice regarding normalisation formula and CEN 02/2024 Level 1 final scorecards. Students can access verified scorecards solely on official RRB regional portals.",
+                        qualification="10th Pass / ITI",
+                        vacancies_count=103769,
+                        official_notification_url="https://indianrailways.gov.in",
+                        application_url="https://rrcb.gov.in",
+                        source_url="https://indianrailways.gov.in",
+                        important_dates={"result_date": "2026-02-28 (Expected - Official Confirmation Pending)"},
+                        publication_date=datetime(2026, 2, 19, 14, 0, tzinfo=timezone.utc),
+                        verification_status="PUBLISHED",
+                        change_type="UPDATED",
+                        is_officially_verified=True,
+                        verification_badge="EXPECTED_UNOFFICIAL",
+                        published_at=datetime.now(timezone.utc)
+                    ),
+                    DetectedUpdate(
+                        title="CBSE Class 10 & 12 Board Results 2026 – Official Verification Portal Readiness",
+                        organization="Central Board of Secondary Education",
+                        category="SCHOOL_RESULT",
+                        state="All India",
+                        description="CBSE has issued security circular instructing schools regarding DigiLocker security PIN distribution for Class 10 and 12 results. Official result release date has not yet been declared by the Controller of Examinations.",
+                        qualification="Class 10 / Class 12 Appearing",
+                        official_notification_url="https://cbse.gov.in",
+                        application_url="https://cbseresults.nic.in",
+                        source_url="https://cbse.gov.in",
+                        important_dates={"result_date": "Date Not Announced"},
+                        publication_date=datetime(2026, 2, 20, 11, 0, tzinfo=timezone.utc),
+                        verification_status="PUBLISHED",
+                        change_type="UPDATED",
+                        is_officially_verified=True,
+                        verification_badge="OFFICIALLY_VERIFIED",
+                        published_at=datetime.now(timezone.utc)
+                    ),
+                    DetectedUpdate(
+                        title="TNPSC Combined Civil Services Examination - IV (Group 4) 2026 Notification",
+                        organization="Tamil Nadu Public Service Commission",
+                        category="GOVT_JOB",
+                        state="Tamil Nadu",
+                        description="Direct recruitment to Village Administrative Officer (VAO), Junior Assistant, Bill Collector, Typist, and Steno-Typist posts under Tamil Nadu Ministerial & Judicial Services.",
+                        qualification="SSLC (10th Standard) Passed with Tamil as one of the subjects",
+                        vacancies_count=7382,
+                        official_notification_url="https://www.tnpsc.gov.in",
+                        application_url="https://apply.tnpscexams.in",
+                        source_url="https://www.tnpsc.gov.in",
+                        important_dates={"application_start": "2026-01-30", "application_end": "2026-02-28", "exam_date": "2026-06-09"},
+                        publication_date=datetime(2026, 1, 30, 9, 0, tzinfo=timezone.utc),
+                        verification_status="PUBLISHED",
+                        change_type="NEW",
+                        is_officially_verified=True,
+                        verification_badge="OFFICIALLY_VERIFIED",
+                        is_closing_soon=True,
+                        published_at=datetime.now(timezone.utc)
+                    ),
+                    DetectedUpdate(
+                        title="Infosys Specialist Programmer & Digital Specialist Engineer 2026 Batch",
+                        organization="Infosys Limited",
+                        category="PRIVATE_JOB",
+                        state="All India",
+                        description="Off-campus recruitment drive for 2025 and 2026 batch engineering graduates. Hands-on coding assessment in Data Structures, Algorithms, and System Design.",
+                        qualification="B.E. / B.Tech / M.E. / M.Tech / MCA / M.Sc (Computer Science / IT)",
+                        vacancies_count=2500,
+                        official_notification_url="https://career.infosys.com",
+                        application_url="https://career.infosys.com/joblist",
+                        source_url="https://career.infosys.com",
+                        important_dates={"application_end": "2026-03-15"},
+                        publication_date=datetime(2026, 2, 10, 15, 0, tzinfo=timezone.utc),
+                        verification_status="PUBLISHED",
+                        change_type="NEW",
+                        is_officially_verified=True,
+                        verification_badge="THIRD_PARTY",
+                        published_at=datetime.now(timezone.utc)
+                    ),
+                    DetectedUpdate(
+                        title="NSP National Means-cum-Merit Scholarship Scheme (NMMSS) 2026 Renewal",
+                        organization="Department of School Education & Literacy, MoE",
+                        category="SCHOLARSHIP",
+                        state="All India",
+                        description="National Scholarship Portal has opened renewal applications for Class 10, 11, and 12 eligible students under NMMSS scheme offering INR 12,000 per annum financial grant.",
+                        qualification="Class 9 to 12 students with minimum 55% aggregate",
+                        official_notification_url="https://scholarships.gov.in",
+                        application_url="https://scholarships.gov.in",
+                        source_url="https://scholarships.gov.in",
+                        important_dates={"application_end": "2026-03-31"},
+                        publication_date=datetime(2026, 2, 1, 10, 0, tzinfo=timezone.utc),
+                        verification_status="PUBLISHED",
+                        change_type="NEW",
+                        is_officially_verified=True,
+                        verification_badge="OFFICIALLY_VERIFIED",
+                        published_at=datetime.now(timezone.utc)
+                    ),
+                    DetectedUpdate(
+                        title="JEE Main Session 2 Examination City Intimation Slip Release Notice",
+                        organization="National Testing Agency (NTA)",
+                        category="ADMIT_CARD",
+                        state="All India",
+                        description="NTA will release exam city advance allotment slips for JEE Main Session 2 on the official exam portal. Admit cards with roll numbers and venue addresses will follow 3 days prior.",
+                        qualification="Class 12 / Appearing with PCM",
+                        official_notification_url="https://jeemain.nta.ac.in",
+                        application_url="https://jeemain.nta.ac.in",
+                        source_url="https://jeemain.nta.ac.in",
+                        important_dates={"exam_date": "2026-04-04"},
+                        publication_date=datetime(2026, 2, 21, 9, 30, tzinfo=timezone.utc),
+                        verification_status="PUBLISHED",
+                        change_type="NEW",
+                        is_officially_verified=True,
+                        verification_badge="OFFICIALLY_VERIFIED",
+                        published_at=datetime.now(timezone.utc)
+                    )
+                ])
+
+            # 31. Seed Website Health Checks
+            hlth_stmt = select(WebsiteHealthCheck)
+            hlth_res = await db.execute(hlth_stmt)
+            if not hlth_res.scalars().first():
+                db.add_all([
+                    WebsiteHealthCheck(component_name="HOMEPAGE", route_path="/", status="HEALTHY", latency_ms=42.5, http_status=200),
+                    WebsiteHealthCheck(component_name="EXAMS_PORTAL", route_path="/apply", status="HEALTHY", latency_ms=68.2, http_status=200),
+                    WebsiteHealthCheck(component_name="JOBS_PORTAL", route_path="/jobs", status="HEALTHY", latency_ms=54.1, http_status=200),
+                    WebsiteHealthCheck(component_name="RESULTS_CHECKER", route_path="/results", status="HEALTHY", latency_ms=39.8, http_status=200),
+                    WebsiteHealthCheck(component_name="SCHOOL_PORTAL", route_path="/school", status="HEALTHY", latency_ms=48.6, http_status=200),
+                    WebsiteHealthCheck(component_name="STUDENT_DASHBOARD", route_path="/dashboard", status="HEALTHY", latency_ms=61.0, http_status=200),
+                    WebsiteHealthCheck(component_name="ADMIN_PORTAL", route_path="/admin/dashboard", status="HEALTHY", latency_ms=75.3, http_status=200),
+                    WebsiteHealthCheck(component_name="API_GATEWAY", route_path="/api/health", status="HEALTHY", latency_ms=12.4, http_status=200),
+                    WebsiteHealthCheck(component_name="AUTH_SERVICE", route_path="/api/auth/login", status="HEALTHY", latency_ms=28.7, http_status=200),
+                    WebsiteHealthCheck(component_name="DATABASE", route_path="sqlite:///examhub.db", status="HEALTHY", latency_ms=3.2, http_status=200)
+                ])
+
+            # 32. Seed Maintenance Tasks
+            task_m_stmt = select(MaintenanceTask)
+            task_m_res = await db.execute(task_m_stmt)
+            if not task_m_res.scalars().first():
+                db.add_all([
+                    MaintenanceTask(
+                        title="Verify TNPSC Group 4 One-Time Registration Gateway Response",
+                        description="Ensure redirected OTR links to apply.tnpscexams.in respond within 3000ms during peak application deadlines.",
+                        category="BROKEN_LINK",
+                        priority="HIGH",
+                        status="IN_PROGRESS",
+                        reported_by="AUTOMATED_MONITOR",
+                        deadline=datetime(2026, 2, 28, 18, 0, tzinfo=timezone.utc)
+                    ),
+                    MaintenanceTask(
+                        title="Audit Content Freshness for Expired State Police Jobs",
+                        description="Scan recruitment database and archive notifications whose application closing date was before February 15, 2026.",
+                        category="CONTENT_UPDATE",
+                        priority="MEDIUM",
+                        status="RESOLVED",
+                        reported_by="SUPER_ADMIN",
+                        resolution_notes="Archived 4 expired police recruitment notices automatically.",
+                        resolved_at=datetime.now(timezone.utc)
+                    ),
+                    MaintenanceTask(
+                        title="Verify CSP & Security Headers Compliance across All School Routes",
+                        description="Check Content-Security-Policy headers on /school/books/reader to guarantee sandboxed iframe protections.",
+                        category="SECURITY_ISSUE",
+                        priority="URGENT",
+                        status="RESOLVED",
+                        reported_by="SECURITY_AUDIT",
+                        resolution_notes="Confirmed X-Frame-Options: DENY and strict referrer policies active.",
+                        resolved_at=datetime.now(timezone.utc)
+                    )
+                ])
+
+            # 33. Seed Backup Records
+            bkp_stmt = select(BackupRecord)
+            bkp_res = await db.execute(bkp_stmt)
+            if not bkp_res.scalars().first():
+                db.add_all([
+                    BackupRecord(
+                        backup_type="DAILY",
+                        file_name="examhub_backup_20260220_020000.sql.gz",
+                        file_size_kb=14280,
+                        status="SUCCESS",
+                        integrity_checksum="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                        storage_path="/var/backups/examhub/daily/examhub_backup_20260220.sql.gz",
+                        retention_days=30,
+                        last_verified_at=datetime.now(timezone.utc)
+                    ),
+                    BackupRecord(
+                        backup_type="WEEKLY",
+                        file_name="examhub_backup_week07_2026.sql.gz",
+                        file_size_kb=13920,
+                        status="SUCCESS",
+                        integrity_checksum="ca978112ca1bbdcafac231b39a23dc4da7860814416067137f828062ec85a218",
+                        storage_path="/var/backups/examhub/weekly/examhub_backup_week07_2026.sql.gz",
+                        retention_days=90,
+                        last_verified_at=datetime.now(timezone.utc)
+                    )
+                ])
+
+            # 34. Seed Daily Admin Report
+            today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            rep_stmt = select(DailyAdminReport).where(DailyAdminReport.report_date == today_str)
+            rep_res = await db.execute(rep_stmt)
+            if not rep_res.scalars().first():
+                db.add(DailyAdminReport(
+                    report_date=today_str,
+                    sources_checked_count=24,
+                    new_govt_jobs=5,
+                    new_private_jobs=3,
+                    new_exam_notices=2,
+                    new_results_announced=1,
+                    school_results_updated=1,
+                    new_admit_cards=2,
+                    scholarships_updated=1,
+                    deadlines_updated=3,
+                    broken_links_found=0,
+                    failed_sources_count=0,
+                    pending_verifications=1,
+                    failed_notifications=0,
+                    website_health_status="HEALTHY",
+                    api_health_status="HEALTHY",
+                    db_health_status="HEALTHY",
+                    backup_status="SUCCESS",
+                    security_alerts_count=0,
+                    maintenance_tasks_completed=2,
+                    outstanding_issues_count=1
+                ))
 
             await db.commit()
             print("Successfully initialized and seeded EXAMHUB INDIA database!")

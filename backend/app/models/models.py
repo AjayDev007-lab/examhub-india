@@ -973,5 +973,256 @@ class ScheduledTaskLog(Base):
     completed_at = Column(DateTime, default=utc_now, nullable=False)
 
 
+# 53. MONITORING SOURCES (Official Recruitment, Examination & Education Authorities)
+class MonitoringSource(Base):
+    __tablename__ = "monitoring_sources"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)
+    organization_code = Column(String(100), nullable=False, index=True) # e.g. "UPSC", "SSC", "RRB", "CBSE"
+    organization_name = Column(String(255), nullable=False)
+    category = Column(String(50), nullable=False, index=True) # "GOVT_JOB", "PRIVATE_JOB", "EXAM", "RESULT", "SCHOOL_RESULT", "ADMIT_CARD", "SCHOLARSHIP", "ADMISSION"
+    state_code = Column(String(10), default="ALL", index=True) # "ALL", "TN", "DL", "KA", "MH", etc.
+    source_type = Column(String(50), default="OFFICIAL_GOVT") # "OFFICIAL_GOVT", "EMPLOYER_CAREER", "EDUCATION_BOARD", "TESTING_AGENCY"
+    official_website_url = Column(String(512), nullable=False)
+    notification_url = Column(String(512), nullable=False)
+    verification_status = Column(String(50), default="VERIFIED", index=True) # "PENDING", "VERIFIED", "NEEDS_REVIEW", "BROKEN", "REDIRECT_CHANGED", "SUSPICIOUS", "DISABLED"
+    check_frequency = Column(String(50), default="DAILY") # "6_HOURS", "DAILY", "TWICE_DAILY"
+    is_enabled = Column(Boolean, default=True)
+    priority = Column(Integer, default=1) # 1 (Highest/Govt), 2 (State), 3 (Private)
+    last_checked_at = Column(DateTime, nullable=True)
+    last_successful_check_at = Column(DateTime, nullable=True)
+    error_count = Column(Integer, default=0)
+    last_error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+
+# 54. MONITORING SCHEDULES
+class MonitoringSchedule(Base):
+    __tablename__ = "monitoring_schedules"
+
+    id = Column(Integer, primary_key=True, index=True)
+    slot_name = Column(String(100), nullable=False) # e.g. "Morning Source Check", "Midday Check", "Evening Check", "Nightly Verification"
+    time_slot = Column(String(10), nullable=False) # e.g. "06:00", "12:00", "18:00", "22:00"
+    timezone = Column(String(50), default="Asia/Kolkata")
+    is_active = Column(Boolean, default=True)
+    category_scope = Column(String(100), default="ALL") # "ALL", "GOVT_JOBS", "EXAMS", "RESULTS"
+    last_run_at = Column(DateTime, nullable=True)
+    next_run_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+
+
+# 55. MONITORING RUNS
+class MonitoringRun(Base):
+    __tablename__ = "monitoring_runs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    schedule_slot = Column(String(100), nullable=False)
+    status = Column(String(50), default="COMPLETED", index=True) # "RUNNING", "COMPLETED", "FAILED", "PARTIAL"
+    sources_checked_count = Column(Integer, default=0)
+    new_items_detected = Column(Integer, default=0)
+    updated_items_detected = Column(Integer, default=0)
+    failed_sources_count = Column(Integer, default=0)
+    duration_seconds = Column(Float, default=0.0)
+    error_details = Column(Text, nullable=True)
+    started_at = Column(DateTime, default=utc_now, nullable=False)
+    completed_at = Column(DateTime, default=utc_now, nullable=False)
+
+
+# 56. DETECTED UPDATES (Information Extraction & Verification Pipeline)
+class DetectedUpdate(Base):
+    __tablename__ = "detected_updates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    source_id = Column(Integer, ForeignKey("monitoring_sources.id", ondelete="SET NULL"), nullable=True, index=True)
+    title = Column(String(255), nullable=False)
+    organization = Column(String(255), nullable=False, index=True)
+    category = Column(String(50), nullable=False, index=True) # "GOVT_JOB", "PRIVATE_JOB", "EXAM", "RESULT", "SCHOOL_RESULT", "ADMIT_CARD", "SCHOLARSHIP", "ADMISSION"
+    state = Column(String(50), default="All India", index=True)
+    description = Column(Text, nullable=False)
+    qualification = Column(String(255), nullable=True)
+    vacancies_count = Column(Integer, nullable=True)
+    official_notification_url = Column(String(512), nullable=True)
+    application_url = Column(String(512), nullable=True)
+    source_url = Column(String(512), nullable=False)
+    important_dates = Column(JSON, nullable=True) # {"application_start": "...", "application_end": "...", "exam_date": "...", "result_date": "..."}
+    publication_date = Column(DateTime, nullable=True)
+    detection_date = Column(DateTime, default=utc_now, nullable=False)
+    
+    # Workflow: DETECTED -> PROCESSING -> PENDING_VERIFICATION -> APPROVED -> PUBLISHED -> ARCHIVED
+    verification_status = Column(String(50), default="PUBLISHED", index=True)
+    change_type = Column(String(50), default="NEW", index=True) # "NEW", "UPDATED", "DUPLICATE", "EXPIRED", "CANCELLED", "DATE_CHANGED", "BROKEN_LINK"
+    is_officially_verified = Column(Boolean, default=True)
+    verification_badge = Column(String(50), default="OFFICIALLY_VERIFIED", index=True) # "OFFICIALLY_VERIFIED", "THIRD_PARTY", "EXPECTED_UNOFFICIAL", "AWAITING_VERIFICATION"
+    is_featured = Column(Boolean, default=False)
+    is_closing_soon = Column(Boolean, default=False)
+    
+    reviewed_by_admin_id = Column(Integer, ForeignKey("admin_users.id", ondelete="SET NULL"), nullable=True)
+    review_notes = Column(Text, nullable=True)
+    published_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+    source = relationship("MonitoringSource")
+
+
+# 57. UPDATE VERIFICATION AUDIT LOGS
+class UpdateVerificationLog(Base):
+    __tablename__ = "update_verification_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    detected_update_id = Column(Integer, ForeignKey("detected_updates.id", ondelete="CASCADE"), nullable=False, index=True)
+    admin_id = Column(Integer, ForeignKey("admin_users.id", ondelete="SET NULL"), nullable=True)
+    action = Column(String(50), nullable=False) # "APPROVE", "REJECT", "EDIT", "PUBLISH", "ARCHIVE", "FLAG_SUSPICIOUS"
+    previous_state = Column(JSON, nullable=True)
+    new_state = Column(JSON, nullable=True)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+
+
+# 58. STUDENT UPDATE BOOKMARKS
+class StudentUpdateBookmark(Base):
+    __tablename__ = "student_update_bookmarks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    update_id = Column(Integer, ForeignKey("detected_updates.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "update_id", name="uq_user_update_bookmark"),
+    )
+
+
+# 59. STUDENT UPDATE PREFERENCES & SUBSCRIPTIONS
+class StudentUpdatePreference(Base):
+    __tablename__ = "student_update_preferences"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False, index=True)
+    subscribed_categories = Column(JSON, nullable=True) # ["GOVT_JOB", "EXAM", "RESULT", "SCHOOL_RESULT"]
+    subscribed_organizations = Column(JSON, nullable=True) # ["UPSC", "SSC", "CBSE"]
+    in_app_enabled = Column(Boolean, default=True)
+    email_enabled = Column(Boolean, default=True)
+    push_enabled = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+
+# 60. WEBSITE MAINTENANCE TASKS
+class MaintenanceTask(Base):
+    __tablename__ = "maintenance_tasks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=False)
+    category = Column(String(50), nullable=False, index=True) # "BROKEN_LINK", "SECURITY_ISSUE", "WEBSITE_BUG", "PERFORMANCE_ISSUE", "CONTENT_UPDATE", "DATABASE_ISSUE", "API_ISSUE", "DESIGN_ISSUE", "USER_REPORTED_ISSUE"
+    priority = Column(String(50), default="MEDIUM", index=True) # "LOW", "MEDIUM", "HIGH", "URGENT"
+    status = Column(String(50), default="OPEN", index=True) # "OPEN", "ASSIGNED", "IN_PROGRESS", "AWAITING_REVIEW", "RESOLVED", "CLOSED"
+    assigned_to_admin_id = Column(Integer, ForeignKey("admin_users.id", ondelete="SET NULL"), nullable=True)
+    reported_by = Column(String(100), default="SYSTEM_MONITOR")
+    resolution_notes = Column(Text, nullable=True)
+    deadline = Column(DateTime, nullable=True)
+    resolved_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+
+# 61. WEBSITE HEALTH CHECKS
+class WebsiteHealthCheck(Base):
+    __tablename__ = "website_health_checks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    component_name = Column(String(100), nullable=False, index=True) # "HOMEPAGE", "EXAMS_PORTAL", "JOBS_PORTAL", "SCHOOL_PORTAL", "STUDENT_DASHBOARD", "ADMIN_PORTAL", "DATABASE", "API_GATEWAY", "AUTH_SERVICE", "BACKGROUND_WORKER"
+    route_path = Column(String(255), nullable=True)
+    status = Column(String(50), default="HEALTHY", index=True) # "HEALTHY", "WARNING", "CRITICAL", "UNKNOWN"
+    latency_ms = Column(Float, default=0.0)
+    http_status = Column(Integer, default=200)
+    error_message = Column(Text, nullable=True)
+    checked_at = Column(DateTime, default=utc_now, nullable=False, index=True)
+
+
+# 62. DATABASE HEALTH LOGS
+class DatabaseHealthLog(Base):
+    __tablename__ = "database_health_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    connection_status = Column(String(50), default="CONNECTED") # "CONNECTED", "ERROR", "SLOW"
+    active_connections = Column(Integer, default=1)
+    query_latency_ms = Column(Float, default=2.5)
+    total_tables_count = Column(Integer, default=65)
+    database_size_mb = Column(Float, default=28.4)
+    failed_migrations_count = Column(Integer, default=0)
+    notes = Column(Text, nullable=True)
+    checked_at = Column(DateTime, default=utc_now, nullable=False)
+
+
+# 63. AUTOMATED BACKUP RECORDS
+class BackupRecord(Base):
+    __tablename__ = "backup_records"
+
+    id = Column(Integer, primary_key=True, index=True)
+    backup_type = Column(String(50), default="DAILY", index=True) # "DAILY", "WEEKLY", "MONTHLY", "MANUAL"
+    file_name = Column(String(255), nullable=False)
+    file_size_kb = Column(Integer, default=0)
+    status = Column(String(50), default="SUCCESS", index=True) # "SUCCESS", "FAILED", "VERIFYING", "RESTORED"
+    integrity_checksum = Column(String(128), nullable=True) # SHA-256
+    storage_path = Column(String(512), nullable=False)
+    retention_days = Column(Integer, default=30)
+    created_by_admin_id = Column(Integer, ForeignKey("admin_users.id", ondelete="SET NULL"), nullable=True)
+    last_verified_at = Column(DateTime, nullable=True)
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+
+
+# 64. APPLICATION ERROR LOGS
+class ApplicationErrorLog(Base):
+    __tablename__ = "application_error_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    error_type = Column(String(100), nullable=False, index=True) # "FRONTEND_EXCEPTION", "BACKEND_EXCEPTION", "API_FAILURE", "DB_ERROR", "TASK_FAILURE", "NOTIFICATION_FAILURE"
+    service = Column(String(100), default="API", index=True) # "API", "FRONTEND", "SCHEDULER", "AUTH", "STORAGE"
+    severity = Column(String(50), default="MEDIUM", index=True) # "LOW", "MEDIUM", "HIGH", "CRITICAL"
+    message = Column(Text, nullable=False)
+    stack_trace = Column(Text, nullable=True)
+    endpoint = Column(String(255), nullable=True)
+    status = Column(String(50), default="OPEN", index=True) # "OPEN", "INVESTIGATING", "RESOLVED", "IGNORED"
+    frequency_count = Column(Integer, default=1)
+    first_seen_at = Column(DateTime, default=utc_now, nullable=False)
+    last_seen_at = Column(DateTime, default=utc_now, nullable=False)
+
+
+# 65. DAILY ADMIN REPORTS (20-Point Operational Report)
+class DailyAdminReport(Base):
+    __tablename__ = "daily_admin_reports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    report_date = Column(String(20), unique=True, index=True, nullable=False) # "YYYY-MM-DD"
+    sources_checked_count = Column(Integer, default=0)
+    new_govt_jobs = Column(Integer, default=0)
+    new_private_jobs = Column(Integer, default=0)
+    new_exam_notices = Column(Integer, default=0)
+    new_results_announced = Column(Integer, default=0)
+    school_results_updated = Column(Integer, default=0)
+    new_admit_cards = Column(Integer, default=0)
+    scholarships_updated = Column(Integer, default=0)
+    deadlines_updated = Column(Integer, default=0)
+    broken_links_found = Column(Integer, default=0)
+    failed_sources_count = Column(Integer, default=0)
+    pending_verifications = Column(Integer, default=0)
+    failed_notifications = Column(Integer, default=0)
+    website_health_status = Column(String(50), default="HEALTHY")
+    api_health_status = Column(String(50), default="HEALTHY")
+    db_health_status = Column(String(50), default="HEALTHY")
+    backup_status = Column(String(50), default="SUCCESS")
+    security_alerts_count = Column(Integer, default=0)
+    maintenance_tasks_completed = Column(Integer, default=0)
+    outstanding_issues_count = Column(Integer, default=0)
+    report_data_json = Column(JSON, nullable=True)
+    generated_at = Column(DateTime, default=utc_now, nullable=False)
+
+
+
 
 
