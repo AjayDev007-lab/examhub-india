@@ -4,60 +4,30 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { 
-  Award, Lock, Mail, Smartphone, ArrowRight, AlertCircle, 
-  RefreshCw, CheckCircle2, Eye, EyeOff, Sparkles, ShieldCheck 
+  Lock, Mail, ArrowRight, AlertCircle, RefreshCw, 
+  CheckCircle2, Eye, EyeOff, Sparkles, ShieldCheck, 
+  GraduationCap, BookOpen, Zap, Award
 } from "lucide-react";
 import { fetchApi } from "@/lib/api";
-import Student3DMascot, { MascotState } from "@/components/Student3DMascot";
 
-export default function StudentLoginPage() {
+export default function SpiderManStudentLoginPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"password" | "otp">("password");
 
-  // 3D Mascot Reactive State
-  const [mascotState, setMascotState] = useState<MascotState>("welcome");
-  const [typingProgress, setTypingProgress] = useState(0);
-
-  // Email / Password state
+  // Form State
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  
-  // Mobile / OTP state
-  const [mobile, setMobile] = useState("");
-  const [otpSent, setOtpSent] = useState(false);
-  const [otp, setOtp] = useState("");
-  const [demoOtp, setDemoOtp] = useState<string | null>(null);
-
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [loginSuccess, setLoginSuccess] = useState(false);
 
-  // Handle Mascot reaction on email typing
-  const handleEmailChange = (val: string) => {
-    setEmail(val);
-    setTypingProgress(Math.min(val.length / 28, 1));
-    if (mascotState !== "email") {
-      setMascotState("email");
-    }
-  };
+  // Mode View (Interactive Portal vs 16:9 Concept Showcase)
+  const [viewMode, setViewMode] = useState<"interactive" | "concept">("interactive");
 
-  // Toggle Password visibility with Mascot reaction
-  const togglePasswordVisibility = () => {
-    const nextShow = !showPassword;
-    setShowPassword(nextShow);
-    if (nextShow) {
-      setMascotState("password_peek"); // Scene 4: Peeking between fingers
-    } else {
-      setMascotState("password_hide"); // Scene 3: Covering both eyes
-    }
-  };
-
-  const handlePasswordLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setErrorMsg(null);
-    setMascotState("waiting"); // Scene 5: Excited & hopeful waiting for authentication
 
     try {
       const res = await fetchApi("/api/auth/login", {
@@ -67,355 +37,371 @@ export default function StudentLoginPage() {
       localStorage.setItem("examhub_token", res.access_token);
       localStorage.setItem("examhub_user", JSON.stringify(res.user));
       
-      // Scene 6: Celebration jump, arms raised, confetti!
       setLoginSuccess(true);
-      setMascotState("success");
-
       setTimeout(() => {
         window.location.href = "/dashboard";
-      }, 1800);
+      }, 1200);
     } catch (err: any) {
       setErrorMsg(err.message || "Invalid email or password");
-      setMascotState("welcome");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSendOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!mobile || mobile.length !== 10) {
-      setErrorMsg("Please enter a valid 10-digit Indian mobile number");
-      return;
-    }
-    setLoading(true);
-    setErrorMsg(null);
-    setMascotState("waiting");
-
-    try {
-      const res = await fetchApi("/api/auth/send-otp", {
-        method: "POST",
-        body: JSON.stringify({ mobile: mobile.trim() }),
-      });
-      setOtpSent(true);
-      if (res.debug_demo_otp) {
-        setDemoOtp(res.debug_demo_otp);
-        setOtp(res.debug_demo_otp); // auto-fill for convenience
-      }
-      setMascotState("email");
-    } catch (err: any) {
-      setErrorMsg(err.message || "Failed to send OTP");
-      setMascotState("welcome");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setErrorMsg(null);
-    setMascotState("waiting"); // Scene 5: Authenticating
-
-    try {
-      const res = await fetchApi("/api/auth/verify-otp", {
-        method: "POST",
-        body: JSON.stringify({ mobile: mobile.trim(), otp: otp.trim() }),
-      });
-      localStorage.setItem("examhub_token", res.access_token);
-      localStorage.setItem("examhub_user", JSON.stringify(res.user));
-      
-      // Scene 6: Celebration
-      setLoginSuccess(true);
-      setMascotState("success");
-
-      setTimeout(() => {
-        window.location.href = "/dashboard";
-      }, 1800);
-    } catch (err: any) {
-      setErrorMsg(err.message || "Invalid or expired OTP");
-      setMascotState("welcome");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-[85vh] flex items-center justify-center px-4 py-8 sm:py-12 bg-slate-50/60 dark:bg-slate-950">
-      <div className="max-w-6xl w-full mx-auto">
-        {/* Page Top Heading */}
-        <div className="text-center mb-8 space-y-1">
-          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-blue-100/80 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 text-xs font-bold uppercase tracking-wider mb-2">
-            <Sparkles className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-            <span>Interactive 3D Student Mascot</span>
+    <div className="min-h-screen relative overflow-hidden bg-[#070F26] text-white flex flex-col justify-between selection:bg-cyan-500 selection:text-black">
+      {/* 1. FUTURISTIC BACKGROUND: Web Geometry & Ambient Neon Glow */}
+      <div className="absolute inset-0 pointer-events-none z-0">
+        {/* Soft Radial Ambient Auras */}
+        <div className="absolute -top-40 -left-40 w-96 h-96 bg-cyan-600/20 rounded-full blur-[140px]" />
+        <div className="absolute top-1/3 left-1/4 w-[500px] h-[500px] bg-blue-600/15 rounded-full blur-[160px]" />
+        <div className="absolute -bottom-20 right-10 w-[450px] h-[450px] bg-red-600/15 rounded-full blur-[150px]" />
+        <div className="absolute top-1/2 right-1/4 w-80 h-80 bg-indigo-600/20 rounded-full blur-[130px]" />
+
+        {/* Geometric Glowing Spider-Web Lines */}
+        <svg className="absolute inset-0 w-full h-full opacity-25" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <radialGradient id="webGlow" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#06B6D4" stopOpacity="0.8" />
+              <stop offset="100%" stopColor="#06B6D4" stopOpacity="0.05" />
+            </radialGradient>
+            <linearGradient id="strandGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#38BDF8" stopOpacity="0.6" />
+              <stop offset="100%" stopColor="#818CF8" stopOpacity="0.1" />
+            </linearGradient>
+          </defs>
+          {/* Web Strands radiating from Left Character origin */}
+          <circle cx="28%" cy="50%" r="120" fill="none" stroke="url(#webGlow)" strokeWidth="1" strokeDasharray="3 3" />
+          <circle cx="28%" cy="50%" r="240" fill="none" stroke="url(#webGlow)" strokeWidth="1" strokeDasharray="4 4" />
+          <circle cx="28%" cy="50%" r="380" fill="none" stroke="url(#webGlow)" strokeWidth="1" strokeDasharray="6 6" />
+          <circle cx="28%" cy="50%" r="540" fill="none" stroke="url(#webGlow)" strokeWidth="1" strokeDasharray="8 8" />
+
+          {/* Radial strands */}
+          <line x1="28%" y1="50%" x2="0%" y2="10%" stroke="url(#strandGlow)" strokeWidth="1.2" />
+          <line x1="28%" y1="50%" x2="10%" y2="0%" stroke="url(#strandGlow)" strokeWidth="1.2" />
+          <line x1="28%" y1="50%" x2="60%" y2="0%" stroke="url(#strandGlow)" strokeWidth="1.2" />
+          <line x1="28%" y1="50%" x2="100%" y2="30%" stroke="url(#strandGlow)" strokeWidth="1.2" />
+          <line x1="28%" y1="50%" x2="100%" y2="70%" stroke="url(#strandGlow)" strokeWidth="1.2" />
+          <line x1="28%" y1="50%" x2="50%" y2="100%" stroke="url(#strandGlow)" strokeWidth="1.2" />
+          <line x1="28%" y1="50%" x2="0%" y2="90%" stroke="url(#strandGlow)" strokeWidth="1.2" />
+        </svg>
+
+        {/* Floating Particles & Neon Light Specks */}
+        {[...Array(20)].map((_, i) => (
+          <div
+            key={i}
+            className="absolute rounded-full bg-cyan-400 animate-pulse"
+            style={{
+              width: `${(i % 3) + 2}px`,
+              height: `${(i % 3) + 2}px`,
+              top: `${(i * 19) % 95}%`,
+              left: `${(i * 23) % 95}%`,
+              opacity: 0.3 + (i % 5) * 0.12,
+              animationDuration: `${2 + (i % 4)}s`,
+            }}
+          />
+        ))}
+
+        {/* Floating Education Icons with Neon Glow */}
+        <div className="absolute top-20 left-[18%] opacity-35 animate-bounce" style={{ animationDuration: "6s" }}>
+          <div className="w-12 h-12 rounded-2xl bg-cyan-950/60 border border-cyan-500/40 backdrop-blur-md flex items-center justify-center shadow-[0_0_20px_rgba(6,182,212,0.3)]">
+            <GraduationCap className="w-6 h-6 text-cyan-300" />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-            Student Login & Career Hub
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-lg mx-auto">
-            Interact with our animated 3D student mascot while accessing all 100% free government exams, job alerts & results.
-          </p>
         </div>
-
-        {/* 16:9 Landscape Composition: Mascot Left, Form Right */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* LEFT: 3D Animated Student Mascot & Cinema Reel (7 cols) */}
-          <div className="lg:col-span-7 flex flex-col items-center">
-            <Student3DMascot
-              currentState={mascotState}
-              onStateChange={(st) => setMascotState(st)}
-              typingProgress={typingProgress}
-              showCinemaReelControl={true}
-              className="w-full"
-            />
+        <div className="absolute bottom-28 left-[38%] opacity-30 animate-bounce" style={{ animationDuration: "8s" }}>
+          <div className="w-10 h-10 rounded-2xl bg-blue-950/60 border border-blue-500/40 backdrop-blur-md flex items-center justify-center shadow-[0_0_20px_rgba(59,130,246,0.3)]">
+            <BookOpen className="w-5 h-5 text-blue-300" />
           </div>
-
-          {/* RIGHT: Login Card Form (5 cols) */}
-          <div className="lg:col-span-5 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xl p-6 sm:p-8 space-y-6">
-            {/* Header info */}
-            <div className="flex items-center space-x-3 pb-3 border-b border-slate-100 dark:border-slate-800">
-              <div className="w-10 h-10 rounded-2xl bg-[#102D59] text-white flex items-center justify-center shadow-md border border-blue-900/40 shrink-0">
-                <Award className="w-5 h-5 text-amber-300" />
-              </div>
-              <div>
-                <h2 className="text-lg font-black text-slate-900 dark:text-white">Student Sign In</h2>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">100% Free · No Payment Required</p>
-              </div>
-            </div>
-
-            {/* Auth method tabs */}
-            <div className="grid grid-cols-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400">
-              <button
-                type="button"
-                onClick={() => { 
-                  setActiveTab("password"); 
-                  setErrorMsg(null); 
-                  setMascotState("welcome");
-                }}
-                className={`py-2 rounded-lg transition-all ${
-                  activeTab === "password" ? "bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm" : "hover:text-slate-900 dark:hover:text-white"
-                }`}
-              >
-                Email & Password
-              </button>
-              <button
-                type="button"
-                onClick={() => { 
-                  setActiveTab("otp"); 
-                  setErrorMsg(null); 
-                  setMascotState("welcome");
-                }}
-                className={`py-2 rounded-lg transition-all ${
-                  activeTab === "otp" ? "bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm" : "hover:text-slate-900 dark:hover:text-white"
-                }`}
-              >
-                Mobile OTP
-              </button>
-            </div>
-
-            {errorMsg && (
-              <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-xs rounded-xl flex items-center space-x-2">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{errorMsg}</span>
-              </div>
-            )}
-
-            {loginSuccess && (
-              <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs rounded-xl flex items-center space-x-2">
-                <CheckCircle2 className="w-4 h-4 shrink-0" />
-                <span>Authentication successful! Redirecting to dashboard...</span>
-              </div>
-            )}
-
-            {/* Email & Password Form */}
-            {activeTab === "password" ? (
-              <form onSubmit={handlePasswordLogin} className="space-y-4">
-                {/* Email Field - Scene 2: Mascot Turns Eyes & Follows Typing */}
-                <div>
-                  <label className="block text-xs font-bold uppercase text-slate-700 dark:text-slate-300 mb-1">
-                    Email Address
-                  </label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
-                    <input
-                      type="email"
-                      value={email}
-                      onFocus={() => setMascotState("email")}
-                      onChange={(e) => handleEmailChange(e.target.value)}
-                      placeholder="student@examhub.in"
-                      required
-                      className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 text-slate-900 dark:text-white"
-                    />
-                  </div>
-                </div>
-
-                {/* Password Field - Scene 3 / Scene 4: Mascot Covers Eyes or Peeks */}
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-bold uppercase text-slate-700 dark:text-slate-300">
-                      Password
-                    </label>
-                    <button
-                      type="button"
-                      onClick={togglePasswordVisibility}
-                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center space-x-1"
-                    >
-                      {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                      <span>{showPassword ? "Hide (Hands on Eyes)" : "Show (Mascot Peeks)"}</span>
-                    </button>
-                  </div>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      value={password}
-                      onFocus={() => {
-                        if (showPassword) {
-                          setMascotState("password_peek");
-                        } else {
-                          setMascotState("password_hide");
-                        }
-                      }}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••••"
-                      required
-                      className="w-full pl-9 pr-10 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 text-slate-900 dark:text-white"
-                    />
-                    <button
-                      type="button"
-                      onClick={togglePasswordVisibility}
-                      className="absolute right-3 top-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                      title={showPassword ? "Hide Password" : "Show Password"}
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex justify-end text-xs">
-                  <Link href="/auth/forgot-password" className="text-blue-600 dark:text-blue-400 hover:underline">
-                    Forgot password?
-                  </Link>
-                </div>
-
-                {/* Submit Button - Scene 5: Mascot waits eagerly */}
-                <button
-                  type="submit"
-                  disabled={loading || loginSuccess}
-                  onMouseEnter={() => {
-                    if (mascotState !== "password_hide" && mascotState !== "password_peek") {
-                      setMascotState("waiting");
-                    }
-                  }}
-                  className="w-full py-3 bg-[#102D59] hover:bg-blue-800 text-white font-bold rounded-xl shadow-md transition-all flex items-center justify-center space-x-2 text-sm"
-                >
-                  {loading ? (
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <span>Sign In to Student Vault</span>
-                  )}
-                </button>
-              </form>
-            ) : (
-              /* Mobile OTP Form */
-              <div className="space-y-4">
-                {!otpSent ? (
-                  <form onSubmit={handleSendOtp} className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-bold uppercase text-slate-700 dark:text-slate-300 mb-1">
-                        Mobile Number (10 Digits)
-                      </label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-2.5 text-xs text-slate-500 dark:text-slate-400 font-bold">+91</span>
-                        <input
-                          type="tel"
-                          value={mobile}
-                          onFocus={() => setMascotState("email")}
-                          onChange={(e) => setMobile(e.target.value)}
-                          placeholder="9876543210"
-                          maxLength={10}
-                          required
-                          className="w-full pl-12 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 text-slate-900 dark:text-white font-medium"
-                        />
-                      </div>
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      onMouseEnter={() => setMascotState("waiting")}
-                      className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition-all flex items-center justify-center space-x-2 text-sm"
-                    >
-                      {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <span>Send OTP</span>}
-                    </button>
-                  </form>
-                ) : (
-                  <form onSubmit={handleVerifyOtp} className="space-y-4">
-                    <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-xl text-xs text-blue-900 dark:text-blue-200">
-                      <span>OTP sent to +91 {mobile}. Valid for 5 minutes.</span>
-                      {demoOtp && (
-                        <div className="mt-1 font-bold text-emerald-700 dark:text-emerald-400">
-                          Auto-filled Demo OTP: {demoOtp}
-                        </div>
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold uppercase text-slate-700 dark:text-slate-300 mb-1">
-                        Enter 6-Digit OTP
-                      </label>
-                      <input
-                        type="text"
-                        value={otp}
-                        onFocus={() => setMascotState("email")}
-                        onChange={(e) => setOtp(e.target.value)}
-                        placeholder="123456"
-                        maxLength={6}
-                        required
-                        className="w-full text-center tracking-widest text-lg font-bold py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 focus:outline-none focus:ring-2 focus:ring-blue-600 text-slate-900 dark:text-white"
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={loading || loginSuccess}
-                      onMouseEnter={() => setMascotState("waiting")}
-                      className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md transition-all flex items-center justify-center space-x-2 text-sm"
-                    >
-                      {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <span>Verify & Login</span>}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setOtpSent(false);
-                        setMascotState("welcome");
-                      }}
-                      className="w-full text-center text-xs text-slate-500 dark:text-slate-400 hover:underline"
-                    >
-                      Change Mobile Number
-                    </button>
-                  </form>
-                )}
-              </div>
-            )}
-
-            <div className="pt-4 border-t border-slate-100 dark:border-slate-800 text-center text-xs text-slate-500 dark:text-slate-400 space-y-2">
-              <div>
-                <span>Don&apos;t have an account? </span>
-                <Link href="/auth/register" className="font-bold text-blue-600 dark:text-blue-400 hover:underline">
-                  Register now (100% Free)
-                </Link>
-              </div>
-
-              <div className="flex items-center justify-center space-x-1.5 text-[10px] text-slate-400">
-                <ShieldCheck className="w-3 h-3 text-emerald-500" />
-                <span>Zero Subscription & Payment-Free Platform Guarantee</span>
-              </div>
-            </div>
+        </div>
+        <div className="absolute top-36 right-[12%] opacity-30 animate-bounce" style={{ animationDuration: "7s" }}>
+          <div className="w-11 h-11 rounded-2xl bg-indigo-950/60 border border-indigo-500/40 backdrop-blur-md flex items-center justify-center shadow-[0_0_20px_rgba(99,102,241,0.3)]">
+            <Sparkles className="w-5 h-5 text-indigo-300" />
           </div>
         </div>
       </div>
+
+      {/* 2. TOP NAV BAR */}
+      <header className="relative z-20 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-red-600 via-blue-700 to-cyan-500 p-0.5 shadow-[0_0_20px_rgba(6,182,212,0.4)]">
+            <div className="w-full h-full bg-[#070F26] rounded-[14px] flex items-center justify-center">
+              <Zap className="w-5 h-5 text-cyan-400" />
+            </div>
+          </div>
+          <div>
+            <span className="font-black text-sm tracking-widest uppercase bg-gradient-to-r from-white via-cyan-200 to-blue-400 bg-clip-text text-transparent">
+              EXAMHUB INDIA
+            </span>
+            <p className="text-[10px] text-cyan-400/80 font-semibold tracking-wider uppercase">
+              Superhero Portal Edition
+            </p>
+          </div>
+        </div>
+
+        {/* View Switcher Pill */}
+        <div className="flex items-center space-x-2 bg-slate-900/80 border border-cyan-500/30 p-1 rounded-2xl backdrop-blur-md">
+          <button
+            onClick={() => setViewMode("interactive")}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              viewMode === "interactive"
+                ? "bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-[0_0_15px_rgba(6,182,212,0.4)]"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            Live Web Interface
+          </button>
+          <button
+            onClick={() => setViewMode("concept")}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              viewMode === "concept"
+                ? "bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-[0_0_15px_rgba(6,182,212,0.4)]"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            16:9 3D Concept View
+          </button>
+        </div>
+      </header>
+
+      {/* 3. MAIN CONTENT: 16:9 LANDSCAPE COMPOSITION */}
+      <main className="relative z-10 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 my-auto">
+        {viewMode === "concept" ? (
+          /* 16:9 Full Concept Render Mockup View */
+          <div className="w-full max-w-5xl mx-auto rounded-3xl overflow-hidden border border-cyan-500/40 shadow-[0_0_60px_rgba(6,182,212,0.25)] relative group">
+            <div className="aspect-[16/9] w-full relative bg-slate-950">
+              <img
+                src="/images/spiderman/spiderman_login_concept.jpg"
+                alt="ExamHub India Spider-Man 3D Login Page Concept"
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute bottom-4 left-4 right-4 bg-slate-950/80 backdrop-blur-md p-4 rounded-2xl border border-cyan-500/30 flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-white flex items-center space-x-2">
+                    <Sparkles className="w-4 h-4 text-cyan-400" />
+                    <span>Official 16:9 Desktop Concept Screenshot</span>
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    High-end 3D Spider-Man guiding student into the futuristic glassmorphism login portal.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setViewMode("interactive")}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white shadow-lg transition-all"
+                >
+                  Test Live Form
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* Live Interactive Desktop UI Mockup */
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+            
+            {/* LEFT SIDE: 3D Spider-Man Character & Interactive Guiding Scene (7 cols) */}
+            <div className="lg:col-span-7 relative flex flex-col items-center lg:items-start justify-center">
+              
+              {/* Floating Status Notification Pill */}
+              <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-cyan-950/80 border border-cyan-400/40 text-cyan-300 text-xs font-bold tracking-wide shadow-[0_0_20px_rgba(6,182,212,0.3)] mb-4">
+                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+                <span>National Education Portal • 100% Free</span>
+              </div>
+
+              {/* Spider-Man Character Viewport */}
+              <div className="relative w-full max-w-lg aspect-[4/3] rounded-3xl overflow-hidden border border-cyan-500/30 shadow-[0_0_50px_rgba(6,182,212,0.2)] bg-gradient-to-br from-[#0B1E38]/80 via-[#070F26] to-[#0D1B2A] backdrop-blur-xl group">
+                <img
+                  src="/images/spiderman/spiderman_login_concept.jpg"
+                  alt="3D Spider-Man Login Mascot"
+                  className="w-full h-full object-cover object-left filter contrast-105"
+                />
+
+                {/* Subtle Inner Glow Border */}
+                <div className="absolute inset-0 border-2 border-cyan-400/20 rounded-3xl pointer-events-none" />
+
+                {/* Dynamic Web Strand Shooting from Character to the Right */}
+                <svg className="absolute inset-0 w-full h-full pointer-events-none z-20" xmlns="http://www.w3.org/2000/svg">
+                  <path
+                    d="M 280 230 Q 380 210, 480 250 T 520 270"
+                    fill="none"
+                    stroke="#38BDF8"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    className="drop-shadow-[0_0_8px_#06B6D4] animate-pulse"
+                  />
+                  <circle cx="515" cy="270" r="4" fill="#38BDF8" className="animate-ping" />
+                </svg>
+
+                {/* Speech Bubble / Superhero Guide Notice */}
+                <div className="absolute bottom-4 left-4 right-4 bg-slate-950/85 backdrop-blur-md border border-cyan-500/30 p-3 rounded-2xl shadow-xl flex items-center space-x-3">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-red-600 to-blue-600 flex items-center justify-center shrink-0 shadow-md">
+                    <span className="text-sm font-black">🕷️</span>
+                  </div>
+                  <div className="text-xs">
+                    <span className="font-bold text-cyan-300 block">Spider-Man Companion:</span>
+                    <span className="text-slate-300 leading-snug">
+                      &quot;Hey Student! Ready to power up your career? Let&apos;s get you signed in!&quot;
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Floating Bottom Highlights */}
+              <div className="flex flex-wrap items-center gap-3 mt-4 text-[11px] font-semibold text-slate-300">
+                <div className="flex items-center space-x-1.5 px-3 py-1 rounded-xl bg-slate-900/60 border border-slate-800">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Exam Vault Encrypted</span>
+                </div>
+                <div className="flex items-center space-x-1.5 px-3 py-1 rounded-xl bg-slate-900/60 border border-slate-800">
+                  <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Zero Monetization Guarantee</span>
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT SIDE: Premium Glassmorphism Login Card (5 cols) */}
+            <div className="lg:col-span-5 relative">
+              {/* Glowing decorative frame behind card */}
+              <div className="absolute -inset-1 rounded-[32px] bg-gradient-to-r from-cyan-500/30 via-blue-600/30 to-purple-600/30 blur-xl opacity-70 group-hover:opacity-100 transition-all pointer-events-none" />
+
+              <div className="relative rounded-[28px] bg-slate-900/70 backdrop-blur-2xl border border-cyan-500/40 shadow-[0_0_60px_rgba(6,182,212,0.18)] p-6 sm:p-8 space-y-6">
+                
+                {/* Header branding requested in prompt */}
+                <div className="text-center space-y-1 pb-2 border-b border-cyan-500/20">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-red-600 via-blue-700 to-cyan-500 p-0.5 mx-auto shadow-[0_0_20px_rgba(6,182,212,0.4)]">
+                    <div className="w-full h-full bg-[#070F26] rounded-[14px] flex items-center justify-center">
+                      <Award className="w-6 h-6 text-cyan-400" />
+                    </div>
+                  </div>
+                  <h1 className="text-xl sm:text-2xl font-black tracking-widest uppercase bg-gradient-to-r from-white via-cyan-100 to-cyan-400 bg-clip-text text-transparent mt-2">
+                    EXAMHUB INDIA
+                  </h1>
+                  <p className="text-xs font-semibold text-cyan-400/90 tracking-wide italic">
+                    &quot;Your Future Starts Here.&quot;
+                  </p>
+                  <h2 className="text-base font-bold text-white pt-1">
+                    Welcome Back!
+                  </h2>
+                </div>
+
+                {/* Error Banner */}
+                {errorMsg && (
+                  <div className="p-3 bg-red-950/60 border border-red-500/60 text-red-300 text-xs rounded-xl flex items-center space-x-2 shadow-inner">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+                    <span>{errorMsg}</span>
+                  </div>
+                )}
+
+                {/* Success Banner */}
+                {loginSuccess && (
+                  <div className="p-3 bg-emerald-950/60 border border-emerald-500/60 text-emerald-300 text-xs rounded-xl flex items-center space-x-2 shadow-inner">
+                    <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                    <span>Authentication successful! Entering ExamHub Vault...</span>
+                  </div>
+                )}
+
+                {/* Login Form */}
+                <form onSubmit={handleLogin} className="space-y-4">
+                  {/* Email Field */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-cyan-200">
+                      Email Address
+                    </label>
+                    <div className="relative">
+                      <Mail className="absolute left-3.5 top-3.5 w-4 h-4 text-cyan-400/70" />
+                      <input
+                        type="email"
+                        required
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="[ Enter your email address ]"
+                        className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/[0.06] border border-cyan-500/30 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400 focus:bg-white/[0.1] transition-all shadow-inner"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Password Field */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-bold uppercase tracking-wider text-cyan-200">
+                        Password
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center space-x-1 transition-colors"
+                      >
+                        {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        <span>{showPassword ? "Hide" : "Show"}</span>
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <Lock className="absolute left-3.5 top-3.5 w-4 h-4 text-cyan-400/70" />
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        required
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="[ Enter your password ]"
+                        className="w-full pl-10 pr-10 py-3 rounded-xl bg-white/[0.06] border border-cyan-500/30 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400 focus:bg-white/[0.1] transition-all shadow-inner"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3.5 top-3.5 text-cyan-400/60 hover:text-cyan-300 transition-colors"
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Forgot Password link */}
+                  <div className="flex justify-end pt-0.5">
+                    <Link
+                      href="/auth/forgot-password"
+                      className="text-xs text-cyan-400 hover:text-cyan-300 hover:underline transition-colors font-medium"
+                    >
+                      Forgot Password?
+                    </Link>
+                  </div>
+
+                  {/* Glowing Sign In Button */}
+                  <button
+                    type="submit"
+                    disabled={loading || loginSuccess}
+                    className="w-full py-3.5 px-4 rounded-xl font-black text-sm tracking-widest uppercase text-white bg-gradient-to-r from-blue-600 via-cyan-600 to-blue-700 hover:from-blue-500 hover:via-cyan-500 hover:to-blue-600 border border-cyan-400/50 shadow-[0_0_30px_rgba(6,182,212,0.5)] active:scale-[0.98] transition-all flex items-center justify-center space-x-2"
+                  >
+                    {loading ? (
+                      <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                    ) : (
+                      <>
+                        <span>[ SIGN IN ]</span>
+                        <ArrowRight className="w-4 h-4 text-cyan-200" />
+                      </>
+                    )}
+                  </button>
+                </form>
+
+                {/* Footer Callout */}
+                <div className="pt-4 border-t border-cyan-500/20 text-center space-y-2">
+                  <p className="text-xs text-slate-400">
+                    Don&apos;t have an account?
+                  </p>
+                  <Link
+                    href="/auth/register"
+                    className="inline-block w-full py-2.5 px-4 rounded-xl text-xs font-bold tracking-wider uppercase text-cyan-300 bg-white/[0.04] hover:bg-white/[0.08] border border-cyan-500/30 hover:border-cyan-400 transition-all shadow-sm"
+                  >
+                    [ CREATE FREE ACCOUNT ]
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* 4. BOTTOM COPYRIGHT / ACCREDITATION */}
+      <footer className="relative z-10 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-4 text-center text-[11px] text-slate-500 border-t border-cyan-500/10">
+        <span>© 2026 EXAMHUB INDIA. 100% Free Education, Government Examination &amp; Career Vault.</span>
+      </footer>
     </div>
   );
 }
