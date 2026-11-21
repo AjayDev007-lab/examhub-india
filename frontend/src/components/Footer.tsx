@@ -1,9 +1,16 @@
+"use client";
+
 import React from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Award, ShieldCheck, Mail, Phone, ExternalLink, HelpCircle, Instagram } from "lucide-react";
 import { SITE_CONFIG } from "@/config/site";
 
 export default function Footer() {
+  const pathname = usePathname();
+  if (pathname === "/auth/login" || pathname === "/student/login" || pathname?.startsWith("/auth/")) {
+    return null;
+  }
   return (
     <footer className="bg-primary-950 text-slate-400 border-t border-slate-800 text-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">

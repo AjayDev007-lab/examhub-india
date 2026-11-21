@@ -1,5 +1,7 @@
-import StudentLoginPage from "@/app/auth/login/page";
+export const dynamic = "force-dynamic";
+
+import SpiderManClientLogin from "@/app/auth/login/SpiderManClientLogin";
 
 export default function StudentDirectLoginRoute() {
-  return <StudentLoginPage />;
+  return <SpiderManClientLogin />;
 }

@@ -18,6 +18,12 @@ export default function Navbar() {
   const [currentLang, setCurrentLang] = useState<Language>("en");
   const [isDarkMode, setIsDarkMode] = useState(false);
 
+  // If on student or auth login routes, hide standard navbar to allow 16:9 cinematic superhero experience
+  const isAuthPage = pathname === "/auth/login" || pathname === "/student/login" || pathname?.startsWith("/auth/");
+  if (isAuthPage) {
+    return null;
+  }
+
   useEffect(() => {
     const savedLang = localStorage.getItem("examhub_lang") as Language;
     if (savedLang && translations[savedLang]) {
