@@ -6,9 +6,10 @@ import { usePathname } from "next/navigation";
 import { 
   Award, FileText, CreditCard, Search, User, LogIn, Menu, X, 
   ShieldCheck, LayoutDashboard, Bell, LogOut, ExternalLink, BookOpen,
-  Globe, Sparkles, Building2, Landmark, Briefcase, Moon, Sun
+  Globe, Sparkles, Building2, Landmark, Briefcase, Moon, Sun, Instagram, Phone
 } from "lucide-react";
 import { Language, translations } from "@/lib/i18n";
+import { SITE_CONFIG } from "@/config/site";
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -125,6 +126,26 @@ export default function Navbar() {
             </Link>
 
             <span className="hidden md:inline text-blue-400/40">|</span>
+
+            {/* Instagram Link */}
+            <a
+              href={SITE_CONFIG.social.instagram.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={`Follow ${SITE_CONFIG.social.instagram.username} on Instagram`}
+              className="flex items-center space-x-1 text-pink-300 hover:text-white transition-colors"
+            >
+              <Instagram className="w-3.5 h-3.5 text-pink-400" />
+              <span className="hidden lg:inline text-[11px] font-medium">{SITE_CONFIG.social.instagram.username}</span>
+            </a>
+
+            <span className="text-blue-400/40">|</span>
+
+            <Link href="/contact" className="hover:text-white transition-colors text-blue-100 font-medium">
+              Contact
+            </Link>
+
+            <span className="text-blue-400/40">|</span>
 
             <Link href="/admin/login" className="flex items-center space-x-1 text-blue-200 hover:text-white transition-colors font-medium">
               <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
@@ -297,6 +318,27 @@ export default function Navbar() {
                 </Link>
               </div>
             )}
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <Link
+                href="/contact"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center justify-center space-x-1 py-2 text-xs text-slate-600 dark:text-slate-300 font-medium bg-slate-50 dark:bg-slate-800 rounded-lg"
+              >
+                <Phone className="w-3.5 h-3.5 text-blue-500" />
+                <span>Contact Us</span>
+              </Link>
+              <a
+                href={SITE_CONFIG.social.instagram.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center justify-center space-x-1 py-2 text-xs text-pink-600 dark:text-pink-400 font-medium bg-pink-50 dark:bg-pink-950/40 rounded-lg"
+              >
+                <Instagram className="w-3.5 h-3.5 text-pink-500" />
+                <span>Instagram</span>
+              </a>
+            </div>
+
             <Link
               href="/admin/login"
               onClick={() => setMobileMenuOpen(false)}

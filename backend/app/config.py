@@ -23,4 +23,8 @@ class Settings(BaseSettings):
     SUPERADMIN_EMAIL: str = os.getenv("SUPERADMIN_EMAIL", "ajaydevvs22102004@gmail.com")
     SUPERADMIN_PASSWORD: str = os.getenv("SUPERADMIN_PASSWORD", "SuperAdmin@ExamHub2026!")
 
+    # Social Channels
+    INSTAGRAM_USERNAME: str = os.getenv("INSTAGRAM_USERNAME", "@the_smiley_hacker_5933z")
+    INSTAGRAM_URL: str = os.getenv("INSTAGRAM_URL", "https://www.instagram.com/the_smiley_hacker_5933z/")
+
 settings = Settings()

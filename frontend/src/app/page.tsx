@@ -5,9 +5,11 @@ import Link from "next/link";
 import { 
   Search, Award, FileText, CreditCard, ChevronRight, CheckCircle2, 
   Calendar, Building2, MapPin, Bell, ArrowRight, ShieldCheck, Download, 
-  Sparkles, AlertCircle, BookOpen, Clock, Users, ArrowUpRight, Briefcase, ExternalLink
+  Sparkles, AlertCircle, BookOpen, Clock, Users, ArrowUpRight, Briefcase, ExternalLink,
+  Instagram, MessageSquare, Mail
 } from "lucide-react";
 import { fetchApi } from "@/lib/api";
+import { SITE_CONFIG } from "@/config/site";
 
 export default function HomePage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -613,7 +615,115 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 6. FREQUENTLY ASKED QUESTIONS */}
+      {/* 6. FOLLOW US & OFFICIAL SOCIAL MEDIA */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 sm:p-10 border border-slate-200 dark:border-slate-800 shadow-xl">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+            {/* Info header */}
+            <div className="lg:col-span-5 space-y-4">
+              <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-pink-50 dark:bg-pink-950/40 border border-pink-200 dark:border-pink-800 text-pink-700 dark:text-pink-300 text-xs font-bold uppercase tracking-wider">
+                <Instagram className="w-3.5 h-3.5 text-pink-600 dark:text-pink-400" />
+                <span>Stay Connected</span>
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white leading-tight">
+                Follow ExamHub India on Official Channels
+              </h2>
+              <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                Receive prompt alerts for examination dates, admit card releases, verified answer keys, and newly gazetted job openings directly in your feed.
+              </p>
+              <div className="pt-2">
+                <Link
+                  href="/contact"
+                  className="inline-flex items-center space-x-2 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  <span>Visit Contact & Helpdesk Centre →</span>
+                </Link>
+              </div>
+            </div>
+
+            {/* Social cards */}
+            <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-5">
+              {/* Featured Instagram Profile Card */}
+              <div className="group relative bg-gradient-to-br from-slate-50 via-white to-pink-50/40 dark:from-slate-850 dark:via-slate-900 dark:to-pink-950/20 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 hover:border-pink-400 dark:hover:border-pink-500 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform">
+                      <Instagram className="w-6 h-6" />
+                    </div>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-pink-100 dark:bg-pink-900/50 text-pink-700 dark:text-pink-300">
+                      Official Handle
+                    </span>
+                  </div>
+
+                  <div>
+                    <h3 className="font-extrabold text-slate-900 dark:text-white text-base">
+                      Instagram Profile
+                    </h3>
+                    <p className="text-xs font-semibold text-pink-600 dark:text-pink-400 mt-0.5">
+                      {SITE_CONFIG.social.instagram.username}
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
+                      Instant circular notifications, admit card release announcements, and examination cycle updates.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="pt-5 mt-5 border-t border-slate-100 dark:border-slate-800">
+                  <a
+                    href={SITE_CONFIG.social.instagram.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-pink-600 via-purple-600 to-indigo-600 hover:from-pink-700 hover:via-purple-700 hover:to-indigo-700 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center space-x-2"
+                  >
+                    <Instagram className="w-4 h-4" />
+                    <span>Follow on Instagram</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              </div>
+
+              {/* Student Support Helpdesk Card */}
+              <div className="bg-slate-50 dark:bg-slate-850 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="w-12 h-12 rounded-2xl bg-[#102D59] text-white flex items-center justify-center shadow-md">
+                      <Mail className="w-6 h-6 text-blue-300" />
+                    </div>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300">
+                      Helpdesk
+                    </span>
+                  </div>
+
+                  <div>
+                    <h3 className="font-extrabold text-slate-900 dark:text-white text-base">
+                      Direct Inquiries
+                    </h3>
+                    <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 mt-0.5">
+                      {SITE_CONFIG.social.email}
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
+                      Submit questions regarding scorecards, admit card retrieval, or official institution directory records.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="pt-5 mt-5 border-t border-slate-100 dark:border-slate-800">
+                  <Link
+                    href="/contact"
+                    className="w-full py-2.5 px-4 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-white font-bold text-xs border border-slate-200 dark:border-slate-700 shadow-sm transition-all flex items-center justify-center space-x-2"
+                  >
+                    <span>Contact Support Desk</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 7. FREQUENTLY ASKED QUESTIONS */}
       <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center space-y-2 mb-8">
           <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Frequently Asked Questions</h2>
