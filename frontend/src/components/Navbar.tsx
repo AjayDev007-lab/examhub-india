@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { 
   Award, FileText, CreditCard, Search, User, LogIn, Menu, X, 
   ShieldCheck, LayoutDashboard, Bell, LogOut, ExternalLink, BookOpen,
-  Globe, Sparkles, Building2, Landmark
+  Globe, Sparkles, Building2, Landmark, Briefcase
 } from "lucide-react";
 import { Language, translations } from "@/lib/i18n";
 
@@ -46,6 +46,7 @@ export default function Navbar() {
 
   const navLinks = [
     { name: t.officialWebsites || "Official Portals", href: "/official-websites", icon: Landmark },
+    { name: "Jobs & Careers", href: "/jobs", icon: Briefcase, isNew: true },
     { name: t.checkResults || "Check Results", href: "/results", icon: Award },
     { name: t.hallTickets || "Hall Tickets", href: "/hall-tickets", icon: FileText },
     { name: t.idCards || "Student ID Cards", href: "/id-cards", icon: CreditCard },
@@ -133,7 +134,7 @@ export default function Navbar() {
                 <Link
                   key={link.name}
                   href={link.href}
-                  className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                     isActive
                       ? "text-blue-700 bg-blue-50/80 font-semibold"
                       : "text-slate-700 hover:text-primary-900 hover:bg-slate-50"
@@ -141,6 +142,11 @@ export default function Navbar() {
                 >
                   <Icon className={`w-4 h-4 ${isActive ? "text-blue-600" : "text-slate-400"}`} />
                   <span>{link.name}</span>
+                  {(link as any).isNew && (
+                    <span className="px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 rounded-md">
+                      NEW
+                    </span>
+                  )}
                 </Link>
               );
             })}
@@ -206,12 +212,19 @@ export default function Navbar() {
                 key={link.name}
                 href={link.href}
                 onClick={() => setMobileMenuOpen(false)}
-                className={`flex items-center space-x-3 px-3 py-2.5 rounded-lg text-base font-medium ${
+                className={`flex items-center justify-between px-3 py-2.5 rounded-lg text-base font-medium ${
                   isActive ? "bg-blue-50 text-blue-700 font-semibold" : "text-slate-700 hover:bg-slate-50"
                 }`}
               >
-                <Icon className="w-5 h-5 text-slate-400" />
-                <span>{link.name}</span>
+                <div className="flex items-center space-x-3">
+                  <Icon className="w-5 h-5 text-slate-400" />
+                  <span>{link.name}</span>
+                </div>
+                {(link as any).isNew && (
+                  <span className="px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 rounded-md">
+                    NEW
+                  </span>
+                )}
               </Link>
             );
           })}

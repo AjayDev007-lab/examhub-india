@@ -8,7 +8,7 @@ import {
   AlertCircle, RefreshCw, LogOut, Search, ExternalLink, Save,
   Check, X, Lock, Key, Wifi, WifiOff, Clock, Trash2, Edit3, Eye,
   History, Globe, Server, CheckCircle, AlertTriangle, ChevronRight, Zap,
-  Train, GraduationCap, Award, Bot, CreditCard, ShieldAlert, Sliders, DollarSign, Download
+  Train, GraduationCap, Award, Bot, CreditCard, ShieldAlert, Sliders, DollarSign, Download, Briefcase
 } from "lucide-react";
 import { fetchApi } from "@/lib/api";
 
@@ -547,6 +547,7 @@ export default function AdminDashboardPage() {
 
   const tabs = [
     { id: "overview", label: "Dashboard Overview", icon: LayoutDashboard },
+    { id: "jobs", label: "Job Notifications", icon: Briefcase, href: "/admin/jobs" },
     { id: "rrb_results", label: "RRB Group D Results", icon: Train, count: rrbList.filter(r => r.status === "PENDING_VERIFICATION").length },
     { id: "institutions", label: "Institutions & Boards", icon: Building2, count: pendingApprovalsCount > 0 ? pendingApprovalsCount : organizations.length },
     { id: "directory", label: "Gov Directory & Portals", icon: Globe, count: brokenReports.filter(r => r.status === "PENDING").length },
@@ -581,6 +582,23 @@ export default function AdminDashboardPage() {
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
+              if ((tab as any).href) {
+                return (
+                  <Link
+                    key={tab.id}
+                    href={(tab as any).href}
+                    className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all text-slate-400 hover:text-white hover:bg-slate-800"
+                  >
+                    <div className="flex items-center space-x-2.5">
+                      <Icon className="w-4 h-4 text-emerald-400" />
+                      <span>{tab.label}</span>
+                    </div>
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/20 text-emerald-300">
+                      NEW
+                    </span>
+                  </Link>
+                );
+              }
               return (
                 <button
                   key={tab.id}

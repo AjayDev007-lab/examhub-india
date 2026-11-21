@@ -1,0 +1,76 @@
+import { NextRequest, NextResponse } from "next/server";
+import { dbStore } from "@/lib/data";
+
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ slug: string }> }
+) {
+  try {
+    const { slug } = await params;
+    const jobs = (dbStore as any).jobs || [];
+
+    const job = jobs.find((j: any) => 
+      j.slug === slug.toLowerCase() || String(j.id) === slug
+    );
+
+    if (!job) {
+      return NextResponse.json({ error: "Job notification not found" }, { status: 404 });
+    }
+
+    // Increment view count
+    job.view_count = (job.view_count || 0) + 1;
+
+    const now = new Date();
+    let isClosingSoon = false;
+    let isExpired = false;
+    if (job.application_end_date) {
+      const diffMs = new Date(job.application_end_date).getTime() - now.getTime();
+      const diffDays = diffMs / (1000 * 60 * 60 * 24);
+      if (diffDays < 0) isExpired = true;
+      else if (diffDays <= 3) isClosingSoon = true;
+    }
+
+    const isSaved = ((dbStore as any).savedJobs || []).some((s: any) => s.jobId === job.id && s.userId === 1);
+
+    return NextResponse.json({
+      ...job,
+      is_closing_soon: isClosingSoon,
+      is_expired: isExpired,
+      is_saved: isSaved
+    });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
+
+export async function PUT(
+  req: NextRequest,
+  { params }: { params: Promise<{ slug: string }> }
+) {
+  try {
+    const { slug } = await params;
+    const body = await req.json();
+    const jobs = (dbStore as any).jobs || [];
+
+    const jobIndex = jobs.findIndex((j: any) => 
+      j.slug === slug.toLowerCase() || String(j.id) === slug
+    );
+
+    if (jobIndex === -1) {
+      return NextResponse.json({ error: "Job not found" }, { status: 404 });
+    }
+
+    const current = jobs[jobIndex];
+    if (body.title) current.title = body.title.trim();
+    if (body.status) current.status = body.status;
+    if (body.vacancies_count !== undefined) current.vacancies_count = Number(body.vacancies_count);
+    if (body.application_end_date !== undefined) current.application_end_date = body.application_end_date;
+    if (body.official_application_url) current.official_application_url = body.official_application_url.trim();
+    if (body.official_notification_pdf !== undefined) current.official_notification_pdf = body.official_notification_pdf;
+    current.last_verified_at = new Date().toISOString();
+
+    return NextResponse.json(current);
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}

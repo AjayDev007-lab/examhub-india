@@ -675,3 +675,101 @@ class SecurityIncident(Base):
     resolved_by_admin_id = Column(Integer, ForeignKey("admin_users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime, default=utc_now, nullable=False, index=True)
 
+
+# 38. JOB NOTIFICATIONS & CAREER UPDATES
+class JobNotification(Base):
+    __tablename__ = "job_notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(255), nullable=False, index=True)
+    slug = Column(String(255), unique=True, index=True, nullable=False)
+    organization_name = Column(String(255), nullable=False, index=True)
+    organization_logo_url = Column(String(512), nullable=True)
+    sector = Column(String(50), default="CENTRAL_GOVT", index=True) # "CENTRAL_GOVT", "STATE_GOVT", "PRIVATE", "PSU"
+    category = Column(String(50), default="GOVERNMENT", index=True) # "GOVERNMENT", "STATE_GOVERNMENT", "PRIVATE", "IT", "INTERNSHIP", "APPRENTICESHIP", "WALK_IN", "REMOTE", "RAILWAY", "BANKING", "DEFENCE", "TEACHING"
+    job_description = Column(Text, nullable=False)
+    vacancies_count = Column(Integer, default=0)
+    qualification = Column(String(255), nullable=False, index=True) # e.g. "B.E/B.Tech", "Any Graduate", "10th / 12th", "Diploma"
+    required_skills = Column(String(512), nullable=True)
+    age_limit = Column(String(100), default="18 - 30 Years")
+    experience_required = Column(String(50), default="FRESHER", index=True) # "FRESHER", "0-1", "1-3", "3-5", "5+"
+    salary_range = Column(String(100), nullable=True) # e.g. "₹35,400 - ₹1,12,400 (Level 6)"
+    location = Column(String(100), default="All India", index=True)
+    work_mode = Column(String(50), default="ON_SITE") # "ON_SITE", "REMOTE", "HYBRID"
+    application_start_date = Column(DateTime, nullable=True)
+    application_end_date = Column(DateTime, nullable=True, index=True)
+    application_fee = Column(String(255), nullable=True) # e.g. "₹100 (SC/ST/Women Exempted)"
+    selection_process = Column(Text, nullable=True) # e.g. "CBT Stage 1 -> CBT Stage 2 -> Document Verification"
+    syllabus_details = Column(Text, nullable=True)
+    official_notification_pdf = Column(String(512), nullable=True)
+    official_application_url = Column(String(512), nullable=False)
+    source_website_url = Column(String(512), nullable=False)
+    verification_source = Column(String(255), default="Official Recruitment Board Portal / Union Gazette")
+    status = Column(String(50), default="PUBLISHED", index=True) # "DRAFT", "PENDING_VERIFICATION", "VERIFIED", "PUBLISHED", "UPDATED", "EXPIRED", "CANCELLED", "REJECTED"
+    view_count = Column(Integer, default=0)
+    apply_clicks_count = Column(Integer, default=0)
+    is_featured = Column(Boolean, default=False)
+    published_at = Column(DateTime, default=utc_now, nullable=False, index=True)
+    last_verified_at = Column(DateTime, default=utc_now, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+
+# 39. OFFICIAL RECRUITMENT SOURCES DIRECTORY
+class JobSource(Base):
+    __tablename__ = "job_sources"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False) # e.g. "Union Public Service Commission"
+    code = Column(String(50), unique=True, index=True, nullable=False) # e.g. "UPSC", "SSC", "RRB"
+    official_url = Column(String(512), nullable=False)
+    careers_url = Column(String(512), nullable=False)
+    category = Column(String(50), default="CENTRAL_GOVT")
+    verification_status = Column(String(50), default="VERIFIED") # "VERIFIED", "NEEDS_REVIEW", "UNREACHABLE"
+    last_checked_at = Column(DateTime, default=utc_now, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+
+
+# 40. SAVED JOBS (STUDENT BOOKMARKS)
+class SavedJob(Base):
+    __tablename__ = "saved_jobs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    job_id = Column(Integer, ForeignKey("job_notifications.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "job_id", name="uq_user_saved_job"),
+    )
+
+
+# 41. STUDENT JOB APPLICATION TRACKER
+class JobApplication(Base):
+    __tablename__ = "job_applications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    job_id = Column(Integer, ForeignKey("job_notifications.id", ondelete="CASCADE"), nullable=False, index=True)
+    status = Column(String(50), default="APPLIED", index=True) # "APPLIED", "UNDER_REVIEW", "INTERVIEW_CALLED", "SELECTED", "REJECTED"
+    application_number = Column(String(100), nullable=True)
+    notes = Column(Text, nullable=True)
+    applied_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+
+# 42. INCORRECT JOB NOTIFICATION REPORTS
+class JobReport(Base):
+    __tablename__ = "job_reports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    job_id = Column(Integer, ForeignKey("job_notifications.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    reporter_email = Column(String(255), nullable=True)
+    issue_type = Column(String(50), nullable=False) # "EXPIRED_LINK", "WRONG_VACANCY", "INCORRECT_DATE", "FAKE_PORTAL", "OTHER"
+    details = Column(Text, nullable=True)
+    status = Column(String(50), default="PENDING") # "PENDING", "VERIFIED", "RESOLVED"
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+
+
+
