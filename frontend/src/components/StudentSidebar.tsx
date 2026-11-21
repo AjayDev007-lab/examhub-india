@@ -63,7 +63,9 @@ export default function StudentSidebar({ unreadNotifsCount = 3, activeExamsCount
 
   const navItems = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Apply for Exams", href: "/apply", icon: BookOpen, isNew: true },
+    { name: "School Education", href: "/school", icon: GraduationCap, isNew: true },
+    { name: "School Textbooks", href: "/school/books", icon: BookOpen },
+    { name: "Apply for Exams", href: "/apply", icon: BookOpen },
     { name: "My Applications", href: "/student/my-applications", icon: FileText },
     { name: "Countdowns", href: "/student/countdown", icon: Clock },
     { name: "My Exams", href: "/student/my-exams", icon: ShieldCheck, badge: activeExamsCount },

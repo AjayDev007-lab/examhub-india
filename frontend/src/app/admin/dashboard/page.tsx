@@ -627,6 +627,7 @@ export default function AdminDashboardPage() {
     { id: "student_applications", label: "Student Applications", icon: BarChart3, href: "/admin/applications" },
     { id: "countdowns", label: "Countdown Clocks", icon: Clock, href: "/admin/countdowns" },
     { id: "backups", label: "Backups & Recovery", icon: Database, href: "/admin/backups" },
+    { id: "school", label: "School Education Suite", icon: GraduationCap, href: "/admin/school" },
     { id: "analytics", label: "Advanced Analytics", icon: BarChart3, href: "/admin/analytics" },
     { id: "jobs", label: "Job Notifications", icon: Briefcase, href: "/admin/jobs" },
     { id: "exam_registrations", label: "Exam Registrations", icon: BookOpen, href: "/admin/exam-registrations" },
