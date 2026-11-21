@@ -170,9 +170,10 @@ export default function SpiderManLive3DLoginPage() {
             </div>
 
             {/* Real Three.js Canvas Container */}
-            <div className="relative w-full aspect-[4/3] sm:aspect-[16/11] rounded-3xl overflow-hidden border border-cyan-500/30 shadow-[0_0_50px_rgba(6,182,212,0.2)] bg-gradient-to-br from-[#0B1E38]/80 via-[#070F26] to-[#0D1B2A] backdrop-blur-xl">
+            <div className="relative w-full h-[500px] sm:h-[580px] rounded-3xl overflow-hidden border border-cyan-500/30 shadow-[0_0_50px_rgba(6,182,212,0.2)] bg-gradient-to-br from-[#0B1E38]/80 via-[#070F26] to-[#0D1B2A] backdrop-blur-xl">
               <SpiderManLive3DCanvas
                 actionState={spiderAction}
+                onStateChange={(st) => setSpiderAction(st)}
                 typingProgress={typingProgress}
                 className="w-full h-full"
               />

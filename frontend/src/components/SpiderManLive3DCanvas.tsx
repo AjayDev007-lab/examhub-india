@@ -17,22 +17,23 @@ export type SpiderManActionState =
 
 interface SpiderManLive3DCanvasProps {
   actionState: SpiderManActionState;
+  onStateChange?: (state: SpiderManActionState) => void;
   typingProgress?: number;
   className?: string;
-  onWebFired?: () => void;
 }
 
 export default function SpiderManLive3DCanvas({
   actionState,
+  onStateChange,
   typingProgress = 0,
   className = "",
-  onWebFired,
 }: SpiderManLive3DCanvasProps) {
   const mountRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [webGLSupported, setWebGLSupported] = useState(true);
+  const [webGLStatus, setWebGLStatus] = useState<string>("Initializing 3D...");
+  const [activeDebugState, setActiveDebugState] = useState<SpiderManActionState>(actionState);
 
-  // Store mutable refs for Three.js animation controller
+  // Sync state
   const stateRef = useRef(actionState);
   stateRef.current = actionState;
 
@@ -40,127 +41,165 @@ export default function SpiderManLive3DCanvas({
   typingProgressRef.current = typingProgress;
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    setActiveDebugState(actionState);
+  }, [actionState]);
 
-    // 1. WEBGL CAPABILITY TEST
-    try {
-      const gl = canvas.getContext("webgl2") || canvas.getContext("webgl");
-      if (!gl) {
-        setWebGLSupported(false);
-        return;
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const container = mountRef.current;
+    if (!canvas || !container) return;
+
+    // 1. PROCEDURAL SPIDER-MAN SUIT WEBBED TEXTURE
+    const createSuitTexture = () => {
+      const texCanvas = document.createElement("canvas");
+      texCanvas.width = 512;
+      texCanvas.height = 512;
+      const ctx = texCanvas.getContext("2d");
+      if (!ctx) return null;
+
+      // Base Red Fabric
+      ctx.fillStyle = "#d41822";
+      ctx.fillRect(0, 0, 512, 512);
+
+      // Micro fabric weave
+      ctx.fillStyle = "rgba(0, 0, 0, 0.08)";
+      for (let x = 0; x < 512; x += 4) {
+        ctx.fillRect(x, 0, 2, 512);
       }
-    } catch (e) {
-      setWebGLSupported(false);
+      for (let y = 0; y < 512; y += 4) {
+        ctx.fillRect(0, y, 512, 2);
+      }
+
+      // Black Web Grid Lines
+      ctx.strokeStyle = "#140303";
+      ctx.lineWidth = 4;
+      ctx.lineCap = "round";
+
+      // Radial web lines
+      const cx = 256;
+      const cy = 256;
+      for (let i = 0; i < 18; i++) {
+        const angle = (i / 18) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + Math.cos(angle) * 320, cy + Math.sin(angle) * 320);
+        ctx.stroke();
+      }
+
+      // Concentric web arches
+      for (let r = 35; r < 300; r += 38) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      const texture = new THREE.CanvasTexture(texCanvas);
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(1.5, 1.5);
+      return texture;
+    };
+
+    const suitWebTexture = createSuitTexture();
+
+    // 2. SCENE, CAMERA, RENDERER
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x070f26, 0.04);
+
+    const initialW = container.clientWidth || 500;
+    const initialH = container.clientHeight || 550;
+
+    const camera = new THREE.PerspectiveCamera(36, initialW / initialH, 0.1, 50);
+    camera.position.set(0, 1.15, 3.4);
+    camera.lookAt(0, 1.05, 0);
+
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({
+        canvas,
+        antialias: true,
+        alpha: true,
+        powerPreference: "high-performance",
+      });
+      renderer.setSize(initialW, initialH);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.25;
+      setWebGLStatus("WebGL 3D Active (60 FPS)");
+    } catch (err) {
+      setWebGLStatus("WebGL Error");
       return;
     }
 
-    // 2. SCENE, CAMERA, RENDERER
-    const width = mountRef.current?.clientWidth || 500;
-    const height = mountRef.current?.clientHeight || 550;
-
-    const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x070f26, 0.05);
-
-    const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 100);
-    camera.position.set(0, 1.35, 3.8);
-
-    const renderer = new THREE.WebGLRenderer({
-      canvas,
-      antialias: true,
-      alpha: true,
-      powerPreference: "high-performance",
-    });
-    renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-
-    // 3. LIGHTING (Cinematic Superhero Lighting)
-    const ambientLight = new THREE.AmbientLight(0x0a1e3f, 1.8);
+    // 3. CINEMATIC LIGHTING
+    const ambientLight = new THREE.AmbientLight(0x102d59, 2.5);
     scene.add(ambientLight);
 
     // Key Light - Electric Cyan
-    const cyanKeyLight = new THREE.SpotLight(0x06b6d4, 8, 12, Math.PI / 4, 0.4, 1);
-    cyanKeyLight.position.set(2.5, 3.5, 3);
-    cyanKeyLight.castShadow = true;
-    scene.add(cyanKeyLight);
+    const keyLight = new THREE.SpotLight(0x06b6d4, 10, 15, Math.PI / 4, 0.3, 1);
+    keyLight.position.set(2.8, 3.2, 3);
+    scene.add(keyLight);
 
-    // Rim Light - Vivid Spider-Man Crimson Red
-    const redRimLight = new THREE.DirectionalLight(0xef4444, 4.5);
-    redRimLight.position.set(-3, 2, -2);
-    scene.add(redRimLight);
+    // Rim Light - Vivid Spider-Man Red
+    const rimLight = new THREE.DirectionalLight(0xff2222, 5.5);
+    rimLight.position.set(-3.2, 2.2, -2);
+    scene.add(rimLight);
 
-    // Bottom Bounce Light - Deep Electric Blue
-    const blueBounceLight = new THREE.PointLight(0x3b82f6, 3, 6);
-    blueBounceLight.position.set(0, -1, 1.5);
-    scene.add(blueBounceLight);
+    // Bounce fill
+    const fillLight = new THREE.PointLight(0x38bdf8, 3.5, 8);
+    fillLight.position.set(0, -0.8, 2);
+    scene.add(fillLight);
 
-    // 4. FLOATING HOLOGRAPHIC PARTICLES
-    const particleCount = 80;
-    const particleGeometry = new THREE.BufferGeometry();
+    // 4. FLOATING 3D HOLOGRAPHIC PARTICLES
+    const particleCount = 100;
+    const particleGeom = new THREE.BufferGeometry();
     const particlePositions = new Float32Array(particleCount * 3);
     for (let i = 0; i < particleCount * 3; i += 3) {
       particlePositions[i] = (Math.random() - 0.5) * 6;
       particlePositions[i + 1] = Math.random() * 4 - 0.5;
       particlePositions[i + 2] = (Math.random() - 0.5) * 4;
     }
-    particleGeometry.setAttribute("position", new THREE.BufferAttribute(particlePositions, 3));
-    const particleMaterial = new THREE.PointsMaterial({
+    particleGeom.setAttribute("position", new THREE.BufferAttribute(particlePositions, 3));
+    const particleMat = new THREE.PointsMaterial({
       color: 0x38bdf8,
-      size: 0.035,
+      size: 0.04,
       transparent: true,
-      opacity: 0.7,
+      opacity: 0.85,
       blending: THREE.AdditiveBlending,
     });
-    const particles = new THREE.Points(particleGeometry, particleMaterial);
+    const particles = new THREE.Points(particleGeom, particleMat);
     scene.add(particles);
 
     // 5. MATERIALS
-    // Spider-Man Suit Red Fabric with specular sheen
     const suitRedMat = new THREE.MeshStandardMaterial({
       color: 0xd91b24,
-      roughness: 0.38,
+      map: suitWebTexture || undefined,
+      roughness: 0.4,
       metalness: 0.15,
     });
 
-    // Spider-Man Suit Royal / Navy Blue
     const suitBlueMat = new THREE.MeshStandardMaterial({
       color: 0x0f2b5c,
       roughness: 0.35,
       metalness: 0.25,
     });
 
-    // Eye Lenses Material (Glowing White with Subtle Iridescence)
     const eyeLensMat = new THREE.MeshStandardMaterial({
       color: 0xffffff,
-      emissive: 0xdbeafe,
-      emissiveIntensity: 0.8,
-      roughness: 0.1,
+      emissive: 0xe0f2fe,
+      emissiveIntensity: 0.9,
+      roughness: 0.08,
       metalness: 0.05,
     });
 
-    // Eye Outer Black Frame
-    const eyeFrameMat = new THREE.MeshBasicMaterial({ color: 0x0a0a0a });
+    const blackWebMat = new THREE.MeshBasicMaterial({ color: 0x0a0a0a });
 
-    // Black Spider Emblem / Web lines
-    const blackWebMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
-
-    // Glowing Cyan Web Strand Material
-    const webStrandMat = new THREE.LineBasicMaterial({
-      color: 0x38bdf8,
-      linewidth: 3,
-      transparent: true,
-      opacity: 0.95,
-      blending: THREE.AdditiveBlending,
-    });
-
-    // 6. BUILD SPIDER-MAN 3D RIGGED MESH HIERARCHY
+    // 6. ASSEMBLE 3D SPIDER-MAN SKELETAL RIG
     const characterRoot = new THREE.Group();
-    characterRoot.position.set(-0.35, 0.2, 0);
+    characterRoot.position.set(-0.25, 0.15, 0);
     scene.add(characterRoot);
 
-    // --- Pelvis / Hips ---
+    // Pelvis & Hips
     const pelvis = new THREE.Group();
     pelvis.position.y = 0.85;
     characterRoot.add(pelvis);
@@ -171,87 +210,76 @@ export default function SpiderManLive3DCanvas({
     );
     pelvis.add(pelvisMesh);
 
-    // --- Spine & Torso ---
+    // Spine & Torso
     const spine = new THREE.Group();
     spine.position.y = 0.16;
     pelvis.add(spine);
 
-    // Chest (Red Center + Blue Lat Wings)
     const chestGroup = new THREE.Group();
-    chestGroup.position.y = 0.24;
+    chestGroup.position.y = 0.26;
     spine.add(chestGroup);
 
+    // Sculpted Muscular Chest
     const chestCenter = new THREE.Mesh(
-      new THREE.BoxGeometry(0.36, 0.38, 0.26),
+      new THREE.BoxGeometry(0.38, 0.4, 0.28),
       suitRedMat
     );
-    chestCenter.castShadow = true;
     chestGroup.add(chestCenter);
 
-    // Blue side panels
-    const leftLat = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.34, 0.24), suitBlueMat);
-    leftLat.position.x = -0.19;
+    const leftLat = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.36, 0.25), suitBlueMat);
+    leftLat.position.x = -0.2;
     chestGroup.add(leftLat);
 
-    const rightLat = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.34, 0.24), suitBlueMat);
-    rightLat.position.x = 0.19;
+    const rightLat = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.36, 0.25), suitBlueMat);
+    rightLat.position.x = 0.2;
     chestGroup.add(rightLat);
 
-    // Chest Spider Emblem
+    // 3D Spider Emblem (Chest)
     const spiderEmblem = new THREE.Mesh(
-      new THREE.OctahedronGeometry(0.065, 0),
+      new THREE.OctahedronGeometry(0.075, 0),
       blackWebMat
     );
-    spiderEmblem.position.set(0, 0.05, 0.135);
-    spiderEmblem.scale.set(1.4, 1.8, 0.3);
+    spiderEmblem.position.set(0, 0.05, 0.145);
+    spiderEmblem.scale.set(1.4, 1.9, 0.25);
     chestGroup.add(spiderEmblem);
 
-    // --- Neck & Head ---
+    // Neck & Head
     const neck = new THREE.Group();
-    neck.position.y = 0.24;
+    neck.position.y = 0.25;
     chestGroup.add(neck);
-
-    const neckMesh = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.1, 0.12, 0.12, 12),
-      suitRedMat
-    );
-    neck.add(neckMesh);
 
     const headGroup = new THREE.Group();
     headGroup.position.y = 0.16;
     neck.add(headGroup);
 
-    // Head Mask Sphere (Slightly tapered)
+    // 3D Mask Sphere (Sculpted oval)
     const headMesh = new THREE.Mesh(
-      new THREE.SphereGeometry(0.24, 24, 20),
+      new THREE.SphereGeometry(0.25, 24, 20),
       suitRedMat
     );
-    headMesh.scale.set(0.94, 1.12, 1.05);
-    headMesh.castShadow = true;
+    headMesh.scale.set(0.92, 1.14, 1.05);
     headGroup.add(headMesh);
 
-    // 3D Expressive White Eye Lenses
+    // Large Expressive White Eye Lenses (Protruding cleanly on mask surface)
     const createEye = (isRight: boolean) => {
       const eyeGroup = new THREE.Group();
-      eyeGroup.position.set(isRight ? 0.085 : -0.085, 0.04, 0.22);
-      eyeGroup.rotation.z = isRight ? -0.18 : 0.18;
-      eyeGroup.rotation.y = isRight ? 0.22 : -0.22;
+      eyeGroup.position.set(isRight ? 0.088 : -0.088, 0.03, 0.245);
+      eyeGroup.rotation.z = isRight ? -0.22 : 0.22;
+      eyeGroup.rotation.y = isRight ? 0.25 : -0.25;
 
-      // Outer black frame
       const frame = new THREE.Mesh(
-        new THREE.RingGeometry(0.02, 0.082, 16),
-        eyeFrameMat
+        new THREE.RingGeometry(0.02, 0.085, 16),
+        blackWebMat
       );
-      frame.scale.set(1, 1.4, 1);
+      frame.scale.set(1, 1.45, 1);
       eyeGroup.add(frame);
 
-      // Inner glowing lens
       const lens = new THREE.Mesh(
-        new THREE.CircleGeometry(0.075, 16),
+        new THREE.CircleGeometry(0.078, 16),
         eyeLensMat
       );
-      lens.scale.set(0.9, 1.35, 1);
-      lens.position.z = 0.005;
+      lens.scale.set(0.92, 1.4, 1);
+      lens.position.z = 0.006;
       eyeGroup.add(lens);
 
       return { eyeGroup, lens, frame };
@@ -262,10 +290,10 @@ export default function SpiderManLive3DCanvas({
     headGroup.add(leftEye.eyeGroup);
     headGroup.add(rightEye.eyeGroup);
 
-    // --- ARMS RIGGING ---
-    // Left Shoulder & Arm
+    // ARMS
+    // Left Arm
     const leftShoulder = new THREE.Group();
-    leftShoulder.position.set(-0.25, 0.15, 0);
+    leftShoulder.position.set(-0.26, 0.16, 0);
     chestGroup.add(leftShoulder);
 
     const leftUpperArm = new THREE.Mesh(
@@ -296,9 +324,9 @@ export default function SpiderManLive3DCanvas({
     );
     leftHand.add(leftHandMesh);
 
-    // Right Shoulder & Arm (Primary Interaction Arm)
+    // Right Arm (Interactive Pointer / Web Shooter)
     const rightShoulder = new THREE.Group();
-    rightShoulder.position.set(0.25, 0.15, 0);
+    rightShoulder.position.set(0.26, 0.16, 0);
     chestGroup.add(rightShoulder);
 
     const rightUpperArm = new THREE.Mesh(
@@ -319,7 +347,6 @@ export default function SpiderManLive3DCanvas({
     rightForearm.position.y = -0.15;
     rightElbow.add(rightForearm);
 
-    // Right Hand & Wrist Web Shooter
     const rightHand = new THREE.Group();
     rightHand.position.y = -0.3;
     rightElbow.add(rightHand);
@@ -330,25 +357,24 @@ export default function SpiderManLive3DCanvas({
     );
     rightHand.add(rightHandMesh);
 
-    // Pointing finger geometry
+    // Pointing finger
     const rightPointerFinger = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.015, 0.015, 0.11, 8),
+      new THREE.CylinderGeometry(0.016, 0.016, 0.12, 8),
       suitRedMat
     );
     rightPointerFinger.position.set(0.03, -0.09, 0.01);
     rightHand.add(rightPointerFinger);
 
-    // Wrist Web Shooter Node
-    const webShooterNode = new THREE.Mesh(
+    // Wrist Web Shooter Nozzle
+    const webShooterNozzle = new THREE.Mesh(
       new THREE.CylinderGeometry(0.025, 0.025, 0.04, 8),
-      blackWebMat
+      new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.8, roughness: 0.2 })
     );
-    webShooterNode.position.set(0, 0.03, 0.03);
-    webShooterNode.rotation.x = Math.PI / 2;
-    rightHand.add(webShooterNode);
+    webShooterNozzle.position.set(0, 0.03, 0.03);
+    webShooterNozzle.rotation.x = Math.PI / 2;
+    rightHand.add(webShooterNozzle);
 
-    // --- LEGS RIGGING ---
-    // Left Leg
+    // LEGS
     const leftHip = new THREE.Group();
     leftHip.position.set(-0.14, -0.1, 0);
     pelvis.add(leftHip);
@@ -366,12 +392,11 @@ export default function SpiderManLive3DCanvas({
 
     const leftCalf = new THREE.Mesh(
       new THREE.CylinderGeometry(0.065, 0.055, 0.4, 12),
-      suitRedMat // Red Boots
+      suitRedMat // Red boots
     );
     leftCalf.position.y = -0.2;
     leftKnee.add(leftCalf);
 
-    // Right Leg
     const rightHip = new THREE.Group();
     rightHip.position.set(0.14, -0.1, 0);
     pelvis.add(rightHip);
@@ -389,38 +414,48 @@ export default function SpiderManLive3DCanvas({
 
     const rightCalf = new THREE.Mesh(
       new THREE.CylinderGeometry(0.065, 0.055, 0.4, 12),
-      suitRedMat // Red Boots
+      suitRedMat // Red boots
     );
     rightCalf.position.y = -0.2;
     rightKnee.add(rightCalf);
 
-    // Initial Superhero Stance (Athletic Spider-Man Lean)
+    // Initial athletic superhero posture
     leftHip.rotation.z = 0.15;
     leftKnee.rotation.x = 0.2;
     rightHip.rotation.z = -0.2;
     rightKnee.rotation.x = 0.35;
-    characterRoot.rotation.y = 0.28; // Turned invitingly towards the form
+    characterRoot.rotation.y = 0.28;
 
-    // 7. REAL 3D WEB STRAND GEOMETRY
-    const webCurvePoints = [
+    // 7. REAL 3D LUMINOUS WEB STRAND
+    const webPoints = [
       new THREE.Vector3(0, 0, 0),
-      new THREE.Vector3(0.6, 0.2, 0),
-      new THREE.Vector3(1.4, -0.1, 0),
-      new THREE.Vector3(2.5, 0, 0),
+      new THREE.Vector3(0.7, 0.15, 0),
+      new THREE.Vector3(1.5, -0.05, 0),
+      new THREE.Vector3(2.6, 0.1, 0),
     ];
-    const webCurve = new THREE.CatmullRomCurve3(webCurvePoints);
-    const webGeometry = new THREE.TubeGeometry(webCurve, 20, 0.012, 6, false);
+    const webCurve = new THREE.CatmullRomCurve3(webPoints);
+    let webTubeGeom = new THREE.TubeGeometry(webCurve, 20, 0.016, 6, false);
     const webMesh = new THREE.Mesh(
-      webGeometry,
-      new THREE.MeshBasicMaterial({
-        color: 0x38bdf8,
-        wireframe: false,
-      })
+      webTubeGeom,
+      new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.95 })
     );
     webMesh.visible = false;
     scene.add(webMesh);
 
-    // Mouse Tracking Coordinates
+    // 8. ROBUST RESIZEOBSERVER (Prevents 0x0 or Skewed Canvas)
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width: w, height: h } = entry.contentRect;
+        if (w > 0 && h > 0) {
+          camera.aspect = w / h;
+          camera.updateProjectionMatrix();
+          renderer.setSize(w, h);
+        }
+      }
+    });
+    resizeObserver.observe(container);
+
+    // Mouse Tracking
     let mouseX = 0;
     let mouseY = 0;
     const handleMouseMove = (e: MouseEvent) => {
@@ -430,23 +465,12 @@ export default function SpiderManLive3DCanvas({
     };
     window.addEventListener("mousemove", handleMouseMove);
 
-    // Resize Handler
-    const handleResize = () => {
-      if (!mountRef.current) return;
-      const newW = mountRef.current.clientWidth;
-      const newH = mountRef.current.clientHeight;
-      camera.aspect = newW / newH;
-      camera.updateProjectionMatrix();
-      renderer.setSize(newW, newH);
-    };
-    window.addEventListener("resize", handleResize);
-
-    // 8. CONTINUOUS ANIMATION LOOP (Live WebGL Three.js RequestAnimationFrame)
+    // 9. ANIMATION LOOP (Live 60 FPS requestAnimationFrame)
     let animationFrameId: number;
     let clock = new THREE.Clock();
     let blinkTimer = 0;
     let isBlinking = false;
-    let previousState = "";
+    let lastAction = "";
 
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
@@ -455,11 +479,10 @@ export default function SpiderManLive3DCanvas({
       const elapsed = clock.getElapsedTime();
       const currentAction = stateRef.current;
 
-      // Detect state transition triggers
-      if (currentAction !== previousState) {
+      // Audio triggers on state change
+      if (currentAction !== lastAction) {
         if (currentAction === "point_email") {
           soundEngine.playWebShoot();
-          onWebFired?.();
         } else if (currentAction === "celebrate") {
           soundEngine.playSuccessChime();
         } else if (currentAction === "error") {
@@ -467,36 +490,33 @@ export default function SpiderManLive3DCanvas({
         } else {
           soundEngine.playWhoosh();
         }
-        previousState = currentAction;
+        lastAction = currentAction;
       }
 
-      // --- Natural Continuous Idle Dynamics (Never Frozen) ---
-      // Breathing motion: Chest expands and contracts rhythmically
-      const breathScale = 1 + Math.sin(elapsed * 2.8) * 0.035;
-      chestGroup.scale.set(breathScale, breathScale, breathScale);
+      // Continuous Idle Breathing & Movement (Never Frozen)
+      const breath = 1 + Math.sin(elapsed * 2.8) * 0.035;
+      chestGroup.scale.set(breath, breath, breath);
+      pelvis.position.y = 0.85 + Math.sin(elapsed * 2.8) * 0.015;
+      characterRoot.position.y = 0.15 + Math.sin(elapsed * 1.8) * 0.02;
 
-      // Idle vertical body bob and hip sway
-      pelvis.position.y = 0.85 + Math.sin(elapsed * 2.8) * 0.02;
-      characterRoot.position.y = 0.2 + Math.sin(elapsed * 1.8) * 0.025;
-
-      // Particles gentle ambient drift
+      // Floating particles
       particles.rotation.y = elapsed * 0.05;
       particles.rotation.x = Math.sin(elapsed * 0.08) * 0.1;
 
-      // Periodic Eye Blink Mechanics
+      // Blinking cycle
       blinkTimer += delta;
-      if (blinkTimer > 3.6) {
+      if (blinkTimer > 3.5) {
         isBlinking = true;
-        if (blinkTimer > 3.75) {
+        if (blinkTimer > 3.68) {
           isBlinking = false;
           blinkTimer = 0;
         }
       }
-      const eyeScaleY = isBlinking ? 0.08 : 1.0;
-      leftEye.eyeGroup.scale.y = THREE.MathUtils.lerp(leftEye.eyeGroup.scale.y, eyeScaleY, 0.4);
-      rightEye.eyeGroup.scale.y = THREE.MathUtils.lerp(rightEye.eyeGroup.scale.y, eyeScaleY, 0.4);
+      const eyeScaleY = isBlinking ? 0.06 : 1.0;
+      leftEye.eyeGroup.scale.y = THREE.MathUtils.lerp(leftEye.eyeGroup.scale.y, eyeScaleY, 0.45);
+      rightEye.eyeGroup.scale.y = THREE.MathUtils.lerp(rightEye.eyeGroup.scale.y, eyeScaleY, 0.45);
 
-      // --- TARGET POSE VARIABLES (Interpolated with Lerp for Silk-Smooth Animation) ---
+      // Target Rotations
       let targetHeadRotY = 0.25;
       let targetHeadRotX = 0;
       let targetRShoulderX = 0;
@@ -508,151 +528,121 @@ export default function SpiderManLive3DCanvas({
       let targetBodyRotY = 0.25;
       let showWeb = false;
 
-      // Cursor Eye & Head Following in Idle/Normal states
       const lookFollowX = Math.max(-0.4, Math.min(0.4, mouseX * 0.35));
       const lookFollowY = Math.max(-0.3, Math.min(0.3, mouseY * 0.25));
 
-      // --- ACTION STATE CONTROLLER ---
+      // Animation State Evaluation
       switch (currentAction) {
         case "point_email":
-          // Extend right arm, point directly towards the email field on the right
-          targetBodyRotY = 0.4;
-          targetHeadRotY = 0.55;
+          targetBodyRotY = 0.42;
+          targetHeadRotY = 0.58;
           targetHeadRotX = 0.05;
-
-          targetRShoulderX = -1.55; // Arm forward
-          targetRShoulderZ = -0.45; // Arm pointing to right
-          targetRElbowX = -0.2;     // Forearm straight
-          rightHand.rotation.z = -0.3;
-
+          targetRShoulderX = -1.55;
+          targetRShoulderZ = -0.45;
+          targetRElbowX = -0.2;
           targetLShoulderX = 0.2;
           targetLShoulderZ = 0.4;
-          showWeb = true; // Trigger 3D web strand!
+          showWeb = true;
           break;
 
         case "type_email":
-          // Curious attentive head tilt following typing progress
           const progress = typingProgressRef.current;
           targetBodyRotY = 0.35;
           targetHeadRotY = 0.45 + progress * 0.15;
-          targetHeadRotX = Math.sin(elapsed * 6) * 0.08; // Curious rhythmic nodding
-
+          targetHeadRotX = Math.sin(elapsed * 6) * 0.08;
           targetRShoulderX = -1.2;
           targetRShoulderZ = -0.3;
           targetRElbowX = -0.5;
-
           targetLShoulderX = 0.1;
           targetLShoulderZ = 0.35;
           break;
 
         case "cover_eyes":
-          // Both arms raise up, hands completely covering the white eye lenses (Password privacy)
           targetBodyRotY = 0.15;
           targetHeadRotY = 0.05;
-          targetHeadRotX = -0.1; // Shy head down tilt
-
+          targetHeadRotX = -0.1;
           targetRShoulderX = -2.2;
           targetRShoulderZ = 0.6;
           targetRElbowX = -1.6;
-
           targetLShoulderX = -2.2;
           targetLShoulderZ = -0.6;
           targetLElbowX = -1.6;
           break;
 
         case "peek":
-          // Hands part slightly, head tilts sideways to peek between fingers
           targetBodyRotY = 0.3;
           targetHeadRotY = 0.4;
-          targetHeadRotX = 0.15; // Tilted peek
-
+          targetHeadRotX = 0.15;
           targetRShoulderX = -2.0;
-          targetRShoulderZ = 0.35; // Hands parted
+          targetRShoulderZ = 0.35;
           targetRElbowX = -1.4;
-
           targetLShoulderX = -2.0;
           targetLShoulderZ = -0.35;
           targetLElbowX = -1.4;
-
-          // One eye lens widens curiously
-          rightEye.eyeGroup.scale.x = 1.25;
+          rightEye.eyeGroup.scale.x = 1.3;
           break;
 
         case "look_button":
-          // Lean forward, look down towards the SIGN IN button
           targetBodyRotY = 0.4;
           targetHeadRotY = 0.5;
-          targetHeadRotX = -0.25; // Looking down
-
+          targetHeadRotX = -0.25;
           targetRShoulderX = -0.5;
           targetRShoulderZ = -0.2;
           targetRElbowX = -0.4;
           break;
 
         case "focused_login":
-          // Focused ready pose (arms flexed, crouched tension)
           targetBodyRotY = 0.2;
           targetHeadRotY = 0.3;
           targetHeadRotX = 0.1;
-
           targetRShoulderX = -0.9;
           targetRShoulderZ = -0.5;
           targetRElbowX = -1.1;
-
           targetLShoulderX = -0.9;
           targetLShoulderZ = 0.5;
           targetLElbowX = -1.1;
           break;
 
         case "celebrate":
-          // Jumps in 3D air, both arms raised high in victory!
-          characterRoot.position.y = 0.5 + Math.abs(Math.sin(elapsed * 5)) * 0.3; // Jumping!
+          characterRoot.position.y = 0.45 + Math.abs(Math.sin(elapsed * 5)) * 0.35;
           targetBodyRotY = Math.sin(elapsed * 4) * 0.25;
           targetHeadRotY = 0;
-          targetHeadRotX = 0.3; // Looking up triumphantly
-
-          targetRShoulderX = -2.9; // Arms straight up
+          targetHeadRotX = 0.3;
+          targetRShoulderX = -2.9;
           targetRShoulderZ = -0.4;
           targetRElbowX = 0.1;
-
           targetLShoulderX = -2.9;
           targetLShoulderZ = 0.4;
           targetLElbowX = 0.1;
           break;
 
         case "error":
-          // Confused head scratch
           targetBodyRotY = 0.1;
           targetHeadRotY = -0.2;
-          targetHeadRotX = 0.25; // Sideways tilt
-
-          targetRShoulderX = -2.5; // Hand behind head
+          targetHeadRotX = 0.25;
+          targetRShoulderX = -2.5;
           targetRShoulderZ = 0.3;
           targetRElbowX = -2.1;
-
           targetLShoulderX = 0;
           targetLShoulderZ = 0.4;
           break;
 
         case "idle":
         default:
-          // Natural breathing idle, relaxed arms, cursor tracking
           targetBodyRotY = 0.25 + lookFollowX * 0.3;
           targetHeadRotY = 0.25 + lookFollowX * 0.6;
           targetHeadRotX = lookFollowY;
-
           targetRShoulderX = Math.sin(elapsed * 1.5) * 0.08;
           targetRShoulderZ = -0.3 + Math.sin(elapsed * 1.2) * 0.05;
           targetRElbowX = -0.2;
-
           targetLShoulderX = Math.sin(elapsed * 1.5 + 1) * 0.08;
           targetLShoulderZ = 0.3 + Math.sin(elapsed * 1.2 + 1) * 0.05;
           targetLElbowX = -0.2;
           break;
       }
 
-      // Smooth Lerp Interpolation on Skeleton Joints (Zero Jitter)
-      const lerpSpeed = 0.12;
+      // Lerp Skeleton
+      const lerpSpeed = 0.14;
       characterRoot.rotation.y = THREE.MathUtils.lerp(characterRoot.rotation.y, targetBodyRotY, lerpSpeed);
       headGroup.rotation.y = THREE.MathUtils.lerp(headGroup.rotation.y, targetHeadRotY, lerpSpeed);
       headGroup.rotation.x = THREE.MathUtils.lerp(headGroup.rotation.x, targetHeadRotX, lerpSpeed);
@@ -665,20 +655,19 @@ export default function SpiderManLive3DCanvas({
       leftShoulder.rotation.z = THREE.MathUtils.lerp(leftShoulder.rotation.z, targetLShoulderZ, lerpSpeed);
       leftElbow.rotation.x = THREE.MathUtils.lerp(leftElbow.rotation.x, targetLElbowX, lerpSpeed);
 
-      // Web Strand Dynamic Position Update
+      // Web mesh positioning
       webMesh.visible = showWeb;
       if (showWeb) {
-        // Connect wrist position to right login card coordinates in 3D
-        const wristWorldPos = new THREE.Vector3();
-        webShooterNode.getWorldPosition(wristWorldPos);
-        webCurvePoints[0].copy(wristWorldPos);
-        webCurvePoints[1].set(wristWorldPos.x + 0.6, wristWorldPos.y + 0.1, wristWorldPos.z);
-        webCurvePoints[2].set(wristWorldPos.x + 1.2, wristWorldPos.y - 0.05, wristWorldPos.z);
-        webCurvePoints[3].set(wristWorldPos.x + 2.2, 1.2, 0); // Attaches to login card
-        webCurve.points = webCurvePoints;
-        const newWebGeom = new THREE.TubeGeometry(webCurve, 16, 0.014, 6, false);
-        webMesh.geometry.dispose();
-        webMesh.geometry = newWebGeom;
+        const wristPos = new THREE.Vector3();
+        webShooterNozzle.getWorldPosition(wristPos);
+        webPoints[0].copy(wristPos);
+        webPoints[1].set(wristPos.x + 0.6, wristPos.y + 0.15, wristPos.z);
+        webPoints[2].set(wristPos.x + 1.3, wristPos.y - 0.05, wristPos.z);
+        webPoints[3].set(wristPos.x + 2.2, 1.2, 0);
+        webCurve.points = webPoints;
+        webTubeGeom.dispose();
+        webTubeGeom = new THREE.TubeGeometry(webCurve, 16, 0.016, 6, false);
+        webMesh.geometry = webTubeGeom;
       }
 
       renderer.render(scene, camera);
@@ -686,26 +675,53 @@ export default function SpiderManLive3DCanvas({
 
     animate();
 
-    // 9. CLEANUP ON UNMOUNT
     return () => {
+      resizeObserver.disconnect();
       window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("resize", handleResize);
       cancelAnimationFrame(animationFrameId);
       renderer.dispose();
     };
   }, []);
 
-  if (!webGLSupported) {
-    return (
-      <div className={`flex items-center justify-center p-8 bg-slate-900/60 rounded-3xl border border-cyan-500/30 text-xs text-cyan-300 ${className}`}>
-        WebGL hardware acceleration is required to render the live 3D Spider-Man character.
-      </div>
-    );
-  }
+  const triggerManualAction = (state: SpiderManActionState) => {
+    setActiveDebugState(state);
+    onStateChange?.(state);
+  };
 
   return (
-    <div ref={mountRef} className={`relative w-full h-full min-h-[460px] sm:min-h-[540px] ${className}`}>
-      <canvas ref={canvasRef} className="w-full h-full block" />
+    <div
+      ref={mountRef}
+      className={`relative w-full h-[480px] sm:h-[560px] overflow-hidden ${className}`}
+    >
+      {/* 3D WebGL Canvas */}
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 w-full h-full block cursor-grab active:cursor-grabbing"
+      />
+
+      {/* Live WebGL Engine Status Badge */}
+      <div className="absolute top-3 left-3 z-20 flex items-center space-x-1.5 px-3 py-1 rounded-full bg-slate-950/80 border border-cyan-500/40 text-[10px] font-mono font-bold text-cyan-300 backdrop-blur-md shadow-sm">
+        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+        <span>{webGLStatus}</span>
+      </div>
+
+      {/* Manual Action State Triggers (For immediate testing) */}
+      <div className="absolute top-3 right-3 z-20 hidden sm:flex flex-wrap items-center gap-1 bg-slate-950/80 p-1.5 rounded-2xl border border-cyan-500/30 backdrop-blur-md">
+        {(["idle", "point_email", "cover_eyes", "peek", "celebrate"] as SpiderManActionState[]).map((st) => (
+          <button
+            key={st}
+            type="button"
+            onClick={() => triggerManualAction(st)}
+            className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all ${
+              activeDebugState === st
+                ? "bg-cyan-500 text-black shadow-sm"
+                : "text-slate-400 hover:text-white hover:bg-slate-800"
+            }`}
+          >
+            {st === "point_email" ? "Point" : st === "cover_eyes" ? "Hide" : st}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
