@@ -495,14 +495,14 @@ export default function SpiderManClientRegister() {
                   disabled={loading || registerSuccess}
                   onMouseEnter={() => setSpiderAction("look_button")}
                   onMouseLeave={() => setSpiderAction("idle")}
-                  className="w-full py-3 px-4 rounded-xl font-black text-xs sm:text-sm tracking-widest uppercase text-white bg-gradient-to-r from-blue-600 via-cyan-600 to-blue-700 hover:from-blue-500 hover:via-cyan-500 hover:to-blue-600 border border-cyan-400/50 shadow-[0_0_30px_rgba(6,182,212,0.5)] active:scale-[0.98] transition-all flex items-center justify-center space-x-2 mt-2"
+                  className="w-full py-3 px-4 rounded-xl font-black text-xs sm:text-sm tracking-widest uppercase text-slate-950 bg-gradient-to-r from-cyan-400 via-cyan-300 to-cyan-500 hover:from-cyan-300 hover:via-cyan-200 hover:to-cyan-400 border border-cyan-200/50 shadow-[0_0_35px_rgba(6,182,212,0.6)] active:scale-[0.98] transition-all flex items-center justify-center space-x-2 mt-2"
                 >
                   {loading ? (
-                    <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                    <RefreshCw className="w-4 h-4 animate-spin text-slate-950" />
                   ) : (
                     <>
-                      <span>[ CREATE ACCOUNT ]</span>
-                      <ArrowRight className="w-4 h-4 text-cyan-200" />
+                      <span>CREATE FREE ACCOUNT</span>
+                      <ArrowRight className="w-4 h-4 text-slate-950 font-bold" />
                     </>
                   )}
                 </button>

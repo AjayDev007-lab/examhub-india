@@ -1766,8 +1766,8 @@ async def seed_database():
                         official_application_url="https://indiapostgdsonline.gov.in/",
                         source_website_url="https://indiapostgdsonline.gov.in/",
                         verification_source="Ministry of Communications / Department of Posts",
-                        status="PUBLISHED",
-                        is_featured=True,
+                        status="CLOSED",
+                        is_featured=False,
                         view_count=94300
                     ),
                     # 6. TNPSC Group 2 & 2A

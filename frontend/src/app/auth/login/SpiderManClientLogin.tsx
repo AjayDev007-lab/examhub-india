@@ -185,6 +185,9 @@ export default function SpiderManClientLogin() {
               
               {/* Header Branding */}
               <div className="text-center space-y-1 pb-2 border-b border-cyan-500/20">
+                <div className="inline-flex items-center px-3.5 py-1 rounded-full bg-cyan-950/80 border border-cyan-400/50 text-[11px] font-bold text-cyan-300 mx-auto mb-2 shadow-[0_0_15px_rgba(6,182,212,0.35)]">
+                  National Education Portal • 100% Free
+                </div>
                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-red-600 via-blue-700 to-cyan-500 p-0.5 mx-auto shadow-[0_0_20px_rgba(6,182,212,0.4)]">
                   <div className="w-full h-full bg-[#070F26] rounded-[14px] flex items-center justify-center">
                     <Award className="w-6 h-6 text-cyan-400" />
@@ -294,14 +297,14 @@ export default function SpiderManClientLogin() {
                   disabled={loading || loginSuccess}
                   onMouseEnter={() => setSpiderAction("look_button")}
                   onMouseLeave={() => setSpiderAction("idle")}
-                  className="w-full py-3.5 px-4 rounded-xl font-black text-sm tracking-widest uppercase text-white bg-gradient-to-r from-blue-600 via-cyan-600 to-blue-700 hover:from-blue-500 hover:via-cyan-500 hover:to-blue-600 border border-cyan-400/50 shadow-[0_0_30px_rgba(6,182,212,0.5)] active:scale-[0.98] transition-all flex items-center justify-center space-x-2"
+                  className="w-full py-3.5 px-4 rounded-xl font-black text-sm tracking-widest uppercase text-slate-950 bg-gradient-to-r from-cyan-400 via-cyan-300 to-cyan-500 hover:from-cyan-300 hover:via-cyan-200 hover:to-cyan-400 border border-cyan-200/50 shadow-[0_0_35px_rgba(6,182,212,0.6)] active:scale-[0.98] transition-all flex items-center justify-center space-x-2"
                 >
                   {loading ? (
-                    <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                    <RefreshCw className="w-4 h-4 animate-spin text-slate-950" />
                   ) : (
                     <>
-                      <span>[ SIGN IN ]</span>
-                      <ArrowRight className="w-4 h-4 text-cyan-200" />
+                      <span>SIGN IN</span>
+                      <ArrowRight className="w-4 h-4 text-slate-950 font-bold" />
                     </>
                   )}
                 </button>
