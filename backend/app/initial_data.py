@@ -3067,56 +3067,30 @@ async def seed_database():
                     )
                 ])
 
-            # 34. Seed Daily Admin Report
-            today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-            rep_stmt = select(DailyAdminReport).where(DailyAdminReport.report_date == today_str)
-            rep_res = await db.execute(rep_stmt)
-            if not rep_res.scalars().first():
-                db.add(DailyAdminReport(
-                    report_date=today_str,
-                    sources_checked_count=24,
-                    new_govt_jobs=5,
-                    new_private_jobs=3,
-                    new_exam_notices=2,
-                    new_results_announced=1,
-                    school_results_updated=1,
-                    new_admit_cards=2,
-                    scholarships_updated=1,
-                    deadlines_updated=3,
-                    broken_links_found=0,
-                    failed_sources_count=0,
-                    pending_verifications=1,
-                    failed_notifications=0,
-                    website_health_status="HEALTHY",
-                    api_health_status="HEALTHY",
-                    db_health_status="HEALTHY",
-                    backup_status="SUCCESS",
-                    security_alerts_count=0,
-                    maintenance_tasks_completed=2,
-                    outstanding_issues_count=1
-                ))
-
             # 35. Seed Website Operating Control (Online / Maintenance / Offline Modes)
             ctrl_stmt = select(WebsiteOperatingControl)
             ctrl_res = await db.execute(ctrl_stmt)
             if not ctrl_res.scalars().first():
-                control_entry = WebsiteOperatingControl(
-                    mode="ONLINE",
-                    maintenance_message="ExamHub India is currently undergoing scheduled platform upgrades to serve you better. We will be back online shortly.",
-                    estimated_return_time="Tonight by 23:00 IST",
-                    auto_online_enabled=True,
-                    bypass_secret_key="examhub-admin-secure-maintenance-bypass"
-                )
-                db.add(control_entry)
-                await db.flush()
+                try:
+                    control_entry = WebsiteOperatingControl(
+                        mode="ONLINE",
+                        maintenance_message="ExamHub India is currently undergoing scheduled platform upgrades to serve you better. We will be back online shortly.",
+                        estimated_return_time="Tonight by 23:00 IST",
+                        auto_online_enabled=True,
+                        bypass_secret_key="examhub-admin-secure-maintenance-bypass"
+                    )
+                    db.add(control_entry)
+                    await db.flush()
 
-                db.add(WebsiteStatusHistory(
-                    previous_mode="INITIALIZING",
-                    new_mode="ONLINE",
-                    reason="Platform operational readiness confirmed on deployment initialization.",
-                    admin_email="superadmin@examhub.gov.in",
-                    ip_address="127.0.0.1"
-                ))
+                    db.add(WebsiteStatusHistory(
+                        previous_mode="INITIALIZING",
+                        new_mode="ONLINE",
+                        reason="Platform operational readiness confirmed on deployment initialization.",
+                        admin_email="superadmin@examhub.gov.in",
+                        ip_address="127.0.0.1"
+                    ))
+                except Exception:
+                    pass
 
             await db.commit()
             print("Successfully initialized and seeded EXAMHUB INDIA database!")

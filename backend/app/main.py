@@ -9,7 +9,7 @@ from app.initial_data import seed_database
 from app.routers import (
     auth, exams, results, hall_tickets, id_cards, documents, notifications,
     admin, admin_institutions, directory, jobs, student_exams, job_alerts, analytics,
-    daily_updates, maintenance, website_control
+    daily_updates, maintenance, website_control, ai_manager
 )
 
 @asynccontextmanager
@@ -65,6 +65,7 @@ app.include_router(analytics.router)
 app.include_router(daily_updates.router)
 app.include_router(maintenance.router)
 app.include_router(website_control.router)
+app.include_router(ai_manager.router)
 
 @app.get("/api/health")
 async def health_check():

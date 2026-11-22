@@ -3,8 +3,8 @@
 import React, { useState, useId } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { 
-  Lock, Mail, User, Phone, ArrowRight, AlertCircle, RefreshCw, 
+import {
+  Lock, Mail, User, Phone, ArrowRight, AlertCircle, RefreshCw,
   CheckCircle2, Eye, EyeOff, Zap, Award, Volume2, VolumeX,
   GraduationCap, BookOpen, ShieldCheck, Check
 } from "lucide-react";
@@ -249,10 +249,10 @@ export default function SpiderManClientRegister() {
       {/* 3. MAIN CONTENT: BALANCED TWO-COLUMN LANDSCAPE COMPOSITION */}
       <main className="relative z-10 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-3 my-auto">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10 items-center">
-          
+
           {/* LEFT SECTION: 100% FREE-ROAMING 3D SUPERHERO + COMMUNITY HEADING (7 cols) */}
           <div className="lg:col-span-7 relative flex flex-col items-center lg:items-start justify-center">
-            
+
             {/* Community Hero Heading */}
             <div className="space-y-2 mb-2 text-center lg:text-left">
               <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-cyan-950/80 border border-cyan-400/40 text-cyan-300 text-xs font-bold tracking-wide shadow-[0_0_20px_rgba(6,182,212,0.3)]">
@@ -283,7 +283,7 @@ export default function SpiderManClientRegister() {
             <div className="absolute -inset-1 rounded-[32px] bg-gradient-to-r from-cyan-500/30 via-blue-600/30 to-purple-600/30 blur-xl opacity-70 pointer-events-none" />
 
             <div className="relative rounded-[28px] bg-slate-900/80 backdrop-blur-2xl border border-cyan-500/40 shadow-[0_0_60px_rgba(6,182,212,0.18)] p-6 sm:p-7 space-y-4">
-              
+
               {/* Header Branding */}
               <div className="text-center space-y-1 pb-2 border-b border-cyan-500/20">
                 <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-red-600 via-blue-700 to-cyan-500 p-0.5 mx-auto shadow-[0_0_20px_rgba(6,182,212,0.4)]">
