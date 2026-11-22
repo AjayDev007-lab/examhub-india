@@ -37,6 +37,7 @@ import {
   BookOpen
 } from "lucide-react";
 import { fetchApi, getFileUrl } from "@/lib/api";
+import { isFirebaseConfigured, auth, onAuthStateChanged, db, doc, getDoc } from "@/lib/firebase";
 import StudentSidebar from "@/components/StudentSidebar";
 import StudentHeader from "@/components/StudentHeader";
 
@@ -63,13 +64,51 @@ export default function StudentDashboardPage() {
 
   useEffect(() => {
     const userStr = localStorage.getItem("examhub_user");
-    if (!userStr) {
+    if (!userStr && !isFirebaseConfigured) {
       window.location.href = "/auth/login";
       return;
     }
-    try {
-      setCurrentUser(JSON.parse(userStr));
-    } catch (_) {}
+    if (userStr) {
+      try {
+        setCurrentUser(JSON.parse(userStr));
+      } catch (_) {}
+    }
+
+    // Live Firebase Auth sync
+    if (isFirebaseConfigured && auth) {
+      const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+        if (!firebaseUser && !localStorage.getItem("examhub_token")) {
+          window.location.href = "/auth/login";
+          return;
+        }
+        if (firebaseUser) {
+          let updatedUser = {
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            full_name: firebaseUser.displayName || firebaseUser.email?.split("@")[0] || "Student",
+            role: "student"
+          };
+          if (db) {
+            try {
+              const snap = await getDoc(doc(db, "students", firebaseUser.uid));
+              if (snap.exists()) {
+                const data = snap.data();
+                updatedUser = {
+                  uid: firebaseUser.uid,
+                  email: data.email || firebaseUser.email,
+                  full_name: data.fullName || firebaseUser.displayName || "Student",
+                  role: data.role || "student"
+                };
+              }
+            } catch (_) {}
+          }
+          setCurrentUser(updatedUser);
+          localStorage.setItem("examhub_user", JSON.stringify(updatedUser));
+        }
+      });
+      loadDashboardData();
+      return () => unsubscribe();
+    }
 
     loadDashboardData();
   }, []);

@@ -17,8 +17,7 @@ import {
   updateProfile, 
   doc, 
   setDoc, 
-  formatFirebaseAuthError, 
-  saveAccountToVault 
+  formatFirebaseAuthError 
 } from "@/lib/firebase";
 import SpiderManLive3DCanvas, { SpiderManActionState } from "@/components/SpiderManLive3DCanvas";
 import { soundEngine } from "@/lib/spidermanAudio";
@@ -148,11 +147,13 @@ export default function SpiderManClientRegister() {
     setLoading(true);
     setSpiderAction("focused_login"); // Superhero power stance
 
+    const emailClean = email.trim().toLowerCase();
+
     try {
-      // 1. If Firebase Authentication is configured, create real Firebase user
+      // 1. Official Firebase Authentication (Single Source of Truth)
       if (isFirebaseConfigured && auth) {
         try {
-          const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+          const cred = await createUserWithEmailAndPassword(auth, emailClean, password);
           
           if (cred.user) {
             await updateProfile(cred.user, {
@@ -165,7 +166,7 @@ export default function SpiderManClientRegister() {
                 await setDoc(doc(db, "students", cred.user.uid), {
                   uid: cred.user.uid,
                   fullName: fullName.trim(),
-                  email: email.trim().toLowerCase(),
+                  email: emailClean,
                   mobile: mobile.trim() || "",
                   role: "student",
                   createdAt: new Date().toISOString()
@@ -180,21 +181,13 @@ export default function SpiderManClientRegister() {
             localStorage.setItem("examhub_token", idToken);
             localStorage.setItem("examhub_user", JSON.stringify({
               uid: cred.user.uid,
-              email: cred.user.email,
-              full_name: fullName.trim()
+              email: cred.user.email || emailClean,
+              full_name: fullName.trim(),
+              role: "student"
             }));
 
             document.cookie = `examhub_token=${idToken}; path=/; max-age=86400; SameSite=Lax`;
             document.cookie = `examhub_user_type=student; path=/; max-age=86400; SameSite=Lax`;
-
-            await saveAccountToVault({
-              uid: cred.user.uid,
-              fullName: fullName.trim(),
-              email: email.trim().toLowerCase(),
-              mobile: mobile.trim() || undefined,
-              password: password,
-              role: "student",
-            });
 
             setRegisterSuccess(true);
             setSpiderAction("celebrate");
@@ -205,7 +198,7 @@ export default function SpiderManClientRegister() {
             return;
           }
         } catch (fbErr: any) {
-          const friendlyMsg = formatFirebaseAuthError(fbErr, email.trim().toLowerCase());
+          const friendlyMsg = formatFirebaseAuthError(fbErr);
           setErrorMsg(friendlyMsg);
           setSpiderAction("error");
           setLoading(false);
@@ -213,52 +206,42 @@ export default function SpiderManClientRegister() {
         }
       }
 
-      // 2. Fallback: Register locally in cryptographic vault
-      const newAccount = await saveAccountToVault({
-        fullName: fullName.trim(),
-        email: email.trim().toLowerCase(),
-        mobile: mobile.trim() || undefined,
-        password: password,
-        role: "student",
-      });
-
-      const token = "student_secure_token_" + Date.now();
-      const studentUser = {
-        uid: newAccount.uid,
-        id: newAccount.studentId,
-        full_name: newAccount.fullName,
-        email: newAccount.email,
-        mobile: newAccount.mobile,
-        role: "student",
-      };
-
-      localStorage.setItem("examhub_token", token);
-      localStorage.setItem("examhub_user", JSON.stringify(studentUser));
-      document.cookie = `examhub_token=${token}; path=/; max-age=86400; SameSite=Lax`;
-      document.cookie = `examhub_user_type=student; path=/; max-age=86400; SameSite=Lax`;
-
-      // 3. Keep backend API store in sync if running
+      // 2. Fallback to Backend API when Firebase credentials are not yet configured
       try {
-        await fetchApi("/api/auth/register", {
+        const res = await fetchApi("/api/auth/register", {
           method: "POST",
           body: JSON.stringify({
             full_name: fullName.trim(),
-            email: email.trim().toLowerCase(),
+            email: emailClean,
             mobile: mobile.trim() || undefined,
             password,
             password_confirm: confirmPassword,
           }),
         });
-      } catch (_) {
-        // Backend failure in serverless or offline mode is safely absorbed by vault
+
+        const token = res.access_token || ("student_secure_token_" + Date.now());
+        const studentUser = res.user || {
+          full_name: fullName.trim(),
+          email: emailClean,
+          mobile: mobile.trim() || undefined,
+          role: "student",
+        };
+
+        localStorage.setItem("examhub_token", token);
+        localStorage.setItem("examhub_user", JSON.stringify(studentUser));
+        document.cookie = `examhub_token=${token}; path=/; max-age=86400; SameSite=Lax`;
+        document.cookie = `examhub_user_type=student; path=/; max-age=86400; SameSite=Lax`;
+
+        setRegisterSuccess(true);
+        setSpiderAction("celebrate");
+
+        setTimeout(() => {
+          window.location.href = "/dashboard";
+        }, 1400);
+      } catch (apiErr: any) {
+        setErrorMsg(apiErr.message || "Registration failed. An account with this email may already exist.");
+        setSpiderAction("error");
       }
-
-      setRegisterSuccess(true);
-      setSpiderAction("celebrate");
-
-      setTimeout(() => {
-        window.location.href = "/dashboard";
-      }, 1400);
     } catch (err: any) {
       setErrorMsg(err.message || "Registration failed. An account with this email may already exist.");
       setSpiderAction("error");

@@ -7,6 +7,12 @@ import {
   CheckCircle2, RefreshCw, Zap, Award, ArrowLeft, ShieldCheck
 } from "lucide-react";
 import { fetchApi } from "@/lib/api";
+import { 
+  isFirebaseConfigured, 
+  auth, 
+  sendPasswordResetEmail, 
+  formatFirebaseAuthError 
+} from "@/lib/firebase";
 
 export default function ForgotPasswordPage() {
   const [step, setStep] = useState<"request" | "reset">("request");
@@ -30,6 +36,22 @@ export default function ForgotPasswordPage() {
     setLoading(true);
     setErrorMsg(null);
     setSuccessMsg(null);
+
+    const cleanIdentifier = identifier.trim().toLowerCase();
+
+    // 1. Firebase Authentication official password reset
+    if (isFirebaseConfigured && auth && cleanIdentifier.includes("@")) {
+      try {
+        await sendPasswordResetEmail(auth, cleanIdentifier);
+        setSuccessMsg("Password reset email sent! Please check your inbox (and spam folder) for instructions.");
+        setLoading(false);
+        return;
+      } catch (fbErr: any) {
+        setErrorMsg(formatFirebaseAuthError(fbErr));
+        setLoading(false);
+        return;
+      }
+    }
 
     try {
       const res = await fetchApi("/api/auth/forgot-password", {

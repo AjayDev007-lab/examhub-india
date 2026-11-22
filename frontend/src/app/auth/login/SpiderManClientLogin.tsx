@@ -1,21 +1,23 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { 
   Lock, Mail, ArrowRight, AlertCircle, RefreshCw, 
   CheckCircle2, Eye, EyeOff, Zap, Award, Volume2, VolumeX,
-  GraduationCap, BookOpen, ShieldCheck
+  GraduationCap, BookOpen, ShieldCheck, Info
 } from "lucide-react";
 import { fetchApi } from "@/lib/api";
 import { 
   isFirebaseConfigured, 
   auth, 
+  db,
   signInWithEmailAndPassword, 
-  formatFirebaseAuthError, 
-  verifyVaultPassword,
-  findVaultAccount
+  onAuthStateChanged,
+  doc,
+  getDoc,
+  formatFirebaseAuthError
 } from "@/lib/firebase";
 import SpiderManLive3DCanvas, { SpiderManActionState } from "@/components/SpiderManLive3DCanvas";
 import { soundEngine } from "@/lib/spidermanAudio";
@@ -35,6 +37,21 @@ export default function SpiderManClientLogin() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [loginSuccess, setLoginSuccess] = useState(false);
+
+  // Check persistent session on mount
+  useEffect(() => {
+    if (isFirebaseConfigured && auth) {
+      const unsubscribe = onAuthStateChanged(auth, (user) => {
+        if (user) {
+          const userToken = localStorage.getItem("examhub_token");
+          if (userToken) {
+            router.push("/dashboard");
+          }
+        }
+      });
+      return () => unsubscribe();
+    }
+  }, [router]);
 
   // Sound Engine Toggle
   const toggleSound = () => {
@@ -132,20 +149,37 @@ export default function SpiderManClientLogin() {
         }
       }
 
-      // 2. If Firebase Authentication is configured, authenticate with Firebase
+      // 2. Official Firebase Authentication (Single Source of Truth)
       if (isFirebaseConfigured && auth) {
         try {
           const cred = await signInWithEmailAndPassword(auth, emailClean, password);
           const user = cred.user;
           const idToken = await user.getIdToken();
 
-          localStorage.setItem("examhub_token", idToken);
-          localStorage.setItem("examhub_user", JSON.stringify({
+          let studentProfile = {
             uid: user.uid,
-            email: user.email,
-            full_name: user.displayName || user.email?.split("@")[0] || "Student"
-          }));
+            email: user.email || emailClean,
+            full_name: user.displayName || user.email?.split("@")[0] || "Student",
+            role: "student"
+          };
 
+          if (db) {
+            try {
+              const userSnap = await getDoc(doc(db, "students", user.uid));
+              if (userSnap.exists()) {
+                const data = userSnap.data();
+                studentProfile = {
+                  uid: user.uid,
+                  email: data.email || user.email || emailClean,
+                  full_name: data.fullName || user.displayName || "Student",
+                  role: data.role || "student"
+                };
+              }
+            } catch (_) {}
+          }
+
+          localStorage.setItem("examhub_token", idToken);
+          localStorage.setItem("examhub_user", JSON.stringify(studentProfile));
           document.cookie = `examhub_token=${idToken}; path=/; max-age=86400; SameSite=Lax`;
           document.cookie = `examhub_user_type=student; path=/; max-age=86400; SameSite=Lax`;
 
@@ -157,7 +191,7 @@ export default function SpiderManClientLogin() {
           }, 1200);
           return;
         } catch (fbErr: any) {
-          const friendlyMsg = formatFirebaseAuthError(fbErr, emailClean);
+          const friendlyMsg = formatFirebaseAuthError(fbErr);
           setErrorMsg(friendlyMsg);
           setSpiderAction("error");
           setLoading(false);
@@ -165,41 +199,7 @@ export default function SpiderManClientLogin() {
         }
       }
 
-      // 3. Fallback: Authenticate via Cryptographic Account Vault
-      const vaultResult = await verifyVaultPassword(emailClean, password);
-      if (vaultResult.success && vaultResult.account) {
-        const student = vaultResult.account;
-        const studentUser = {
-          uid: student.uid,
-          id: student.studentId,
-          email: student.email,
-          full_name: student.fullName,
-          role: "student"
-        };
-        const token = "student_secure_token_" + Date.now();
-
-        localStorage.setItem("examhub_token", token);
-        localStorage.setItem("examhub_user", JSON.stringify(studentUser));
-        document.cookie = `examhub_token=${token}; path=/; max-age=86400; SameSite=Lax`;
-        document.cookie = `examhub_user_type=student; path=/; max-age=86400; SameSite=Lax`;
-
-        setLoginSuccess(true);
-        setSpiderAction("celebrate");
-
-        setTimeout(() => {
-          window.location.href = "/dashboard";
-        }, 1200);
-        return;
-      }
-
-      if (vaultResult.reason === "invalid_password") {
-        setErrorMsg("Incorrect password entered. Please verify your password.");
-        setSpiderAction("error");
-        setLoading(false);
-        return;
-      }
-
-      // 4. Try Backend API as remote verification
+      // 3. Fallback to Backend Authentication API when Firebase credentials are not yet configured
       try {
         const res = await fetchApi("/api/auth/login", {
           method: "POST",
@@ -234,11 +234,7 @@ export default function SpiderManClientLogin() {
           }, 1200);
         }
       } catch (err: any) {
-        if (err.message?.toLowerCase().includes("password") || err.detail?.toLowerCase().includes("password")) {
-          setErrorMsg("Incorrect password entered. Please verify your password.");
-        } else {
-          setErrorMsg("No account found matching this email address. Please check spelling or create an account.");
-        }
+        setErrorMsg(err.message || "Authentication failed. Please verify your credentials.");
         setSpiderAction("error");
       }
     } catch (err: any) {
