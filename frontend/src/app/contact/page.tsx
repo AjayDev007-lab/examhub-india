@@ -117,7 +117,7 @@ export default function ContactPage() {
                 <div className="flex items-start space-x-3 text-slate-600 dark:text-slate-300">
                   <MapPin className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
                   <div>
-                    <div className="font-semibold text-slate-900 dark:text-white">National Registry</div>
+                    <div className="font-semibold text-slate-900 dark:text-white">Office Address</div>
                     <div>{SITE_CONFIG.social.officeAddress}</div>
                   </div>
                 </div>

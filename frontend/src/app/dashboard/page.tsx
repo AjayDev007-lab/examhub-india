@@ -148,11 +148,11 @@ export default function StudentDashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#F5F8FE] dark:bg-[#0B132B] text-[#14213D] dark:text-slate-100 flex transition-colors">
-      {/* 1. MODEL 3 DARK NAVY SIDEBAR */}
-      <StudentSidebar unreadNotifsCount={unreadCount} activeExamsCount={registeredExams.length} />
+      {/* 1. COMPACT SIDEBAR */}
+      <StudentSidebar />
 
-      {/* Main Column (offset for 72 = 18rem on desktop) */}
-      <div className="flex-1 lg:pl-72 flex flex-col min-w-0">
+      {/* Main Column (offset for 64 = 16rem on desktop) */}
+      <div className="flex-1 lg:pl-64 flex flex-col min-w-0">
         {/* 2. TOP NAVIGATION HEADER */}
         <StudentHeader pageTitle="Student Control Hub" unreadCount={unreadCount} />
 
@@ -202,156 +202,159 @@ export default function StudentDashboardPage() {
           </div>
 
           {activeTab === "overview" && (
-            <div className="space-y-8">
-              {/* 3. DASHBOARD HERO BANNER (Requirement 3) */}
-              <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#102D59] via-[#1b3f7a] to-[#2563EB] text-white p-6 sm:p-8 lg:p-10 shadow-xl border border-blue-400/20">
-                {/* Decorative Pattern Background */}
-                <div className="absolute right-0 top-0 bottom-0 w-1/2 opacity-10 bg-[radial-gradient(#ffffff_1.5px,transparent_1.5px)] [background-size:16px_16px] pointer-events-none" />
-
-                <div className="relative z-10 max-w-2xl space-y-4">
-                  <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-amber-300 text-xs font-bold border border-white/10">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>Welcome to Model 3 National Education Hub</span>
-                  </div>
-
-                  <h2 className="text-2xl sm:text-4xl font-black tracking-tight text-white leading-tight">
-                    Welcome back, {currentUser?.full_name?.split(" ")[0] || "Student"}! 🎓
+            <div className="space-y-6">
+              {/* Compact Greeting Banner */}
+              <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 sm:p-6 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
+                    Welcome back{currentUser?.full_name ? `, ${currentUser.full_name.split(" ")[0]}` : ""}!
                   </h2>
-
-                  <p className="text-xs sm:text-sm text-blue-100 leading-relaxed font-normal">
-                    Empowering your journey to national examinations, official scorecards & verified career opportunities across all 36 States & UTs.
+                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
+                    Stay updated with your examinations and opportunities.
                   </p>
-
-                  <div className="pt-2 flex flex-wrap items-center gap-3">
-                    <Link
-                      href="/jobs"
-                      className="px-5 py-2.5 rounded-xl bg-white text-[#102D59] hover:bg-blue-50 font-bold text-xs shadow-lg transition-all flex items-center space-x-2"
-                    >
-                      <Briefcase className="w-4 h-4 text-[#2563EB]" />
-                      <span>Explore Career Opportunities</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </Link>
-
-                    <Link
-                      href="/student/my-exams"
-                      className="px-5 py-2.5 rounded-xl bg-blue-600/40 hover:bg-blue-600/60 text-white font-bold text-xs border border-white/20 backdrop-blur-md transition-all flex items-center space-x-2"
-                    >
-                      <BookOpen className="w-4 h-4 text-amber-300" />
-                      <span>View Registered Exams ({registeredExams.length})</span>
-                    </Link>
-                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Link
+                    href="/student/my-exams"
+                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-sm transition-all"
+                  >
+                    My Exams
+                  </Link>
+                  <Link
+                    href="/jobs"
+                    className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 font-bold text-xs transition-all"
+                  >
+                    Explore Jobs
+                  </Link>
                 </div>
               </div>
 
-              {/* 4. STATISTICS CARDS (Requirement 4) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* Next Examination */}
-                <div className="p-5 rounded-3xl bg-white dark:bg-[#101E3D] border border-slate-200/80 dark:border-slate-800 shadow-sm card-hover-lift flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                        Next Examination
+              {/* Three Dashboard Action Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                
+                {/* 1. Next Exam */}
+                <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                        Next Exam
                       </span>
-                      <div className="w-8 h-8 rounded-xl bg-red-50 dark:bg-red-950/50 text-[#DC2626] flex items-center justify-center font-bold">
+                      <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 flex items-center justify-center">
                         <Calendar className="w-4 h-4" />
                       </div>
                     </div>
-                    <h3 className="font-black text-sm text-[#14213D] dark:text-white line-clamp-1">
-                      {registeredExams[0]?.examination?.name || "Civil Services Exam (CSE)"}
-                    </h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                      {registeredExams[0]?.examination?.code || "UPSC-CSE-2026"}
-                    </p>
+
+                    {registeredExams.length > 0 ? (
+                      <div className="space-y-1">
+                        <h3 className="font-bold text-sm text-slate-900 dark:text-white line-clamp-1">
+                          {registeredExams[0]?.examination?.name || "Registered Exam"}
+                        </h3>
+                        <p className="text-xs text-slate-500">
+                          {registeredExams[0]?.examination?.code || "Exam Schedule Active"}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        <h3 className="font-bold text-sm text-slate-900 dark:text-white">
+                          No exams yet
+                        </h3>
+                        <p className="text-xs text-slate-500">
+                          Add your upcoming examination to stay organised.
+                        </p>
+                      </div>
+                    )}
                   </div>
-                  <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs font-semibold">
-                    <span className="px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 text-[10px] font-bold">
-                      Exam in 18 Days
-                    </span>
-                    <Link href="/student/my-exams" className="text-[#2563EB] dark:text-blue-400 hover:underline">
-                      Details →
+
+                  <div className="mt-5 pt-3 border-t border-slate-100 dark:border-slate-800">
+                    <Link
+                      href="/student/my-exams"
+                      className="w-full py-2 px-3 rounded-xl bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-bold text-xs flex items-center justify-center space-x-1 transition-colors"
+                    >
+                      <span>{registeredExams.length > 0 ? "View Details" : "Add an Exam"}</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
                     </Link>
                   </div>
                 </div>
 
-                {/* Active Job Alerts */}
-                <div className="p-5 rounded-3xl bg-white dark:bg-[#101E3D] border border-slate-200/80 dark:border-slate-800 shadow-sm card-hover-lift flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                        Active Job Alerts
+                {/* 2. Pending Applications */}
+                <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                        Pending Applications
                       </span>
-                      <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-[#2563EB] flex items-center justify-center font-bold">
-                        <Briefcase className="w-4 h-4" />
+                      <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                        <FileText className="w-4 h-4" />
                       </div>
                     </div>
-                    <span className="text-2xl font-black text-[#14213D] dark:text-white block">
-                      {jobs.length > 0 ? `${jobs.length * 4}+` : "24+"} Matches
-                    </span>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                      Tailored to your degree & skills
-                    </p>
+
+                    <div className="space-y-1">
+                      <h3 className="font-bold text-sm text-slate-900 dark:text-white">
+                        {registeredExams.length > 0 ? `${registeredExams.length} Active` : "No pending applications"}
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        {registeredExams.length > 0
+                          ? "Your ongoing application filings"
+                          : "Explore current examination and job opportunities."}
+                      </p>
+                    </div>
                   </div>
-                  <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs font-semibold">
-                    <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold">
-                      +8 New Today
-                    </span>
-                    <Link href="/student/job-alerts" className="text-[#2563EB] dark:text-blue-400 hover:underline">
-                      View Feed →
+
+                  <div className="mt-5 pt-3 border-t border-slate-100 dark:border-slate-800">
+                    <Link
+                      href={registeredExams.length > 0 ? "/student/my-applications" : "/jobs"}
+                      className="w-full py-2 px-3 rounded-xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/60 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-300 font-bold text-xs flex items-center justify-center space-x-1 transition-colors"
+                    >
+                      <span>{registeredExams.length > 0 ? "Continue Application" : "Explore Opportunities"}</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
                     </Link>
                   </div>
                 </div>
 
-                {/* Latest Results */}
-                <div className="p-5 rounded-3xl bg-white dark:bg-[#101E3D] border border-slate-200/80 dark:border-slate-800 shadow-sm card-hover-lift flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                        Results Indexed
+                {/* 3. Latest Result / Documents */}
+                <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                        Latest Result
                       </span>
-                      <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-[#16A34A] flex items-center justify-center font-bold">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
                         <Award className="w-4 h-4" />
                       </div>
                     </div>
-                    <span className="text-2xl font-black text-[#14213D] dark:text-white block">100% Live</span>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                      Official gazette marksheet sync
-                    </p>
+
+                    {documents.length > 0 ? (
+                      <div className="space-y-1">
+                        <h3 className="font-bold text-sm text-slate-900 dark:text-white line-clamp-1">
+                          {documents[0]?.title || "Saved Scorecard"}
+                        </h3>
+                        <p className="text-xs text-slate-500">
+                          {documents[0]?.created_at ? new Date(documents[0].created_at).toLocaleDateString() : "Verified Marksheet"}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        <h3 className="font-bold text-sm text-slate-900 dark:text-white">
+                          No saved documents
+                        </h3>
+                        <p className="text-xs text-slate-500">
+                          Upload your important examination documents.
+                        </p>
+                      </div>
+                    )}
                   </div>
-                  <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs font-semibold">
-                    <span className="px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-[10px] font-bold">
-                      RRB, UPSC, NEET
-                    </span>
-                    <Link href="/results" className="text-[#2563EB] dark:text-blue-400 hover:underline">
-                      Check Marks →
+
+                  <div className="mt-5 pt-3 border-t border-slate-100 dark:border-slate-800">
+                    <Link
+                      href={documents.length > 0 ? "/results" : "/dashboard?tab=vault"}
+                      className="w-full py-2 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 font-bold text-xs flex items-center justify-center space-x-1 transition-colors"
+                    >
+                      <span>{documents.length > 0 ? "View Result" : "Add Document"}</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
                     </Link>
                   </div>
                 </div>
 
-                {/* Available Scholarships */}
-                <div className="p-5 rounded-3xl bg-white dark:bg-[#101E3D] border border-slate-200/80 dark:border-slate-800 shadow-sm card-hover-lift flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                        Scholarships
-                      </span>
-                      <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-[#F59E0B] flex items-center justify-center font-bold">
-                        <GraduationCap className="w-4 h-4" />
-                      </div>
-                    </div>
-                    <span className="text-2xl font-black text-[#14213D] dark:text-white block">14 Schemes</span>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                      National Scholarship Portal (NSP)
-                    </p>
-                  </div>
-                  <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs font-semibold">
-                    <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 text-[10px] font-bold">
-                      Apply Open
-                    </span>
-                    <Link href="/dashboard?tab=scholarships" className="text-[#2563EB] dark:text-blue-400 hover:underline">
-                      Explore →
-                    </Link>
-                  </div>
-                </div>
               </div>
 
               {/* 5. QUICK ACCESS SHORTCUTS (Requirement 9) */}

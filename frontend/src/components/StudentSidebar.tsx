@@ -8,37 +8,22 @@ import {
   Calendar,
   Briefcase,
   Award,
-  GraduationCap,
-  BookOpen,
-  Bell,
-  Sparkles,
-  Settings,
-  Bookmark,
+  FolderArchive,
+  HelpCircle,
   Moon,
   Sun,
-  ShieldCheck,
-  ChevronRight,
   LogOut,
-  Zap,
   Menu,
   X,
-  FileText,
-  Clock,
-  Radio
+  ChevronRight
 } from "lucide-react";
 
-interface StudentSidebarProps {
-  unreadNotifsCount?: number;
-  activeExamsCount?: number;
-}
-
-export default function StudentSidebar({ unreadNotifsCount = 3, activeExamsCount = 4 }: StudentSidebarProps) {
+export default function StudentSidebar() {
   const pathname = usePathname();
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   useEffect(() => {
-    // Check initial dark mode preference
     const stored = localStorage.getItem("examhub_theme");
     const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
     const shouldDark = stored === "dark" || (!stored && prefersDark);
@@ -62,23 +47,15 @@ export default function StudentSidebar({ unreadNotifsCount = 3, activeExamsCount
     }
   };
 
+  // Exactly 6 Sidebar Navigation Groups as required:
+  // 1. Home, 2. My Exams, 3. Results, 4. Jobs, 5. Documents, 6. Help
   const navItems = [
-    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Daily Updates", href: "/updates", icon: Radio, isNew: true },
-    { name: "School Education", href: "/school", icon: GraduationCap, isNew: true },
-    { name: "School Textbooks", href: "/school/books", icon: BookOpen },
-    { name: "Apply for Exams", href: "/apply", icon: BookOpen },
-    { name: "My Applications", href: "/student/my-applications", icon: FileText },
-    { name: "Countdowns", href: "/student/countdown", icon: Clock },
-    { name: "My Exams", href: "/student/my-exams", icon: ShieldCheck, badge: activeExamsCount },
-    { name: "Job Alerts", href: "/student/job-alerts", icon: Briefcase },
-    { name: "My Calendar", href: "/student/calendar", icon: Calendar },
-    { name: "Check Results", href: "/results", icon: Award },
-    { name: "Scholarships", href: "/dashboard?tab=scholarships", icon: GraduationCap },
-    { name: "Official Directory", href: "/official-websites", icon: Bookmark },
-    { name: "Notifications", href: "/student/notifications", icon: Bell, badge: unreadNotifsCount },
-    { name: "AI Assistant", href: "/assistant", icon: Sparkles, highlight: true },
-    { name: "Settings", href: "/student/settings", icon: Settings },
+    { name: "Home", href: "/dashboard", icon: LayoutDashboard },
+    { name: "My Exams", href: "/student/my-exams", icon: Calendar },
+    { name: "Results", href: "/results", icon: Award },
+    { name: "Jobs", href: "/jobs", icon: Briefcase },
+    { name: "Documents", href: "/dashboard?tab=vault", icon: FolderArchive },
+    { name: "Help", href: "/dashboard?tab=support", icon: HelpCircle },
   ];
 
   const handleLogout = () => {
@@ -89,11 +66,11 @@ export default function StudentSidebar({ unreadNotifsCount = 3, activeExamsCount
 
   return (
     <>
-      {/* Mobile Drawer Button */}
+      {/* Mobile Drawer Floating Toggle Button */}
       <button
         onClick={() => setIsMobileOpen(true)}
-        className="lg:hidden fixed bottom-6 left-6 z-50 w-12 h-12 bg-[#102D59] text-white rounded-full flex items-center justify-center shadow-2xl border border-blue-400/30"
-        aria-label="Open Student Navigation"
+        className="lg:hidden fixed bottom-6 left-6 z-50 w-12 h-12 bg-[#0B1E3F] text-white rounded-full flex items-center justify-center shadow-xl border border-blue-400/30"
+        aria-label="Open Sidebar Navigation"
       >
         <Menu className="w-5 h-5" />
       </button>
@@ -108,39 +85,37 @@ export default function StudentSidebar({ unreadNotifsCount = 3, activeExamsCount
 
       {/* Sidebar Container */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 w-72 bg-[#102D59] text-white z-50 flex flex-col transition-transform duration-300 ease-in-out border-r border-[#1e3a6a] shadow-2xl ${
+        className={`fixed top-0 bottom-0 left-0 w-64 bg-[#0B1E3F] text-white z-50 flex flex-col transition-transform duration-300 ease-in-out border-r border-blue-900/60 shadow-xl ${
           isMobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         }`}
       >
         {/* Brand Header */}
-        <div className="p-5 flex items-center justify-between border-b border-[#1b3d73]">
-          <Link href="/dashboard" className="flex items-center space-x-3 group">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white shadow-lg shadow-blue-600/30 group-hover:scale-105 transition-transform">
+        <div className="p-4 flex items-center justify-between border-b border-blue-900/50">
+          <Link href="/dashboard" className="flex items-center space-x-2.5">
+            <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-md">
               <Award className="w-5 h-5 text-amber-300" />
             </div>
             <div>
-              <div className="flex items-center space-x-1.5">
-                <span className="font-black text-lg tracking-tight text-white">EXAMHUB</span>
-                <span className="text-xs px-1.5 py-0.5 rounded font-black bg-blue-500 text-white tracking-wider">
-                  INDIA
-                </span>
-              </div>
-              <p className="text-[10px] text-blue-200/70 font-medium tracking-wide">National Student Portal</p>
+              <span className="font-black text-base tracking-tight text-white">
+                EXAMHUB<span className="text-blue-400"> INDIA</span>
+              </span>
+              <p className="text-[10px] text-blue-200/70">Student Workspace</p>
             </div>
           </Link>
 
-          {/* Close for mobile */}
+          {/* Close button for mobile */}
           <button
             onClick={() => setIsMobileOpen(false)}
             className="lg:hidden p-1.5 rounded-lg text-blue-300 hover:text-white hover:bg-white/10"
+            aria-label="Close Sidebar"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Navigation Items */}
-        <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1 scrollbar-thin">
-          <div className="px-3 pb-2 text-[10px] font-black uppercase tracking-wider text-blue-300/60">
+        {/* 6 Navigation Items */}
+        <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+          <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-blue-300/60">
             Student Menu
           </div>
 
@@ -153,71 +128,40 @@ export default function StudentSidebar({ unreadNotifsCount = 3, activeExamsCount
                 key={item.name}
                 href={item.href}
                 onClick={() => setIsMobileOpen(false)}
-                className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all group ${
+                className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all group ${
                   isActive
-                    ? "bg-[#2563EB] text-white shadow-md shadow-blue-600/25 font-bold"
-                    : "text-blue-100/80 hover:bg-[#18396c] hover:text-white"
-                } ${item.highlight && !isActive ? "border border-blue-400/30 bg-blue-500/10 text-blue-200" : ""}`}
+                    ? "bg-blue-600 text-white shadow-md font-bold"
+                    : "text-blue-100/80 hover:bg-blue-900/40 hover:text-white"
+                }`}
               >
-                <div className="flex items-center space-x-3">
-                  <Icon
-                    className={`w-4 h-4 transition-transform group-hover:scale-110 ${
-                      isActive ? "text-white" : item.highlight ? "text-amber-300" : "text-blue-300"
-                    }`}
-                  />
+                <div className="flex items-center space-x-2.5">
+                  <Icon className="w-4 h-4 text-blue-300 group-hover:text-white" />
                   <span>{item.name}</span>
                 </div>
-
-                <div className="flex items-center space-x-1.5">
-                  {item.isNew && (
-                    <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-emerald-500 text-white tracking-widest uppercase">
-                      NEW
-                    </span>
-                  )}
-                  {item.badge !== undefined && item.badge > 0 && (
-                    <span
-                      className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                        isActive ? "bg-white text-blue-700" : "bg-blue-600/60 text-white"
-                      }`}
-                    >
-                      {item.badge}
-                    </span>
-                  )}
-                  {isActive && <ChevronRight className="w-3.5 h-3.5 text-white/70" />}
-                </div>
+                <ChevronRight className="w-3.5 h-3.5 opacity-40 group-hover:opacity-100 transition-opacity" />
               </Link>
             );
           })}
         </div>
 
-        {/* 100% Free Public Education Badge */}
-        <div className="p-3.5 mx-3 mb-3 rounded-2xl bg-gradient-to-br from-[#102D59] to-[#0A1A33] border border-blue-400/20 text-white shadow-md">
-          <div className="flex items-center space-x-1.5 mb-1 text-[11px] font-bold text-emerald-400">
-            <ShieldCheck className="w-3.5 h-3.5" />
-            <span>100% Free Public Portal</span>
-          </div>
-          <p className="text-[10px] text-blue-200/90 leading-tight">
-            All examinations, application tracking, countdowns, and alerts are completely free for all Indian students.
-          </p>
-        </div>
-
-        {/* Footer with Dark Mode Toggle & Sign Out */}
-        <div className="p-3 border-t border-[#1b3d73] flex items-center justify-between text-xs text-blue-200/80">
+        {/* Bottom Theme Toggle and Logout */}
+        <div className="p-3 border-t border-blue-900/50 space-y-2">
           <button
             onClick={toggleDarkMode}
-            className="flex items-center space-x-2 px-2.5 py-1.5 rounded-lg hover:bg-white/10 transition-colors"
-            title="Toggle Light / Dark Mode"
+            className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-blue-200 hover:bg-blue-900/40 transition-colors"
           >
-            {isDarkMode ? <Sun className="w-4 h-4 text-amber-300" /> : <Moon className="w-4 h-4 text-blue-300" />}
-            <span className="text-[11px] font-medium">{isDarkMode ? "Light Mode" : "Dark Mode"}</span>
+            <span className="flex items-center space-x-2">
+              {isDarkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-400" />}
+              <span>{isDarkMode ? "Light Mode" : "Dark Mode"}</span>
+            </span>
           </button>
 
           <button
             onClick={handleLogout}
-            className="p-1.5 rounded-lg hover:bg-red-500/20 hover:text-red-300 transition-colors"
-            title="Sign Out"
+            className="w-full flex items-center space-x-2 px-3 py-2 rounded-xl text-xs font-bold text-red-300 hover:bg-red-950/40 transition-colors"
           >
             <LogOut className="w-4 h-4" />
+            <span>Log Out</span>
           </button>
         </div>
       </aside>

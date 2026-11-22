@@ -325,18 +325,17 @@ export default function ResultsContent() {
 
         <div className="relative max-w-6xl mx-auto space-y-5 text-center">
           
-          {/* Dashboard Trust Pill */}
+          {/* Disclaimer Notice Pill */}
           <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-blue-500/15 border border-blue-400/30 text-blue-200 text-xs font-semibold tracking-wide backdrop-blur-md">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Concept 1: Premium Student Results Dashboard • All-India Gazette Gateway</span>
+            <span>Notice: Not an official government website. Always verify on the official exam body site.</span>
           </div>
 
           <h1 className="text-3xl sm:text-5xl font-black tracking-tight text-white max-w-3xl mx-auto leading-tight">
-            Check Your Examination Results & Marks
+            Find Your Examination
           </h1>
           
           <p className="text-xs sm:text-sm text-blue-100/90 max-w-xl mx-auto leading-relaxed">
-            Centralized portal covering Central Commissions, State Secondary Boards, Universities, Railways, and National Entrance Tests.
+            Search examination results from school boards, universities and recruitment authorities.
           </p>
 
           {/* Primary Action Button: Triggers Modal 1 */}
@@ -877,7 +876,7 @@ export default function ResultsContent() {
                       setActiveCategoryDrilldown(null);
                     }
                   }}
-                  placeholder="Type examination name, code, or board (e.g. NEET, CBSE, UPSC, RRB)..."
+                  placeholder="Search exam or board..."
                   className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs sm:text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition-all"
                 />
                 {modalSearch && (

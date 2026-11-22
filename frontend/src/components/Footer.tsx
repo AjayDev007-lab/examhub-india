@@ -3,8 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Award, ShieldCheck, Phone, ExternalLink, Instagram } from "lucide-react";
-import { SITE_CONFIG } from "@/config/site";
+import { Award, ExternalLink, ShieldAlert, Phone, Mail } from "lucide-react";
 
 export default function Footer() {
   const pathname = usePathname();
@@ -12,102 +11,93 @@ export default function Footer() {
     return null;
   }
 
+  const officialExternalLinks = [
+    { name: "National Testing Agency (NTA)", url: "https://nta.ac.in/" },
+    { name: "Central Board of Secondary Education (CBSE)", url: "https://www.cbse.gov.in/" },
+    { name: "Union Public Service Commission (UPSC)", url: "https://upsc.gov.in/" },
+    { name: "Staff Selection Commission (SSC)", url: "https://ssc.gov.in/" },
+  ];
+
   return (
-    <footer className="bg-[#0B1528] text-slate-400 border-t border-slate-800/80 text-xs mt-auto">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6 sm:gap-8 pb-6 border-b border-slate-800/60">
-          {/* Brand Col (2 cols on lg) */}
-          <div className="col-span-2 space-y-3">
-            <div className="flex items-center space-x-2.5">
-              <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center text-white shadow-sm">
+    <footer className="bg-[#0B1528] text-slate-400 border-t border-slate-800 text-xs mt-auto">
+      {/* Disclaimer Banner */}
+      <div className="bg-[#060D1A] py-3 px-4 border-b border-slate-800/80 text-center">
+        <p className="max-w-4xl mx-auto text-[11px] text-slate-400 leading-relaxed">
+          <span className="text-amber-400 font-bold">Important Disclaimer:</span> ExamHub India is an independent educational information platform and is not affiliated with any government authority. Not an official government website. Always verify examination schedules, notices, and criteria on the official exam body site.
+        </p>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 pb-8 border-b border-slate-800/80">
+          
+          {/* Brand Info (2 columns on large screens) */}
+          <div className="lg:col-span-2 space-y-3">
+            <Link href="/" className="flex items-center space-x-2.5">
+              <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white shadow-sm">
                 <Award className="w-4 h-4 text-amber-300" />
               </div>
-              <span className="text-base font-black text-white tracking-tight">
+              <span className="text-lg font-black text-white tracking-tight">
                 EXAMHUB<span className="text-blue-400"> INDIA</span>
               </span>
-            </div>
+            </Link>
             <p className="text-slate-400 text-xs leading-relaxed max-w-sm">
-              All Your Examination Documents and Results in One Place. Centralized access for Indian students covering Central, State, Entrance & University examinations.
+              All your examination documents, results, admit cards, and job updates in one place. An independent information resource for students across India.
             </p>
-            <div className="flex items-center space-x-2 text-[11px] text-emerald-400 font-medium">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>100% Free National Student Public Portal</span>
+            <div className="pt-2 text-[11px] text-slate-500">
+              <p>Designed for fast access on Indian mobile networks.</p>
             </div>
           </div>
 
           {/* Core Services */}
           <div>
-            <h4 className="text-white font-bold text-[11px] uppercase tracking-wider mb-2.5">Core Services</h4>
-            <ul className="space-y-1.5">
-              <li><Link href="/results" className="hover:text-blue-400 transition-colors">Check Exam Results</Link></li>
-              <li><Link href="/hall-tickets" className="hover:text-blue-400 transition-colors">Admit Cards</Link></li>
-              <li><Link href="/id-cards" className="hover:text-blue-400 transition-colors">Student ID Cards</Link></li>
-              <li><Link href="/dashboard" className="hover:text-blue-400 transition-colors">Personal Vault</Link></li>
-              <li><Link href="/jobs" className="hover:text-blue-400 transition-colors">Job Alerts</Link></li>
+            <h4 className="text-white font-bold text-xs uppercase tracking-wider mb-3">Core Portals</h4>
+            <ul className="space-y-2">
+              <li><Link href="/results" className="hover:text-white transition-colors">Results</Link></li>
+              <li><Link href="/hall-tickets" className="hover:text-white transition-colors">Admit Cards</Link></li>
+              <li><Link href="/jobs" className="hover:text-white transition-colors">Jobs</Link></li>
+              <li><Link href="/dashboard?tab=vault" className="hover:text-white transition-colors">Documents</Link></li>
             </ul>
           </div>
 
-          {/* Exam Coverage */}
+          {/* Quick Links & Legal */}
           <div>
-            <h4 className="text-white font-bold text-[11px] uppercase tracking-wider mb-2.5">Coverage</h4>
-            <ul className="space-y-1.5">
-              <li><Link href="/directory?cat=CENTRAL_GOVT" className="hover:text-blue-400">UPSC & SSC</Link></li>
-              <li><Link href="/directory?cat=ENTRANCE_BOARD" className="hover:text-blue-400">NEET & JEE</Link></li>
-              <li><Link href="/directory?cat=RECRUITMENT_BOARD" className="hover:text-blue-400">RRB & IBPS</Link></li>
-              <li><Link href="/directory?cat=STATE_GOVT" className="hover:text-blue-400">State PSCs</Link></li>
-              <li><Link href="/school" className="hover:text-blue-400">School Boards</Link></li>
+            <h4 className="text-white font-bold text-xs uppercase tracking-wider mb-3">Information</h4>
+            <ul className="space-y-2">
+              <li><Link href="/about" className="hover:text-white transition-colors">About Us</Link></li>
+              <li><Link href="/contact" className="hover:text-white transition-colors">Contact</Link></li>
+              <li><Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
+              <li><Link href="/terms" className="hover:text-white transition-colors">Terms and Conditions</Link></li>
             </ul>
           </div>
 
-          {/* Legal & Governance */}
+          {/* Official External Exam Authority Links */}
           <div>
-            <h4 className="text-white font-bold text-[11px] uppercase tracking-wider mb-2.5">Legal & Policy</h4>
-            <ul className="space-y-1.5">
-              <li><Link href="/privacy" className="hover:text-cyan-400 transition-colors">Privacy Policy (DPDP)</Link></li>
-              <li><Link href="/terms" className="hover:text-cyan-400 transition-colors">Terms of Service</Link></li>
-              <li><Link href="/admin/login" className="hover:text-blue-400 flex items-center space-x-1">
-                <ShieldCheck className="w-3 h-3 text-blue-400" />
-                <span>Admin Portal</span>
-              </Link></li>
+            <h4 className="text-white font-bold text-xs uppercase tracking-wider mb-3">Official Websites</h4>
+            <ul className="space-y-2">
+              {officialExternalLinks.map((item) => (
+                <li key={item.name}>
+                  <a
+                    href={item.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-blue-300 flex items-center space-x-1.5 transition-colors group"
+                  >
+                    <span className="truncate">{item.name}</span>
+                    <ExternalLink className="w-3 h-3 text-slate-500 group-hover:text-blue-300 shrink-0" />
+                  </a>
+                </li>
+              ))}
             </ul>
           </div>
 
-          {/* Connect & Support */}
-          <div>
-            <h4 className="text-white font-bold text-[11px] uppercase tracking-wider mb-2.5">Connect</h4>
-            <ul className="space-y-1.5">
-              <li>
-                <Link href="/contact" className="hover:text-white flex items-center space-x-1 font-medium text-slate-300">
-                  <Phone className="w-3 h-3 text-blue-400" />
-                  <span>Contact Us</span>
-                </Link>
-              </li>
-              <li>
-                <a
-                  href={SITE_CONFIG.social.instagram.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-pink-400 flex items-center space-x-1 text-slate-300 transition-colors"
-                >
-                  <Instagram className="w-3 h-3 text-pink-500" />
-                  <span>{SITE_CONFIG.social.instagram.username}</span>
-                </a>
-              </li>
-            </ul>
-          </div>
         </div>
 
-        {/* Compact Bottom Bar */}
-        <div className="pt-4 flex flex-col sm:flex-row justify-between items-center text-[11px] text-slate-500 gap-2">
-          <p>© {new Date().getFullYear()} EXAMHUB INDIA. Centralized All-India Student Portal.</p>
-          <div className="flex items-center space-x-4">
-            <span>Server Time (IST): {new Date().toLocaleDateString("en-IN")}</span>
-            <span className="text-slate-700">•</span>
-            <span className="inline-flex items-center space-x-1 text-emerald-400">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-              <span>Official Indexer Live</span>
-            </span>
-          </div>
+        {/* Bottom Copyright Row */}
+        <div className="pt-6 flex flex-col sm:flex-row justify-between items-center text-[11px] text-slate-500 gap-3">
+          <p>© {new Date().getFullYear()} ExamHub India. All rights reserved.</p>
+          <p className="text-slate-500 text-center sm:text-right">
+            Independent Student Information Portal
+          </p>
         </div>
       </div>
     </footer>

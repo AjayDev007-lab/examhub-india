@@ -4,13 +4,10 @@ import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { 
-  Award, FileText, CreditCard, Search, User, LogIn, Menu, X, 
-  ShieldCheck, LayoutDashboard, Bell, LogOut, ExternalLink, BookOpen,
-  Globe, Sparkles, Building2, Landmark, Briefcase, Moon, Sun, Instagram, 
-  Phone, Clock, GraduationCap, Radio, ChevronDown, Check, ArrowRight
+  Award, FileText, Briefcase, FolderArchive, LogIn, User, 
+  Menu, X, Moon, Sun, ChevronDown, Check, LogOut, ShieldAlert
 } from "lucide-react";
 import { Language, translations } from "@/lib/i18n";
-import { SITE_CONFIG } from "@/config/site";
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -18,21 +15,25 @@ export default function Navbar() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [currentLang, setCurrentLang] = useState<Language>("en");
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const [langDropdownOpen, setLangDropdownOpen] = useState(false);
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
 
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const langRef = useRef<HTMLDivElement>(null);
+  const userRef = useRef<HTMLDivElement>(null);
 
-  // If on student or auth login routes, hide standard navbar to allow cinematic superhero experience
+  // Hide public navbar on auth pages to allow dedicated authentication view
   const isAuthPage = pathname === "/auth/login" || pathname === "/student/login" || pathname?.startsWith("/auth/");
   if (isAuthPage) {
     return null;
   }
 
   useEffect(() => {
+    // Check saved language
     const savedLang = localStorage.getItem("examhub_lang") as Language;
     if (savedLang && translations[savedLang]) {
       setCurrentLang(savedLang);
     }
+    // Check saved user
     const userStr = localStorage.getItem("examhub_user");
     if (userStr) {
       try {
@@ -40,7 +41,7 @@ export default function Navbar() {
       } catch (_) {}
     }
 
-    // Check dark mode
+    // Check dark mode preference
     const storedTheme = localStorage.getItem("examhub_theme");
     const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
     const shouldDark = storedTheme === "dark" || (!storedTheme && prefersDark);
@@ -51,10 +52,13 @@ export default function Navbar() {
       document.documentElement.classList.remove("dark");
     }
 
-    // Close dropdown on click outside
+    // Close dropdowns on outside click
     function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setOpenDropdown(null);
+      if (langRef.current && !langRef.current.contains(event.target as Node)) {
+        setLangDropdownOpen(false);
+      }
+      if (userRef.current && !userRef.current.contains(event.target as Node)) {
+        setUserDropdownOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -76,6 +80,7 @@ export default function Navbar() {
   const handleLanguageChange = (lang: Language) => {
     setCurrentLang(lang);
     localStorage.setItem("examhub_lang", lang);
+    setLangDropdownOpen(false);
     window.dispatchEvent(new Event("examhub-language-changed"));
   };
 
@@ -86,405 +91,278 @@ export default function Navbar() {
     window.location.href = "/";
   };
 
-  const t = translations[currentLang] || translations.en;
+  const navLinks = [
+    { name: "Results", href: "/results", icon: Award },
+    { name: "Admit Cards", href: "/hall-tickets", icon: FileText },
+    { name: "Jobs", href: "/jobs", icon: Briefcase },
+    { name: "Documents", href: "/dashboard?tab=vault", icon: FolderArchive },
+  ];
+
+  const languages = [
+    { code: "en" as Language, label: "English" },
+    { code: "hi" as Language, label: "हिन्दी" },
+    { code: "ta" as Language, label: "தமிழ்" },
+  ];
 
   return (
     <header className="sticky top-0 z-50 bg-white/95 dark:bg-[#0A1428]/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 transition-colors shadow-sm">
-      {/* Top National Announcement Bar */}
-      <div className="bg-[#0B1E3F] text-slate-200 text-xs py-1.5 px-4 border-b border-blue-900/40">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div className="flex items-center space-x-2">
-            <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span className="font-bold text-white tracking-wide">National Portal:</span>
-            <span className="hidden sm:inline text-blue-100/90">Centralized All-India Examination Results, Official Gazette Portals & Student Records</span>
-          </div>
-
-          <div className="flex items-center space-x-3 text-[11px]">
-            {/* Language Selector */}
-            <div className="flex items-center space-x-1.5 text-blue-200">
-              {(["en", "hi", "ta"] as Language[]).map((lang) => (
-                <button
-                  key={lang}
-                  onClick={() => handleLanguageChange(lang)}
-                  className={`px-1.5 py-0.5 rounded transition-all ${
-                    currentLang === lang ? "bg-blue-600 text-white font-bold" : "hover:text-white"
-                  }`}
-                >
-                  {lang === "en" ? "English" : lang === "hi" ? "हिन्दी" : "தமிழ்"}
-                </button>
-              ))}
-            </div>
-
-            <span className="text-blue-400 hidden md:inline">|</span>
-
-            {/* Helpline / Admin link */}
-            <Link href="/official-websites" className="hidden md:inline hover:text-white text-blue-200 transition-colors">
-              Directory (36 States)
-            </Link>
-
-            <Link href="/admin/login" className="hover:text-blue-300 text-blue-200 font-semibold transition-colors">
-              Admin Portal
-            </Link>
-          </div>
-        </div>
+      
+      {/* Top Disclaimer Notice */}
+      <div className="bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 text-[11px] py-1 px-4 border-b border-slate-200/60 dark:border-slate-800/80 text-center font-medium">
+        <p>
+          <span className="font-semibold text-slate-800 dark:text-slate-200">Notice:</span> Not an official government website. Always verify on the official exam body site.
+        </p>
       </div>
 
-      {/* Main Navigation Bar */}
+      {/* Main Responsive Header Container */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16" ref={dropdownRef}>
+        <div className="flex items-center justify-between h-16">
           
-          {/* Brand Logo & Name */}
+          {/* Logo & Brand Name */}
           <Link href="/" className="flex items-center space-x-2.5 group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-700 via-blue-600 to-cyan-500 flex items-center justify-center text-white shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#0B1E3F] via-[#102D59] to-[#2563EB] flex items-center justify-center text-white shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform">
               <Award className="w-5 h-5 text-amber-300" />
             </div>
             <div>
-              <div className="flex items-center space-x-1.5">
-                <span className="text-lg font-black text-slate-900 dark:text-white tracking-tight">
-                  EXAMHUB<span className="text-blue-600 dark:text-blue-400"> INDIA</span>
-                </span>
-                <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">
-                  GOV.IN
-                </span>
-              </div>
+              <span className="text-lg font-black text-slate-900 dark:text-white tracking-tight">
+                EXAMHUB<span className="text-blue-600 dark:text-blue-400"> INDIA</span>
+              </span>
               <p className="text-[10px] text-slate-500 dark:text-slate-400 hidden sm:block -mt-0.5">
-                National Examination & Career Gateway
+                Educational Information Portal
               </p>
             </div>
           </Link>
 
-          {/* Clean, User-Friendly Desktop Navigation Links */}
-          <nav className="hidden lg:flex items-center space-x-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
-            
-            {/* 1. Results & Examinations Dropdown */}
-            <div className="relative">
-              <button
-                onClick={() => setOpenDropdown(openDropdown === "results" ? null : "results")}
-                className={`flex items-center space-x-1 px-3 py-2 rounded-xl transition-all ${
-                  pathname.startsWith("/results") || pathname.startsWith("/hall-tickets") || pathname.startsWith("/id-cards") || pathname.startsWith("/student/countdown")
-                    ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20"
-                    : "hover:bg-slate-100 dark:hover:bg-slate-800"
-                }`}
-              >
-                <Award className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                <span>Exams & Results</span>
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${openDropdown === "results" ? "rotate-180" : ""}`} />
-              </button>
-
-              {openDropdown === "results" && (
-                <div className="absolute top-full left-0 mt-1 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-2 space-y-1 animate-fadeIn">
-                  <Link
-                    href="/results"
-                    onClick={() => setOpenDropdown(null)}
-                    className="flex items-start space-x-2.5 p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                  >
-                    <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 shrink-0">
-                      <Award className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="font-bold text-slate-900 dark:text-white">Check Exam Results</div>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 font-normal">Scorecards, marks & ranks</p>
-                    </div>
-                  </Link>
-
-                  <Link
-                    href="/hall-tickets"
-                    onClick={() => setOpenDropdown(null)}
-                    className="flex items-start space-x-2.5 p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                  >
-                    <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 shrink-0">
-                      <FileText className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="font-bold text-slate-900 dark:text-white">Hall Tickets / Admit Cards</div>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 font-normal">e-Admit cards & center info</p>
-                    </div>
-                  </Link>
-
-                  <Link
-                    href="/id-cards"
-                    onClick={() => setOpenDropdown(null)}
-                    className="flex items-start space-x-2.5 p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                  >
-                    <div className="p-2 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 shrink-0">
-                      <CreditCard className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="font-bold text-slate-900 dark:text-white">Student ID Cards</div>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 font-normal">College & university IDs</p>
-                    </div>
-                  </Link>
-
-                  <Link
-                    href="/student/countdown"
-                    onClick={() => setOpenDropdown(null)}
-                    className="flex items-start space-x-2.5 p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors border-t border-slate-100 dark:border-slate-800 pt-2"
-                  >
-                    <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 shrink-0">
-                      <Clock className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="font-bold text-slate-900 dark:text-white">Exam Countdowns</div>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 font-normal">Live timers to major exams</p>
-                    </div>
-                  </Link>
-                </div>
-              )}
-            </div>
-
-            {/* 2. Jobs & Careers */}
-            <Link
-              href="/jobs"
-              className={`flex items-center space-x-1.5 px-3 py-2 rounded-xl transition-all ${
-                pathname.startsWith("/jobs")
-                  ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20"
-                  : "hover:bg-slate-100 dark:hover:bg-slate-800"
-              }`}
-            >
-              <Briefcase className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-              <span>Jobs & Careers</span>
-            </Link>
-
-            {/* 3. Official Portals Dropdown */}
-            <div className="relative">
-              <button
-                onClick={() => setOpenDropdown(openDropdown === "portals" ? null : "portals")}
-                className={`flex items-center space-x-1 px-3 py-2 rounded-xl transition-all ${
-                  pathname.startsWith("/official-websites") || pathname.startsWith("/school") || pathname.startsWith("/directory")
-                    ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20"
-                    : "hover:bg-slate-100 dark:hover:bg-slate-800"
-                }`}
-              >
-                <Landmark className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                <span>Official Directory</span>
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${openDropdown === "portals" ? "rotate-180" : ""}`} />
-              </button>
-
-              {openDropdown === "portals" && (
-                <div className="absolute top-full left-0 mt-1 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-2 space-y-1 animate-fadeIn">
-                  <Link
-                    href="/official-websites"
-                    onClick={() => setOpenDropdown(null)}
-                    className="flex items-start space-x-2.5 p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                  >
-                    <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 shrink-0">
-                      <Landmark className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="font-bold text-slate-900 dark:text-white">Government Portals</div>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 font-normal">36 States, UPSC, SSC & Boards</p>
-                    </div>
-                  </Link>
-
-                  <Link
-                    href="/school"
-                    onClick={() => setOpenDropdown(null)}
-                    className="flex items-start space-x-2.5 p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                  >
-                    <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 shrink-0">
-                      <GraduationCap className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="font-bold text-slate-900 dark:text-white">School Education</div>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 font-normal">CBSE, ICSE & State Boards</p>
-                    </div>
-                  </Link>
-
-                  <Link
-                    href="/apply"
-                    onClick={() => setOpenDropdown(null)}
-                    className="flex items-start space-x-2.5 p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                  >
-                    <div className="p-2 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 shrink-0">
-                      <BookOpen className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="font-bold text-slate-900 dark:text-white">Apply Online Forms</div>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 font-normal">Active registrations gateway</p>
-                    </div>
-                  </Link>
-                </div>
-              )}
-            </div>
-
-            {/* 4. Daily Updates with Live Badge */}
-            <Link
-              href="/updates"
-              className={`flex items-center space-x-1.5 px-3 py-2 rounded-xl transition-all ${
-                pathname.startsWith("/updates")
-                  ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20"
-                  : "hover:bg-slate-100 dark:hover:bg-slate-800"
-              }`}
-            >
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-              </span>
-              <span>Daily Updates</span>
-            </Link>
-
+          {/* Desktop Navigation Links */}
+          <nav className="hidden md:flex items-center space-x-1 lg:space-x-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+            {navLinks.map((link) => {
+              const Icon = link.icon;
+              const isActive = pathname === link.href || pathname.startsWith(`${link.href}/`);
+              return (
+                <Link
+                  key={link.name}
+                  href={link.href}
+                  className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                    isActive
+                      ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30"
+                      : "hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-blue-600"
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span>{link.name}</span>
+                </Link>
+              );
+            })}
           </nav>
 
-          {/* Right Action Icons & Auth Buttons */}
-          <div className="flex items-center space-x-2">
+          {/* Right Action Controls: Language, Theme & Auth */}
+          <div className="hidden md:flex items-center space-x-2.5">
             
-            {/* AI Assistant Pill */}
-            <Link
-              href="/assistant"
-              className="hidden sm:inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-blue-600/10 via-cyan-500/10 to-purple-600/10 border border-blue-500/20 hover:border-blue-500/40 text-blue-700 dark:text-blue-300 text-xs font-semibold transition-all hover:scale-105"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-blue-600 dark:text-cyan-400 animate-pulse" />
-              <span>Ask AI</span>
-            </Link>
+            {/* Language Dropdown */}
+            <div className="relative" ref={langRef}>
+              <button
+                onClick={() => setLangDropdownOpen(!langDropdownOpen)}
+                className="flex items-center space-x-1 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 transition-colors"
+                aria-label="Select Language"
+              >
+                <span>{languages.find((l) => l.code === currentLang)?.label || "English"}</span>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+              </button>
 
-            {/* Dark Mode Toggle */}
+              {langDropdownOpen && (
+                <div className="absolute right-0 mt-1 w-32 bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800 p-1 z-50 animate-fadeIn">
+                  {languages.map((l) => (
+                    <button
+                      key={l.code}
+                      onClick={() => handleLanguageChange(l.code)}
+                      className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                        currentLang === l.code
+                          ? "bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 font-bold"
+                          : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
+                      }`}
+                    >
+                      <span>{l.label}</span>
+                      {currentLang === l.code && <Check className="w-3.5 h-3.5" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Light / Dark Mode Toggle */}
             <button
               onClick={toggleDarkMode}
-              className="p-2 rounded-xl text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+              className="p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border border-slate-200 dark:border-slate-700"
+              aria-label="Toggle Theme"
             >
-              {isDarkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" />}
+              {isDarkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-600" />}
             </button>
 
-            {/* Student Auth Section */}
+            {/* User Profile or Log In / Sign Up */}
             {currentUser ? (
-              <div className="flex items-center space-x-2">
-                <Link
-                  href="/dashboard"
-                  className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm transition-all"
-                >
-                  <User className="w-3.5 h-3.5" />
-                  <span className="max-w-[100px] truncate">{currentUser.full_name || "Student"}</span>
-                </Link>
+              <div className="relative" ref={userRef}>
                 <button
-                  onClick={handleLogout}
-                  className="p-2 rounded-xl text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
-                  title="Log Out"
+                  onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+                  className="flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 text-xs font-bold hover:bg-blue-100 transition-colors"
                 >
-                  <LogOut className="w-4 h-4" />
+                  <User className="w-4 h-4" />
+                  <span className="max-w-[120px] truncate">{currentUser.full_name || "Student"}</span>
+                  <ChevronDown className="w-3.5 h-3.5 text-blue-500" />
                 </button>
+
+                {userDropdownOpen && (
+                  <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-800 p-1.5 z-50 animate-fadeIn space-y-1">
+                    <Link
+                      href="/dashboard"
+                      onClick={() => setUserDropdownOpen(false)}
+                      className="flex items-center space-x-2 px-3 py-2 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    >
+                      <User className="w-4 h-4 text-blue-600" />
+                      <span>Student Dashboard</span>
+                    </Link>
+                    <Link
+                      href="/dashboard?tab=vault"
+                      onClick={() => setUserDropdownOpen(false)}
+                      className="flex items-center space-x-2 px-3 py-2 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    >
+                      <FolderArchive className="w-4 h-4 text-emerald-600" />
+                      <span>Personal Vault</span>
+                    </Link>
+                    <div className="border-t border-slate-100 dark:border-slate-800 my-1" />
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center space-x-2 px-3 py-2 rounded-lg text-xs font-semibold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      <span>Log Out</span>
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
-              <div className="flex items-center space-x-1.5">
+              <div className="flex items-center space-x-2">
                 <Link
                   href="/auth/login"
-                  className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-blue-600 transition-colors"
                 >
-                  <LogIn className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                  <span>Log In</span>
+                  Log In
                 </Link>
-
                 <Link
                   href="/auth/register"
-                  className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-md shadow-blue-500/20 hover:shadow-blue-500/30 transition-all hover:-translate-y-0.5"
+                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-extrabold shadow-sm transition-all"
                 >
-                  <span>Sign Up Free</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                  Sign Up
                 </Link>
               </div>
             )}
+          </div>
 
-            {/* Mobile Menu Button */}
+          {/* Mobile Hamburger Menu Toggle */}
+          <div className="flex items-center space-x-2 md:hidden">
+            <button
+              onClick={toggleDarkMode}
+              className="p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+              aria-label="Toggle Theme"
+            >
+              {isDarkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" />}
+            </button>
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="lg:hidden p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              className="p-2 rounded-xl text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+              aria-label="Toggle Navigation Menu"
             >
-              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
           </div>
+
         </div>
       </div>
 
-      {/* User-Friendly Mobile Navigation Drawer */}
+      {/* Mobile Drawer Navigation */}
       {mobileMenuOpen && (
-        <div className="lg:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0A1428] px-4 pt-3 pb-6 space-y-4 shadow-xl">
-          <div className="grid grid-cols-2 gap-2 text-xs font-semibold">
-            <Link
-              href="/results"
-              onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center space-x-2 p-3 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300"
-            >
-              <Award className="w-4 h-4 shrink-0" />
-              <span>Check Results</span>
-            </Link>
+        <div className="md:hidden bg-white dark:bg-[#0A1428] border-b border-slate-200 dark:border-slate-800 px-4 pt-2 pb-6 space-y-4 animate-fadeIn">
+          <nav className="space-y-1">
+            {navLinks.map((link) => {
+              const Icon = link.icon;
+              const isActive = pathname === link.href;
+              return (
+                <Link
+                  key={link.name}
+                  href={link.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                    isActive
+                      ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+                      : "text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span>{link.name}</span>
+                </Link>
+              );
+            })}
+          </nav>
 
-            <Link
-              href="/hall-tickets"
-              onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center space-x-2 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300"
-            >
-              <FileText className="w-4 h-4 shrink-0" />
-              <span>Hall Tickets</span>
-            </Link>
-
-            <Link
-              href="/jobs"
-              onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center space-x-2 p-3 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300"
-            >
-              <Briefcase className="w-4 h-4 shrink-0" />
-              <span>Jobs & Careers</span>
-            </Link>
-
-            <Link
-              href="/official-websites"
-              onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center space-x-2 p-3 rounded-xl bg-cyan-50 dark:bg-cyan-950/60 text-cyan-700 dark:text-cyan-300"
-            >
-              <Landmark className="w-4 h-4 shrink-0" />
-              <span>Official Portals</span>
-            </Link>
-
-            <Link
-              href="/school"
-              onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center space-x-2 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300"
-            >
-              <GraduationCap className="w-4 h-4 shrink-0" />
-              <span>School Education</span>
-            </Link>
-
-            <Link
-              href="/updates"
-              onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center space-x-2 p-3 rounded-xl bg-red-50 dark:bg-red-950/60 text-red-700 dark:text-red-300"
-            >
-              <Radio className="w-4 h-4 shrink-0" />
-              <span>Daily Updates</span>
-            </Link>
+          {/* Mobile Language Selector */}
+          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
+            <span className="font-semibold text-slate-500">Language:</span>
+            <div className="flex items-center space-x-1.5">
+              {languages.map((l) => (
+                <button
+                  key={l.code}
+                  onClick={() => handleLanguageChange(l.code)}
+                  className={`px-2 py-1 rounded-lg font-bold text-xs ${
+                    currentLang === l.code
+                      ? "bg-blue-600 text-white"
+                      : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
+                  }`}
+                >
+                  {l.label}
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
-            <Link
-              href="/assistant"
-              onClick={() => setMobileMenuOpen(false)}
-              className="w-full flex items-center justify-center space-x-2 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 text-white text-xs font-bold shadow-md"
-            >
-              <Sparkles className="w-4 h-4 text-amber-300" />
-              <span>Ask AI Exam Assistant</span>
-            </Link>
-
-            {!currentUser && (
-              <div className="grid grid-cols-2 gap-2 pt-1">
+          {/* Mobile Auth Actions */}
+          <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
+            {currentUser ? (
+              <div className="space-y-2">
+                <Link
+                  href="/dashboard"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="w-full py-2.5 px-4 rounded-xl bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-bold text-xs text-center block"
+                >
+                  Dashboard ({currentUser.full_name || "Student"})
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  className="w-full py-2.5 px-4 rounded-xl bg-red-50 dark:bg-red-950/40 text-red-600 font-bold text-xs text-center block"
+                >
+                  Log Out
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
                 <Link
                   href="/auth/login"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="w-full text-center py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-800 dark:text-slate-200"
+                  className="py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs text-center"
                 >
                   Log In
                 </Link>
                 <Link
                   href="/auth/register"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="w-full text-center py-2.5 rounded-xl bg-blue-600 text-white text-xs font-bold"
+                  className="py-2.5 px-4 rounded-xl bg-blue-600 text-white font-bold text-xs text-center shadow-sm"
                 >
-                  Sign Up Free
+                  Sign Up
                 </Link>
               </div>
             )}
           </div>
         </div>
       )}
+
     </header>
   );
 }
