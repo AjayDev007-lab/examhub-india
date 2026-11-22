@@ -73,7 +73,7 @@ export default function SpiderManLive3DCanvas({
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
       renderer.toneMappingExposure = 1.35;
       renderer.shadowMap.enabled = true;
-      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.shadowMap.type = THREE.PCFShadowMap;
     } catch {
       setLoadError(true);
       return;
@@ -184,7 +184,10 @@ export default function SpiderManLive3DCanvas({
     // 7. LOAD RIGGED SPIDER-MAN GLB MODEL VIA GLTFLoader
     let mixer: THREE.AnimationMixer | null = null;
     let characterModel: THREE.Group | null = null;
-    const clock = new THREE.Clock();
+    const timer = new THREE.Timer();
+    if (typeof document !== "undefined") {
+      timer.connect(document);
+    }
 
     // Bone references
     let headBone: THREE.Object3D | null = null;
@@ -268,12 +271,13 @@ export default function SpiderManLive3DCanvas({
     // 8. RENDER LOOP WITH PROCEDURAL SKELETAL INTERACTION LAYER
     let prevAction: SpiderManActionState = "idle";
 
-    const animate = () => {
+    const animate = (timestamp?: number) => {
       if (isDisposed) return;
       animationFrameId = requestAnimationFrame(animate);
 
-      const delta = clock.getDelta();
-      const elapsed = clock.getElapsedTime();
+      timer.update(timestamp);
+      const delta = timer.getDelta();
+      const elapsed = timer.getElapsed();
 
       // Update skeletal animation mixer
       if (mixer) {
@@ -448,6 +452,7 @@ export default function SpiderManLive3DCanvas({
       resizeObserver.disconnect();
       window.removeEventListener("mousemove", handleMouseMove);
       cancelAnimationFrame(animationFrameId);
+      timer.dispose();
       if (mixer) mixer.stopAllAction();
       groundShadowTexture?.dispose();
       webTubeGeom.dispose();
