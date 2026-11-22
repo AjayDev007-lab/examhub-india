@@ -26,14 +26,14 @@ import {
   Firestore
 } from "firebase/firestore";
 
-// Read Firebase environment variables
+// Read Firebase environment variables with active project fallbacks
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "",
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "examhub-india.firebaseapp.com",
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "examhub-india",
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "examhub-india.firebasestorage.app",
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "",
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || ""
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyDFkI2-OPGnGkZ2PgQqZx5Lc1Z28fB59zQ",
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "examhub-india-6ba59.firebaseapp.com",
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "examhub-india-6ba59",
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "examhub-india-6ba59.firebasestorage.app",
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "109827630610",
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:109827630610:web:93ff9fbacd2838d1d69acb"
 };
 
 export const isFirebaseConfigured = Boolean(

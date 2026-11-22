@@ -8,14 +8,14 @@ import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
-// Read environment variables
+// Read environment variables with production fallbacks
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || ""
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDFkI2-OPGnGkZ2PgQqZx5Lc1Z28fB59zQ",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "examhub-india-6ba59.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "examhub-india-6ba59",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "examhub-india-6ba59.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "109827630610",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:109827630610:web:93ff9fbacd2838d1d69acb"
 };
 
 // Check if valid Firebase configuration is present
