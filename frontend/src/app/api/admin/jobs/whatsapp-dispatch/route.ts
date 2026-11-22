@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
       job.whatsapp_status = "READY_TO_POST";
     }
 
-    const targetPhone = customPhone || aiManager.config.whatsapp.adminPhoneNumber || "+919876543210";
+    const targetPhone = customPhone || process.env.ADMIN_WHATSAPP_NUMBER || aiManager.config.whatsapp.adminPhoneNumber || "+918220525033";
 
     if (action === "DISPATCH_ADMIN") {
       // Record task in AI Manager history

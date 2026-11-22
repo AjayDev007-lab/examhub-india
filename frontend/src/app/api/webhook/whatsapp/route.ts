@@ -61,8 +61,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: "IGNORED_EMPTY" }, { status: 200 });
     }
 
-    // 2. Strict Admin-Only Sender Validation
-    const configuredAdminPhone = aiManager.config.whatsapp.adminPhoneNumber.replace(/[^\d]/g, "");
+    // 2. Strict Admin-Only Sender Validation (reads private server-side env)
+    const configuredAdminPhone = (process.env.ADMIN_WHATSAPP_NUMBER || aiManager.config.whatsapp.adminPhoneNumber || "+918220525033").replace(/[^\d]/g, "");
     const cleanSender = senderNumber.replace(/[^\d]/g, "");
 
     const isAuthorized = cleanSender.endsWith(configuredAdminPhone.slice(-10)) || configuredAdminPhone.endsWith(cleanSender.slice(-10));

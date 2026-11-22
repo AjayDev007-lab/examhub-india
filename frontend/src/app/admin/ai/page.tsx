@@ -994,25 +994,42 @@ export default function AutonomousAIManagerPage() {
               <div>
                 <h2 className="text-base font-bold text-white flex items-center gap-2">
                   <Phone className="w-4 h-4 text-emerald-400" />
-                  <span>Section 12: WhatsApp Reports & Webhook Configuration</span>
+                  <span>Section 12: Private Admin WhatsApp Reports & Webhook Configuration</span>
                 </h2>
-                <p className="text-xs text-slate-400">Direct integration with Meta WhatsApp Business Platform for administrative control</p>
+                <p className="text-xs text-slate-400">Direct integration with Meta WhatsApp Business Platform for administrative control & monitoring digests</p>
               </div>
-              <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                WHATSAPP AI ONLINE
-              </span>
+              <div className="flex items-center gap-2">
+                <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${
+                  config.whatsapp?.isMetaVerified 
+                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" 
+                    : "bg-blue-500/10 text-blue-400 border-blue-500/20"
+                }`}>
+                  {config.whatsapp?.isMetaVerified ? "META CLOUD API VERIFIED" : "ADMIN RECIPIENT CONNECTED"}
+                </span>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
               <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
-                <h3 className="font-bold text-white text-sm">Security & Admin Sender Allowlist</h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-white text-sm">Private Admin Recipient & Allowlist</h3>
+                  <span className="text-[10px] text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/40 font-mono">
+                    ADMIN_WHATSAPP_NUMBER
+                  </span>
+                </div>
+                
+                <p className="text-slate-400 text-[11px] leading-relaxed">
+                  This private number receives all AI Guardian health audits, security threat alerts, and 20-point daily digests. Public student WhatsApp Channel broadcasts are kept completely separate.
+                </p>
+
                 <div className="space-y-2">
                   <div>
-                    <label className="text-slate-400 text-[11px]">Authorized Admin Phone Number:</label>
+                    <label className="text-slate-400 text-[11px] font-semibold">Configured Admin Phone Number (Server-Side Env):</label>
                     <input
                       type="text"
                       value={testPhoneInput}
                       onChange={(e) => setTestPhoneInput(e.target.value)}
+                      placeholder="+918220525033"
                       className="w-full mt-1 bg-slate-900 border border-slate-800 rounded-lg p-2 text-white font-mono"
                     />
                   </div>
@@ -1038,7 +1055,7 @@ export default function AutonomousAIManagerPage() {
                     className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-semibold flex items-center justify-center gap-2 transition-all shadow-md"
                   >
                     {sendingTestWhatsApp ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                    <span>Dispatch Test WhatsApp Digest Now</span>
+                    <span>Prepare & Verify Admin WhatsApp Digest</span>
                   </button>
                 </div>
               </div>

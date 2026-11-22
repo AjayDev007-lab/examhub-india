@@ -120,6 +120,8 @@ export interface WhatsAppConfig {
   dailyDigestTime: string; // e.g. "08:30"
   emergencyAlerts: boolean;
   lastReportSentAt: string | null;
+  isMetaVerified: boolean;
+  cloudApiConfigured: boolean;
 }
 
 export interface AIAutonomousConfig {
@@ -434,11 +436,13 @@ function initAIManagerState() {
         costInrToday: 13.68,
         whatsapp: {
           isEnabled: true,
-          adminPhoneNumber: "+919876543210",
-          webhookVerifyToken: "examhub_ai_manager_whatsapp_secure_token_2026",
+          adminPhoneNumber: process.env.ADMIN_WHATSAPP_NUMBER || "+918220525033",
+          webhookVerifyToken: process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || "examhub_ai_manager_whatsapp_secure_token_2026",
           dailyDigestTime: "08:30",
           emergencyAlerts: true,
-          lastReportSentAt: new Date(Date.now() - 3600000 * 15).toISOString()
+          lastReportSentAt: new Date(Date.now() - 3600000 * 15).toISOString(),
+          isMetaVerified: Boolean(process.env.WHATSAPP_CLOUD_API_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID),
+          cloudApiConfigured: Boolean(process.env.WHATSAPP_CLOUD_API_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID)
         }
       },
       conversation: [
@@ -680,4 +684,81 @@ export function generateWhatsAppDailyDigest(): string {
     `• Critical Incidents: 0\n` +
     `• Threat Level: NORMAL\n\n` +
     `_Reply 'Approve all' to publish pending items or 'Help' for quick actions._`;
+}
+
+/**
+ * Checks whether the Meta WhatsApp Cloud API credentials are configured in the environment.
+ */
+export function isMetaWhatsAppCloudApiConfigured(): boolean {
+  return Boolean(process.env.WHATSAPP_CLOUD_API_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID);
+}
+
+/**
+ * Safely dispatches a private admin WhatsApp notification via Meta WhatsApp Cloud API.
+ * 
+ * SAFETY RULE: If Meta Cloud API credentials (access token and phone number ID)
+ * are not yet verified and configured, this function does NOT make external API
+ * calls. It records the status as "PENDING_META_VERIFICATION" and returns a clean,
+ * safe diagnostic report without throwing errors.
+ */
+export async function sendMetaWhatsAppCloudApiMessage(
+  recipientPhone: string,
+  messageText: string
+): Promise<{
+  success: boolean;
+  status: "SENT" | "PENDING_META_VERIFICATION" | "CREDENTIALS_MISSING" | "FAILED";
+  message: string;
+  details?: any;
+}> {
+  const token = process.env.WHATSAPP_CLOUD_API_ACCESS_TOKEN;
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const cleanRecipient = recipientPhone.replace(/[^\d]/g, "");
+
+  if (!token || !phoneNumberId) {
+    return {
+      success: false,
+      status: "PENDING_META_VERIFICATION",
+      message: "Meta WhatsApp Cloud API credentials (WHATSAPP_CLOUD_API_ACCESS_TOKEN / WHATSAPP_PHONE_NUMBER_ID) are not configured. Outbound message safely held to avoid unverified API calls."
+    };
+  }
+
+  try {
+    const res = await fetch(`https://graph.facebook.com/v19.0/${phoneNumberId}/messages`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: cleanRecipient,
+        type: "text",
+        text: { preview_url: true, body: messageText }
+      })
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      return {
+        success: false,
+        status: "FAILED",
+        message: data.error?.message || "Meta Cloud API returned an error response",
+        details: data
+      };
+    }
+
+    return {
+      success: true,
+      status: "SENT",
+      message: `WhatsApp message successfully sent to +${cleanRecipient} via Meta Cloud API`,
+      details: data
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      status: "FAILED",
+      message: `Network error reaching Meta Cloud API: ${err.message}`
+    };
+  }
 }
