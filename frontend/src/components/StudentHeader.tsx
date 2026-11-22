@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { logoutUser } from "@/lib/firebase";
 import {
   Search,
   Bell,
@@ -68,9 +69,7 @@ export default function StudentHeader({ pageTitle = "Student Portal", unreadCoun
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("examhub_token");
-    localStorage.removeItem("examhub_user");
-    window.location.href = "/auth/login";
+    logoutUser();
   };
 
   const getInitials = (name?: string) => {

@@ -8,6 +8,7 @@ import {
   Menu, X, Moon, Sun, ChevronDown, Check, LogOut, ShieldAlert
 } from "lucide-react";
 import { Language, translations } from "@/lib/i18n";
+import { logoutUser } from "@/lib/firebase";
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -85,10 +86,7 @@ export default function Navbar() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("examhub_token");
-    localStorage.removeItem("examhub_user");
-    setCurrentUser(null);
-    window.location.href = "/";
+    logoutUser();
   };
 
   const navLinks = [

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { logoutUser } from "@/lib/firebase";
 import {
   LayoutDashboard,
   Calendar,
@@ -59,9 +60,7 @@ export default function StudentSidebar() {
   ];
 
   const handleLogout = () => {
-    localStorage.removeItem("examhub_token");
-    localStorage.removeItem("examhub_user");
-    window.location.href = "/auth/login";
+    logoutUser();
   };
 
   return (

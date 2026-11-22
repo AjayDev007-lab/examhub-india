@@ -2,10 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 // Import route handlers
-import { POST as loginPOST } from "../src/app/api/auth/login/route.ts";
-import { POST as registerPOST } from "../src/app/api/auth/register/route.ts";
-import { POST as forgotPasswordPOST } from "../src/app/api/auth/forgot-password/route.ts";
-import { POST as resetPasswordPOST } from "../src/app/api/auth/reset-password/route.ts";
+import { POST as loginPOST } from "../src/app/api/auth/login/route";
+import { POST as registerPOST } from "../src/app/api/auth/register/route";
+import { POST as forgotPasswordPOST } from "../src/app/api/auth/forgot-password/route";
+import { POST as resetPasswordPOST } from "../src/app/api/auth/reset-password/route";
 
 function createJsonRequest(url: string, body: any): Request {
   return new Request(url, {
@@ -40,7 +40,7 @@ test("Phase 1: Authentication - Login Button & Credentials Validation", async (t
     const res = await loginPOST(req);
     assert.equal(res.status, 401);
     const data = await res.json();
-    assert.equal(data.detail, "Invalid email or password");
+    assert.match(data.detail, /Incorrect password/i);
   });
 
   await t.test("Authenticates registered student and returns student token", async () => {

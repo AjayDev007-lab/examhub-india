@@ -105,12 +105,17 @@ export async function POST(request: Request) {
             is_verified: true,
           },
         });
+      } else {
+        return NextResponse.json(
+          { detail: "Incorrect password entered. Please verify your password." },
+          { status: 401 }
+        );
       }
     }
 
     return NextResponse.json(
-      { detail: "Invalid email or password" },
-      { status: 401 }
+      { detail: "No account found matching this email address. Please check spelling or create an account." },
+      { status: 404 }
     );
   } catch (err: any) {
     return NextResponse.json(

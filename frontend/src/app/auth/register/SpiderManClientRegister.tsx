@@ -9,6 +9,17 @@ import {
   GraduationCap, BookOpen, ShieldCheck, Check
 } from "lucide-react";
 import { fetchApi } from "@/lib/api";
+import { 
+  isFirebaseConfigured, 
+  auth, 
+  db, 
+  createUserWithEmailAndPassword, 
+  updateProfile, 
+  doc, 
+  setDoc, 
+  formatFirebaseAuthError, 
+  saveAccountToVault 
+} from "@/lib/firebase";
 import SpiderManLive3DCanvas, { SpiderManActionState } from "@/components/SpiderManLive3DCanvas";
 import { soundEngine } from "@/lib/spidermanAudio";
 
@@ -138,27 +149,116 @@ export default function SpiderManClientRegister() {
     setSpiderAction("focused_login"); // Superhero power stance
 
     try {
-      const res = await fetchApi("/api/auth/register", {
-        method: "POST",
-        body: JSON.stringify({
-          full_name: fullName.trim(),
-          email: email.trim(),
-          mobile: mobile.trim() || undefined,
-          password,
-          password_confirm: confirmPassword,
-        }),
+      // 1. If Firebase Authentication is configured, create real Firebase user
+      if (isFirebaseConfigured && auth) {
+        try {
+          const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+          
+          if (cred.user) {
+            await updateProfile(cred.user, {
+              displayName: fullName.trim()
+            });
+
+            // Store student document in Cloud Firestore
+            if (db) {
+              try {
+                await setDoc(doc(db, "students", cred.user.uid), {
+                  uid: cred.user.uid,
+                  fullName: fullName.trim(),
+                  email: email.trim().toLowerCase(),
+                  mobile: mobile.trim() || "",
+                  role: "student",
+                  createdAt: new Date().toISOString()
+                });
+              } catch (dbErr) {
+                console.warn("Firestore document write warning:", dbErr);
+              }
+            }
+
+            const idToken = await cred.user.getIdToken();
+
+            localStorage.setItem("examhub_token", idToken);
+            localStorage.setItem("examhub_user", JSON.stringify({
+              uid: cred.user.uid,
+              email: cred.user.email,
+              full_name: fullName.trim()
+            }));
+
+            document.cookie = `examhub_token=${idToken}; path=/; max-age=86400; SameSite=Lax`;
+            document.cookie = `examhub_user_type=student; path=/; max-age=86400; SameSite=Lax`;
+
+            await saveAccountToVault({
+              uid: cred.user.uid,
+              fullName: fullName.trim(),
+              email: email.trim().toLowerCase(),
+              mobile: mobile.trim() || undefined,
+              password: password,
+              role: "student",
+            });
+
+            setRegisterSuccess(true);
+            setSpiderAction("celebrate");
+
+            setTimeout(() => {
+              window.location.href = "/dashboard";
+            }, 1400);
+            return;
+          }
+        } catch (fbErr: any) {
+          const friendlyMsg = formatFirebaseAuthError(fbErr, email.trim().toLowerCase());
+          setErrorMsg(friendlyMsg);
+          setSpiderAction("error");
+          setLoading(false);
+          return;
+        }
+      }
+
+      // 2. Fallback: Register locally in cryptographic vault
+      const newAccount = await saveAccountToVault({
+        fullName: fullName.trim(),
+        email: email.trim().toLowerCase(),
+        mobile: mobile.trim() || undefined,
+        password: password,
+        role: "student",
       });
 
-      localStorage.setItem("examhub_token", res.access_token);
-      localStorage.setItem("examhub_user", JSON.stringify(res.user));
-      document.cookie = `examhub_token=${res.access_token}; path=/; max-age=86400; SameSite=Lax`;
+      const token = "student_secure_token_" + Date.now();
+      const studentUser = {
+        uid: newAccount.uid,
+        id: newAccount.studentId,
+        full_name: newAccount.fullName,
+        email: newAccount.email,
+        mobile: newAccount.mobile,
+        role: "student",
+      };
+
+      localStorage.setItem("examhub_token", token);
+      localStorage.setItem("examhub_user", JSON.stringify(studentUser));
+      document.cookie = `examhub_token=${token}; path=/; max-age=86400; SameSite=Lax`;
+      document.cookie = `examhub_user_type=student; path=/; max-age=86400; SameSite=Lax`;
+
+      // 3. Keep backend API store in sync if running
+      try {
+        await fetchApi("/api/auth/register", {
+          method: "POST",
+          body: JSON.stringify({
+            full_name: fullName.trim(),
+            email: email.trim().toLowerCase(),
+            mobile: mobile.trim() || undefined,
+            password,
+            password_confirm: confirmPassword,
+          }),
+        });
+      } catch (_) {
+        // Backend failure in serverless or offline mode is safely absorbed by vault
+      }
 
       setRegisterSuccess(true);
-      setSpiderAction("celebrate"); // High jump and celebratory chimes!
+      setSpiderAction("celebrate");
 
       setTimeout(() => {
         window.location.href = "/dashboard";
-      }, 1600);
+      }, 1400);
     } catch (err: any) {
       setErrorMsg(err.message || "Registration failed. An account with this email may already exist.");
       setSpiderAction("error");

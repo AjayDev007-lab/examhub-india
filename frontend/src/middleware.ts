@@ -91,6 +91,16 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  // 3. Student routes protection (Requirement 12)
+  if (pathname.startsWith("/dashboard") || pathname.startsWith("/student")) {
+    const userTypeCookie = request.cookies.get("examhub_user_type")?.value;
+    const token = request.cookies.get("examhub_token")?.value;
+
+    if (!token && !userTypeCookie) {
+      return NextResponse.redirect(new URL("/auth/login", request.url));
+    }
+  }
+
   // Allow status and maintenance pages
   if (
     pathname.startsWith("/api/status") ||

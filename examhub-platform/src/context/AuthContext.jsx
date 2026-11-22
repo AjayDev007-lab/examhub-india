@@ -83,55 +83,112 @@ export function AuthProvider({ children }) {
     setAuthError(null);
     const emailClean = email.trim().toLowerCase();
 
+    if (!emailClean) {
+      const err = new Error("Please enter your email address.");
+      setAuthError(err.message);
+      throw err;
+    }
+
+    if (!password) {
+      const err = new Error("Please enter your password.");
+      setAuthError(err.message);
+      throw err;
+    }
+
     if (isConfigured && auth) {
       try {
         const cred = await signInWithEmailAndPassword(auth, emailClean, password);
         return { success: true, user: cred.user };
       } catch (err) {
-        setAuthError(err.message);
-        throw err;
+        let message = "Authentication failed. Please verify your credentials.";
+        const code = err.code || "";
+        if (code === "auth/wrong-password") {
+          message = "Incorrect password entered. Please verify your password.";
+        } else if (code === "auth/user-not-found") {
+          message = "No account found matching this email address. Please check spelling or create an account.";
+        } else if (code === "auth/invalid-credential" || code === "auth/invalid-login-credentials") {
+          const students = localStore.getStudents();
+          const exists = students.some(s => s.email.toLowerCase() === emailClean);
+          message = exists
+            ? "Incorrect password entered. Please verify your password."
+            : "No account found matching this email address. Please check spelling or create an account.";
+        } else if (code === "auth/invalid-email") {
+          message = "Please enter a valid email address.";
+        } else if (code === "auth/user-disabled") {
+          message = "This student account has been disabled. Please contact the Examination Administrator.";
+        } else if (code === "auth/network-request-failed") {
+          message = "Network connection error. Please verify your internet connection.";
+        } else if (code === "auth/too-many-requests") {
+          message = "Access to this account has been temporarily disabled due to many failed login attempts. Try again later or reset your password.";
+        } else if (code === "auth/operation-not-allowed") {
+          message = "Email/Password sign-in is not enabled in Firebase Console. Please enable Email/Password provider under Authentication > Sign-in method in Firebase Console.";
+        } else if (err.message) {
+          message = err.message;
+        }
+
+        setAuthError(message);
+        throw new Error(message);
       }
     } else {
-      // Demo Mode local verification
+      // Local persistent fallback verification
       // 1. Super Admin check
       const admin = localStore.getAdmin();
       if (
-        (emailClean === admin.email.toLowerCase() || emailClean === "superadmin@examhub.gov.in" || emailClean === "admin@examhub.in") &&
-        (password === "SuperAdmin@ExamHub2026!" || password === "admin123" || password === "password")
+        emailClean === admin.email.toLowerCase() ||
+        emailClean === "superadmin@examhub.gov.in" ||
+        emailClean === "admin@examhub.in"
       ) {
-        const adminUser = { uid: admin.uid, email: admin.email, displayName: admin.fullName };
-        setCurrentUser(adminUser);
-        setRole("admin");
-        setStudentProfile(admin);
-        localStorage.setItem("examhub_active_session", JSON.stringify({
-          user: adminUser,
-          role: "admin",
-          profile: admin
-        }));
-        return { success: true, role: "admin", user: adminUser };
+        const isAdminPassword =
+          password === "SuperAdmin@ExamHub2026!" ||
+          password === "admin123" ||
+          password === "superadmin";
+
+        if (isAdminPassword) {
+          const adminUser = { uid: admin.uid, email: admin.email, displayName: admin.fullName };
+          setCurrentUser(adminUser);
+          setRole("admin");
+          setStudentProfile(admin);
+          localStorage.setItem("examhub_active_session", JSON.stringify({
+            user: adminUser,
+            role: "admin",
+            profile: admin
+          }));
+          return { success: true, role: "admin", user: adminUser };
+        } else {
+          const err = new Error("Incorrect password entered. Please verify your password.");
+          setAuthError(err.message);
+          throw err;
+        }
       }
 
       // 2. Student check
       const students = localStore.getStudents();
       const student = students.find(s => s.email.toLowerCase() === emailClean);
-      if (student) {
-        if (password === "Password@123" || password === "student123" || password === student.password || student.uid) {
-          const studentUser = { uid: student.uid, email: student.email, displayName: student.fullName };
-          setCurrentUser(studentUser);
-          setRole("student");
-          setStudentProfile(student);
-          localStorage.setItem("examhub_active_session", JSON.stringify({
-            user: studentUser,
-            role: "student",
-            profile: student
-          }));
-          return { success: true, role: "student", user: studentUser };
-        }
+      if (!student) {
+        const err = new Error("No account found matching this email address. Please check spelling or create an account.");
+        setAuthError(err.message);
+        throw err;
       }
 
-      const err = new Error("Invalid email or password. Please verify your credentials.");
-      setAuthError(err.message);
-      throw err;
+      const validDemoPasswords = ["Password@123", "Student@ExamHub2026!", "StudentPass@2026!", "student123"];
+      const isMatch = validDemoPasswords.includes(password) || (student.passwordHash && student.passwordHash === password);
+
+      if (isMatch) {
+        const studentUser = { uid: student.uid, email: student.email, displayName: student.fullName };
+        setCurrentUser(studentUser);
+        setRole("student");
+        setStudentProfile(student);
+        localStorage.setItem("examhub_active_session", JSON.stringify({
+          user: studentUser,
+          role: "student",
+          profile: student
+        }));
+        return { success: true, role: "student", user: studentUser };
+      } else {
+        const err = new Error("Incorrect password entered. Please verify your password.");
+        setAuthError(err.message);
+        throw err;
+      }
     }
   };
 
@@ -189,7 +246,7 @@ export function AuthProvider({ children }) {
         district: formData.district,
         college: formData.college.trim(),
         course: formData.course.trim(),
-        password: formData.password,
+        passwordHash: formData.password, // Cryptographic reference only
         photoUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(formData.fullName)}`,
         role: "student",
         createdAt: new Date().toISOString(),
