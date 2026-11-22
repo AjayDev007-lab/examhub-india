@@ -7,8 +7,9 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { token, new_password, confirm_password } = body;
+    const resetToken = (token || body.recovery_token || "").trim();
 
-    if (!token || !token.trim()) {
+    if (!resetToken) {
       return NextResponse.json({ detail: "Recovery token or OTP is required." }, { status: 400 });
     }
 

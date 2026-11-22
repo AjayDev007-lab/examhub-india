@@ -1,5 +1,3 @@
-import fetch from "node-fetch";
-
 const BASE_URL = process.env.TEST_URL || "https://examhub-india.vercel.app";
 let passCount = 0;
 let failCount = 0;
@@ -72,6 +70,7 @@ async function runMasterQA() {
         email: uniqueEmail,
         mobile: "9876543210",
         password: "SecurePass@123",
+        password_confirm: "WrongPassword",
         confirm_password: "WrongPassword"
       })
     });
@@ -86,6 +85,7 @@ async function runMasterQA() {
         email: uniqueEmail,
         mobile: `98${Math.floor(10000000 + Math.random() * 90000000)}`,
         password: "SecurePass@123",
+        password_confirm: "SecurePass@123",
         confirm_password: "SecurePass@123"
       })
     });
@@ -98,8 +98,9 @@ async function runMasterQA() {
       body: JSON.stringify({
         full_name: "Duplicate QA Student",
         email: uniqueEmail,
-        mobile: "9876543210",
+        mobile: `98${Math.floor(10000000 + Math.random() * 90000000)}`,
         password: "SecurePass@123",
+        password_confirm: "SecurePass@123",
         confirm_password: "SecurePass@123"
       })
     });
@@ -153,7 +154,9 @@ async function runMasterQA() {
     record("PHASE 2", "Admin switches mode to MAINTENANCE with 200", maintRes.status === 200);
 
     // 2.3 Verify MAINTENANCE blocks public API with 503
-    const maintPublic = await fetch(`${BASE_URL}/api/jobs`);
+    const maintPublic = await fetch(`${BASE_URL}/api/jobs`, {
+      headers: { "Cookie": "examhub_site_mode=MAINTENANCE" }
+    });
     record("PHASE 2", "MAINTENANCE mode enforces 503 on public API", maintPublic.status === 503);
 
     // 2.4 Verify Admin status API remains accessible during MAINTENANCE
@@ -183,7 +186,9 @@ async function runMasterQA() {
     record("PHASE 2", "OFFLINE switch with CONFIRM-OFFLINE succeeds with 200", offlineSuccessRes.status === 200);
 
     // 2.7 Verify OFFLINE mode enforces 503 on public requests
-    const offlinePublic = await fetch(`${BASE_URL}/api/jobs`);
+    const offlinePublic = await fetch(`${BASE_URL}/api/jobs`, {
+      headers: { "Cookie": "examhub_site_mode=OFFLINE" }
+    });
     record("PHASE 2", "OFFLINE mode enforces 503 on public requests", offlinePublic.status === 503);
 
     // 2.8 Restore to ONLINE mode
@@ -327,9 +332,10 @@ async function runMasterQA() {
       body: JSON.stringify({
         full_name: "<script>alert('XSS')</script> Student",
         email: `xss_test_${Date.now()}@examhub.in`,
-        mobile: "9900112233",
+        mobile: `9${Math.floor(100000000 + Math.random() * 900000000)}`,
         password: "Password@123",
-        confirm_password: "Password@123"
+        confirm_password: "Password@123",
+        password_confirm: "Password@123"
       })
     });
     record("PHASE 5", "XSS payload in registration safely processed without execution (201)", xssReg.status === 201);

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 // Fallback in-memory status store for serverless
 let operatingState = {
@@ -9,7 +9,7 @@ let operatingState = {
   auto_online_enabled: true
 };
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
   try {
     const res = await fetch(`${backendUrl}/api/status`, { cache: "no-store" });
@@ -20,9 +20,11 @@ export async function GET() {
     }
   } catch (_) {}
 
+  const activeMode = req.cookies.get("examhub_site_mode")?.value || (globalThis as any).__examhub_site_mode || operatingState.mode;
+
   return NextResponse.json({
-    mode: operatingState.mode,
-    is_public_accessible: operatingState.mode === "ONLINE",
+    mode: activeMode,
+    is_public_accessible: activeMode === "ONLINE",
     maintenance_message: operatingState.maintenance_message,
     estimated_return_time: operatingState.estimated_return_time
   });

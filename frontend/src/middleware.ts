@@ -108,17 +108,27 @@ export async function middleware(request: NextRequest) {
   }
 
   // 4. Check Current Operating Mode
-  const { mode, message, estimated_return } = await getOperatingMode(request);
+  const modeCookie = request.cookies.get("examhub_site_mode")?.value;
+  let activeMode = modeCookie;
+  let activeMessage: string | undefined = undefined;
+  let activeEstimated: string | undefined = undefined;
 
-  if (mode === "MAINTENANCE") {
+  if (!activeMode) {
+    const statusData = await getOperatingMode(request);
+    activeMode = statusData.mode;
+    activeMessage = statusData.message;
+    activeEstimated = statusData.estimated_return;
+  }
+
+  if (activeMode === "MAINTENANCE") {
     // Return 503 for API requests
     if (pathname.startsWith("/api/")) {
       return NextResponse.json(
         {
           error: "Service Unavailable",
           mode: "MAINTENANCE",
-          message: message || "ExamHub India is currently undergoing scheduled platform upgrades.",
-          estimated_return_time: estimated_return || "Shortly"
+          message: activeMessage || "ExamHub India is currently undergoing scheduled platform upgrades.",
+          estimated_return_time: activeEstimated || "Shortly"
         },
         {
           status: 503,
@@ -130,7 +140,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.rewrite(new URL("/maintenance", request.url));
   }
 
-  if (mode === "OFFLINE") {
+  if (activeMode === "OFFLINE") {
     // Return 503 for API requests
     if (pathname.startsWith("/api/")) {
       return NextResponse.json(

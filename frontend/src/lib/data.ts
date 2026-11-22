@@ -431,6 +431,7 @@ export const initialStudents = [
     full_name: "Aditya Sharma",
     email: "student@examhub.in",
     mobile: "9876543210",
+    password: "Password@123",
     is_active: true,
     is_verified: true,
     mobile_verified: true,

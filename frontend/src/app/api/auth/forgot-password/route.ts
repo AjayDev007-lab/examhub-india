@@ -71,6 +71,7 @@ export async function POST(request: Request) {
       message: hasAccount
         ? `A 6-digit verification OTP has been generated for your registered credentials.`
         : "If an account matches your details, recovery instructions have been dispatched.",
+      recovery_token: hasAccount ? resetToken : undefined,
       debug_reset_token: hasAccount ? resetToken : undefined,
     });
   } catch (err: any) {

@@ -87,7 +87,8 @@ export async function POST(request: Request) {
       const isPasswordMatch =
         (student as any).password === rawPassword ||
         (isDefaultStudent &&
-          (rawPassword === "Student@ExamHub2026!" ||
+          (rawPassword === "Password@123" ||
+            rawPassword === "Student@ExamHub2026!" ||
             rawPassword === "StudentPass@2026!" ||
             rawPassword === "student123"));
 

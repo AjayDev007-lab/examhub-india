@@ -26,10 +26,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ detail: "Taking website OFFLINE requires strict confirmation code: 'CONFIRM-OFFLINE'." }, { status: 400 });
   }
 
-  return NextResponse.json({
+  const prevMode = (globalThis as any).__examhub_site_mode || "ONLINE";
+  const newMode = body.mode || "ONLINE";
+  (globalThis as any).__examhub_site_mode = newMode;
+
+  const res = NextResponse.json({
     success: true,
-    previous_mode: "ONLINE",
-    current_mode: body.mode,
-    message: `Website operating mode successfully changed to ${body.mode}.`
+    previous_mode: prevMode,
+    current_mode: newMode,
+    message: `Website operating mode successfully changed to ${newMode}.`
   });
+  res.cookies.set("examhub_site_mode", newMode, { path: "/", httpOnly: false, sameSite: "lax", maxAge: 86400 });
+  return res;
 }

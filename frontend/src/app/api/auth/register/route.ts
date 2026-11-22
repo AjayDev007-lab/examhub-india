@@ -7,6 +7,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { full_name, email, mobile, password, password_confirm } = body;
+    const confirmPassword = password_confirm || body.confirm_password;
 
     if (!full_name || !full_name.trim()) {
       return NextResponse.json({ detail: "Please enter your full name." }, { status: 400 });
@@ -20,7 +21,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ detail: "Password must be at least 8 characters long." }, { status: 400 });
     }
 
-    if (password !== password_confirm) {
+    if (password !== confirmPassword) {
       return NextResponse.json({ detail: "Passwords do not match." }, { status: 400 });
     }
 
