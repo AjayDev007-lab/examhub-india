@@ -56,6 +56,21 @@ export default function SpiderManClientLogin() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading || loginSuccess) return;
+
+    const emailClean = email.trim();
+    if (!emailClean) {
+      setErrorMsg("Please enter your email address.");
+      setSpiderAction("error");
+      return;
+    }
+
+    if (!password) {
+      setErrorMsg("Please enter your password.");
+      setSpiderAction("error");
+      return;
+    }
+
     setLoading(true);
     setErrorMsg(null);
     setSpiderAction("focused_login"); // Superhero focused ready stance
@@ -63,17 +78,35 @@ export default function SpiderManClientLogin() {
     try {
       const res = await fetchApi("/api/auth/login", {
         method: "POST",
-        body: JSON.stringify({ email: email.trim(), password }),
+        body: JSON.stringify({ email: emailClean, password }),
       });
-      localStorage.setItem("examhub_token", res.access_token);
-      localStorage.setItem("examhub_user", JSON.stringify(res.user));
-      
-      setLoginSuccess(true);
-      setSpiderAction("celebrate"); // Jumps and celebrates in victory!
 
-      setTimeout(() => {
-        window.location.href = "/dashboard";
-      }, 1600);
+      // Differentiate student vs administrator redirection
+      const isAdmin = res.user_type === "admin" || res.user?.role === "SUPER_ADMIN" || res.user?.role === "ADMIN";
+      
+      if (isAdmin) {
+        localStorage.setItem("examhub_admin_token", res.access_token);
+        localStorage.setItem("examhub_admin_user", JSON.stringify(res.user));
+        document.cookie = `examhub_admin_token=${res.access_token}; path=/; max-age=86400; SameSite=Lax`;
+        
+        setLoginSuccess(true);
+        setSpiderAction("celebrate");
+
+        setTimeout(() => {
+          window.location.href = "/admin/dashboard";
+        }, 1200);
+      } else {
+        localStorage.setItem("examhub_token", res.access_token);
+        localStorage.setItem("examhub_user", JSON.stringify(res.user));
+        document.cookie = `examhub_token=${res.access_token}; path=/; max-age=86400; SameSite=Lax`;
+        
+        setLoginSuccess(true);
+        setSpiderAction("celebrate");
+
+        setTimeout(() => {
+          window.location.href = "/dashboard";
+        }, 1200);
+      }
     } catch (err: any) {
       setErrorMsg(err.message || "Invalid email or password");
       setSpiderAction("error"); // Puzzled head scratch
@@ -297,7 +330,7 @@ export default function SpiderManClientLogin() {
                   disabled={loading || loginSuccess}
                   onMouseEnter={() => setSpiderAction("look_button")}
                   onMouseLeave={() => setSpiderAction("idle")}
-                  className="w-full py-3.5 px-4 rounded-xl font-black text-sm tracking-widest uppercase text-slate-950 bg-gradient-to-r from-cyan-400 via-cyan-300 to-cyan-500 hover:from-cyan-300 hover:via-cyan-200 hover:to-cyan-400 border border-cyan-200/50 shadow-[0_0_35px_rgba(6,182,212,0.6)] active:scale-[0.98] transition-all flex items-center justify-center space-x-2"
+                  className="w-full py-3.5 px-4 rounded-xl font-black text-sm tracking-widest uppercase text-slate-950 bg-gradient-to-r from-cyan-400 via-cyan-300 to-cyan-500 hover:from-cyan-300 hover:via-cyan-200 hover:to-cyan-400 border border-cyan-200/50 shadow-[0_0_35px_rgba(6,182,212,0.6)] active:scale-[0.98] transition-all flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {loading ? (
                     <RefreshCw className="w-4 h-4 animate-spin text-slate-950" />

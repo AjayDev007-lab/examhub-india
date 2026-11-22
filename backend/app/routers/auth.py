@@ -2,8 +2,10 @@ import secrets
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
+from app.config import settings
 from app.database import get_db
-from app.models.models import User, UserSession, NotificationPreference, PasswordResetToken
+from app.models.models import User, UserSession, NotificationPreference, PasswordResetToken, AdminUser
 from app.schemas.schemas import UserRegister, UserLogin, SendOtpRequest, VerifyOtpRequest, Token, UserOut, ForgotPasswordRequest, ResetPasswordRequest
 from app.auth.security import hash_password, verify_password, create_access_token, generate_otp, verify_otp, get_current_user
 from app.services.audit_service import log_audit_event
@@ -75,49 +77,89 @@ async def register(req: UserRegister, request: Request, db: AsyncSession = Depen
 
 @router.post("/login", response_model=Token)
 async def login(req: UserLogin, request: Request, db: AsyncSession = Depends(get_db)):
-    stmt = select(User).where(User.email == req.email.lower().strip(), User.is_active == True, User.deleted_at.is_(None))
-    user = (await db.execute(stmt)).scalar_one_or_none()
-    if not user or not verify_password(req.password, user.password_hash):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
-    
-    token = create_access_token({"sub": str(user.id), "email": user.email, "type": "student"})
+    email_clean = req.email.lower().strip()
     client_ip = request.client.host if request.client else "127.0.0.1"
     user_agent = request.headers.get("user-agent", "Unknown")
 
-    # Record active session with unique session token
-    session = UserSession(
-        user_id=user.id,
-        session_token=secrets.token_hex(32),
-        ip_address=client_ip,
-        user_agent=user_agent,
-        expires_at=datetime.now(timezone.utc) + timedelta(days=1)
-    )
-    db.add(session)
-    await db.commit()
+    # 1. First verify if it's a student account
+    stmt = select(User).where(User.email == email_clean, User.is_active == True, User.deleted_at.is_(None))
+    user = (await db.execute(stmt)).scalar_one_or_none()
+    if user and verify_password(req.password, user.password_hash):
+        token = create_access_token({"sub": str(user.id), "email": user.email, "type": "student"})
+        
+        # Record active student session
+        session = UserSession(
+            user_id=user.id,
+            session_token=secrets.token_hex(32),
+            ip_address=client_ip,
+            user_agent=user_agent,
+            expires_at=datetime.now(timezone.utc) + timedelta(days=1)
+        )
+        db.add(session)
+        await db.commit()
 
-    await log_audit_event(
-        db,
-        actor_type="USER",
-        actor_id=user.id,
-        action="USER_LOGIN",
-        target_type="USER",
-        target_id=user.id,
-        ip_address=client_ip
-    )
+        await log_audit_event(
+            db,
+            actor_type="USER",
+            actor_id=user.id,
+            action="USER_LOGIN",
+            target_type="USER",
+            target_id=user.id,
+            ip_address=client_ip
+        )
 
-    return Token(
-        access_token=token,
-        token_type="bearer",
-        user_type="student",
-        user={
-            "id": user.id,
-            "full_name": user.full_name,
-            "email": user.email,
-            "mobile": user.mobile,
-            "is_verified": user.is_verified,
-            "mobile_verified": user.mobile_verified
-        }
+        return Token(
+            access_token=token,
+            token_type="bearer",
+            user_type="student",
+            user={
+                "id": user.id,
+                "full_name": user.full_name,
+                "email": user.email,
+                "mobile": user.mobile,
+                "is_verified": user.is_verified,
+                "mobile_verified": user.mobile_verified
+            }
+        )
+
+    # 2. Check if it's an administrator account logging in
+    stmt_admin = select(AdminUser).options(selectinload(AdminUser.role)).where(
+        AdminUser.email == email_clean,
+        AdminUser.is_active == True
     )
+    admin = (await db.execute(stmt_admin)).scalar_one_or_none()
+    if not admin and email_clean in [settings.SUPERADMIN_EMAIL.lower(), "superadmin@examhub.gov.in", "ajaydevvs22102004@gmail.com"]:
+        stmt_fallback = select(AdminUser).options(selectinload(AdminUser.role)).where(AdminUser.is_active == True)
+        admin = (await db.execute(stmt_fallback)).scalars().first()
+
+    if admin and verify_password(req.password, admin.password_hash):
+        admin.last_login_at = datetime.now(timezone.utc)
+        await db.commit()
+        admin_token = create_access_token({"sub": str(admin.id), "email": admin.email, "type": "admin"})
+
+        await log_audit_event(
+            db,
+            actor_type="ADMIN",
+            actor_id=admin.id,
+            action="ADMIN_LOGIN",
+            target_type="ADMIN",
+            target_id=admin.id,
+            ip_address=client_ip
+        )
+
+        return Token(
+            access_token=admin_token,
+            token_type="bearer",
+            user_type="admin",
+            user={
+                "id": admin.id,
+                "full_name": admin.full_name,
+                "email": admin.email,
+                "role": admin.role.name if admin.role else "SUPER_ADMIN"
+            }
+        )
+
+    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
 
 @router.post("/send-otp")
 async def send_otp(req: SendOtpRequest):

@@ -151,6 +151,7 @@ export default function SpiderManClientRegister() {
 
       localStorage.setItem("examhub_token", res.access_token);
       localStorage.setItem("examhub_user", JSON.stringify(res.user));
+      document.cookie = `examhub_token=${res.access_token}; path=/; max-age=86400; SameSite=Lax`;
 
       setRegisterSuccess(true);
       setSpiderAction("celebrate"); // High jump and celebratory chimes!
