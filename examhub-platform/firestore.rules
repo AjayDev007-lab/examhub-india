@@ -1,0 +1,73 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+        (request.auth.token.role == 'admin' || 
+         get(/databases/$(database)/documents/admins/$(request.auth.uid)).data != null);
+    }
+
+    // Users and Students Collection
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId) || isAdmin();
+    }
+    
+    match /students/{studentId} {
+      allow read: if isOwner(studentId) || isAdmin();
+      allow create: if isAuthenticated();
+      allow update: if isOwner(studentId) || isAdmin();
+      allow delete: if isAdmin();
+    }
+    
+    // Admins Collection: Protected, only existing Admins can read or manage
+    match /admins/{adminId} {
+      allow read, write: if isAdmin();
+    }
+
+    // Examinations Collection: Public read, Admin manage
+    match /exams/{examId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Exam Registrations
+    match /registrations/{regId} {
+      allow read: if isAuthenticated() && (resource.data.studentId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && request.resource.data.studentId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    // Hall Tickets
+    match /hallTickets/{ticketId} {
+      allow read: if isAuthenticated() && (resource.data.studentId == request.auth.uid || isAdmin());
+      allow write: if isAdmin();
+    }
+
+    // Exam Results: Only published results can be read by student
+    match /results/{resultId} {
+      allow read: if isAdmin() || (
+        isAuthenticated() && 
+        resource.data.studentId == request.auth.uid && 
+        resource.data.isPublished == true
+      );
+      allow write: if isAdmin();
+    }
+
+    // Notifications: Public read for announcements, private write for Admin
+    match /notifications/{notifId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+  }
+}
