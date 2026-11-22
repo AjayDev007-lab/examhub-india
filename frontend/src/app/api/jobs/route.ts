@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbStore } from "@/lib/data";
+import { generateJobWhatsAppMessage } from "@/lib/whatsappJobNotification";
 
 export async function GET(req: NextRequest) {
   try {
@@ -137,46 +138,74 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
-    if (!body.title || !body.slug || !body.organization_name || !body.official_application_url) {
-      return NextResponse.json({ error: "Missing required job fields" }, { status: 400 });
+    const title = body.title?.trim();
+    const slug = (body.slug?.trim() || title?.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""))?.toLowerCase();
+    const organizationName = body.organization_name?.trim() || body.organization?.trim();
+    const applyUrl = body.official_application_url?.trim() || body.official_apply_url?.trim();
+
+    if (!title || !slug || !organizationName || !applyUrl) {
+      return NextResponse.json({ error: "Missing required job fields (title, organization, apply URL)" }, { status: 400 });
     }
 
     const jobs = (dbStore as any).jobs;
     const newId = jobs.length > 0 ? Math.max(...jobs.map((j: any) => j.id)) + 1 : 1;
 
-    const newJob = {
+    const status = body.status || "PUBLISHED";
+    const vacancies = Number(body.vacancies_count ?? body.total_vacancies) || 0;
+    const salary = body.salary_range || body.pay_scale || null;
+    const endDate = body.application_end_date || body.last_date_to_apply || null;
+    const pdfUrl = body.official_notification_pdf || body.official_notification_pdf_url || null;
+
+    const newJob: any = {
       id: newId,
-      title: body.title.trim(),
-      slug: body.slug.trim().toLowerCase(),
-      organization_name: body.organization_name.trim(),
+      title,
+      slug,
+      organization_name: organizationName,
       organization_logo_url: body.organization_logo_url || null,
       sector: body.sector || "CENTRAL_GOVT",
       category: body.category || "GOVERNMENT",
       job_description: body.job_description || "",
-      vacancies_count: Number(body.vacancies_count) || 0,
+      vacancies_count: vacancies,
+      total_vacancies: vacancies,
       qualification: body.qualification || "Any Graduate",
+      qualification_description: body.qualification_description || null,
       required_skills: body.required_skills || null,
       age_limit: body.age_limit || "18 - 30 Years",
       experience_required: body.experience_required || "FRESHER",
-      salary_range: body.salary_range || null,
+      salary_range: salary,
+      pay_scale: salary,
       location: body.location || "All India",
       work_mode: body.work_mode || "ON_SITE",
       application_start_date: body.application_start_date || new Date().toISOString(),
-      application_end_date: body.application_end_date || null,
+      application_end_date: endDate,
+      last_date_to_apply: endDate,
       application_fee: body.application_fee || null,
       selection_process: body.selection_process || null,
       syllabus_details: body.syllabus_details || null,
-      official_notification_pdf: body.official_notification_pdf || null,
-      official_application_url: body.official_application_url.trim(),
-      source_website_url: body.source_website_url?.trim() || body.official_application_url.trim(),
+      official_notification_pdf: pdfUrl,
+      official_notification_pdf_url: pdfUrl,
+      official_application_url: applyUrl,
+      official_apply_url: applyUrl,
+      source_website_url: body.source_website_url?.trim() || applyUrl,
       verification_source: body.verification_source || "Official Gazette / Board Circular",
-      status: body.status || "PUBLISHED",
+      status,
       view_count: 0,
       apply_clicks_count: 0,
       is_featured: Boolean(body.is_featured),
-      published_at: new Date().toISOString(),
-      last_verified_at: new Date().toISOString()
+      published_at: status === "PUBLISHED" ? new Date().toISOString() : null,
+      last_verified_at: new Date().toISOString(),
     };
+
+    // Automated WhatsApp Notification Workflow
+    if (status === "PUBLISHED") {
+      newJob.whatsapp_message = generateJobWhatsAppMessage(newJob);
+      newJob.whatsapp_generated_at = new Date().toISOString();
+      newJob.whatsapp_status = "READY_TO_POST";
+    } else {
+      newJob.whatsapp_status = "PENDING";
+      newJob.whatsapp_message = null;
+      newJob.whatsapp_generated_at = null;
+    }
 
     jobs.unshift(newJob);
 
@@ -185,14 +214,14 @@ export async function POST(req: NextRequest) {
       id: Date.now(),
       actor_type: "ADMIN",
       actor_id: 1,
-      action: "JOB_NOTIFICATION_PUBLISHED",
+      action: status === "PUBLISHED" ? "JOB_NOTIFICATION_PUBLISHED" : "JOB_NOTIFICATION_DRAFTED",
       target_type: "JOB",
       target_id: newId,
       ip_address: "127.0.0.1",
       created_at: new Date().toISOString()
     });
 
-    return NextResponse.json(newJob, { status: 201 });
+    return NextResponse.json({ success: true, job: newJob }, { status: 201 });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

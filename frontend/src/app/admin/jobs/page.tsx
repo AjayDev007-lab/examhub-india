@@ -5,9 +5,11 @@ import Link from "next/link";
 import { 
   Briefcase, ArrowLeft, Plus, Search, Filter, ShieldCheck, 
   ExternalLink, CheckCircle, AlertTriangle, Clock, RefreshCw, 
-  Edit3, Trash2, Eye, Building, FileText, ChevronRight, X
+  Edit3, Trash2, Eye, Building, FileText, ChevronRight, X,
+  MessageCircle, Copy, Check, Send, Sparkles, Share2, Info
 } from "lucide-react";
 import { fetchApi } from "@/lib/api";
+import { generateJobWhatsAppMessage, buildWhatsAppShareUrl, EXAMHUB_WHATSAPP_CHANNEL_URL } from "@/lib/whatsappJobNotification";
 
 export default function AdminJobsManagementPage() {
   const [jobs, setJobs] = useState<any[]>([]);
@@ -22,6 +24,14 @@ export default function AdminJobsManagementPage() {
   const [submitting, setSubmitting] = useState(false);
   const [modalError, setModalError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+
+  // WhatsApp Notification State
+  const [selectedJobForWhatsApp, setSelectedJobForWhatsApp] = useState<any | null>(null);
+  const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
+  const [copiedWhatsApp, setCopiedWhatsApp] = useState(false);
+  const [dispatchingAdmin, setDispatchingAdmin] = useState(false);
+  const [dispatchMsg, setDispatchMsg] = useState("");
+  const [autoNotifyAdminOnCreate, setAutoNotifyAdminOnCreate] = useState(true);
 
   // Form State
   const [formTitle, setFormTitle] = useState("");
@@ -80,13 +90,127 @@ export default function AdminJobsManagementPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),
       });
-      if (res && res.job) {
-        setJobs(jobs.map((j) => (j.id === job.id ? { ...j, status: newStatus } : j)));
+      if (res) {
+        const updated = res.job || res;
+        setJobs(jobs.map((j) => (j.id === job.id ? { ...j, ...updated, status: newStatus } : j)));
         setSuccessMsg(`Status updated for ${job.title} to ${newStatus}`);
         setTimeout(() => setSuccessMsg(""), 3000);
       }
     } catch (err: any) {
       alert("Failed to update status: " + (err.message || "Unknown error"));
+    }
+  }
+
+  // Open WhatsApp Modal for a Job
+  function openWhatsAppModal(job: any) {
+    let msg = job.whatsapp_message;
+    if (!msg) {
+      msg = generateJobWhatsAppMessage(job);
+    }
+    const updatedJob = {
+      ...job,
+      whatsapp_message: msg,
+      whatsapp_status: job.whatsapp_status || (job.status === "PUBLISHED" ? "READY_TO_POST" : "PENDING")
+    };
+    setSelectedJobForWhatsApp(updatedJob);
+    setIsWhatsAppModalOpen(true);
+    setCopiedWhatsApp(false);
+    setDispatchMsg("");
+  }
+
+  function handleCopyMessage(text: string) {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopiedWhatsApp(true);
+    setTimeout(() => setCopiedWhatsApp(false), 3000);
+  }
+
+  async function handleDispatchToAdmin(jobId: any) {
+    setDispatchingAdmin(true);
+    setDispatchMsg("");
+    try {
+      const res = await fetchApi("/api/admin/jobs/whatsapp-dispatch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId, action: "DISPATCH_ADMIN" }),
+      });
+      if (res && res.success) {
+        setDispatchMsg(res.message || "Alert dispatched to Admin WhatsApp!");
+        setJobs(jobs.map((j) => (j.id === jobId ? { ...j, whatsapp_status: "SENT_TO_ADMIN", whatsapp_sent_at: res.whatsapp_sent_at } : j)));
+        if (selectedJobForWhatsApp && (selectedJobForWhatsApp.id === jobId || selectedJobForWhatsApp.slug === jobId)) {
+          setSelectedJobForWhatsApp({ ...selectedJobForWhatsApp, whatsapp_status: "SENT_TO_ADMIN" });
+        }
+      } else {
+        throw new Error(res?.error || "Failed to dispatch");
+      }
+    } catch (err: any) {
+      alert("Error dispatching to Admin WhatsApp: " + err.message);
+    } finally {
+      setDispatchingAdmin(false);
+    }
+  }
+
+  async function handleRegenerateWhatsApp(jobId: any) {
+    try {
+      const res = await fetchApi("/api/admin/jobs/whatsapp-dispatch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId, action: "REGENERATE" }),
+      });
+      if (res && res.success) {
+        if (selectedJobForWhatsApp && (selectedJobForWhatsApp.id === jobId || selectedJobForWhatsApp.slug === jobId)) {
+          setSelectedJobForWhatsApp({
+            ...selectedJobForWhatsApp,
+            whatsapp_message: res.whatsapp_message,
+            whatsapp_status: res.whatsapp_status,
+          });
+        }
+        setJobs(jobs.map((j) => (j.id === jobId ? { ...j, whatsapp_message: res.whatsapp_message, whatsapp_status: res.whatsapp_status } : j)));
+      }
+    } catch (err: any) {
+      console.error("Failed to regenerate WhatsApp message:", err);
+    }
+  }
+
+  function getWhatsAppBadge(job: any) {
+    const status = job.whatsapp_status || (job.status === "PUBLISHED" ? "READY_TO_POST" : "PENDING");
+    switch (status) {
+      case "SENT_TO_ADMIN":
+        return (
+          <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">
+            <ShieldCheck className="w-3 h-3 text-blue-400" />
+            <span>Sent to Admin</span>
+          </span>
+        );
+      case "READY_TO_POST":
+        return (
+          <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+            <MessageCircle className="w-3 h-3 text-emerald-400" />
+            <span>Ready to Post</span>
+          </span>
+        );
+      case "GENERATED":
+        return (
+          <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+            <Sparkles className="w-3 h-3 text-cyan-400" />
+            <span>Generated</span>
+          </span>
+        );
+      case "FAILED":
+        return (
+          <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+            <AlertTriangle className="w-3 h-3 text-rose-400" />
+            <span>Failed</span>
+          </span>
+        );
+      case "PENDING":
+      default:
+        return (
+          <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700">
+            <Clock className="w-3 h-3 text-slate-500" />
+            <span>Pending</span>
+          </span>
+        );
     }
   }
 
@@ -127,8 +251,9 @@ export default function AdminJobsManagementPage() {
         body: JSON.stringify(payload),
       });
 
-      if (res && res.job) {
-        setJobs([res.job, ...jobs]);
+      if (res && (res.job || res.id)) {
+        const createdJob = res.job || res;
+        setJobs([createdJob, ...jobs]);
         setIsModalOpen(false);
         setSuccessMsg("Job notification created and published successfully!");
         setTimeout(() => setSuccessMsg(""), 4000);
@@ -136,8 +261,16 @@ export default function AdminJobsManagementPage() {
         setFormTitle("");
         setFormOrg("");
         setFormSlug("");
+
+        // If published, automatically open WhatsApp modal and dispatch to admin if enabled
+        if (createdJob.status === "PUBLISHED") {
+          openWhatsAppModal(createdJob);
+          if (autoNotifyAdminOnCreate) {
+            handleDispatchToAdmin(createdJob.id);
+          }
+        }
       } else {
-        throw new Error(res?.detail || "Failed to create job");
+        throw new Error(res?.detail || res?.error || "Failed to create job");
       }
     } catch (err: any) {
       setModalError(err.message || "Failed to create job notification");
@@ -149,7 +282,7 @@ export default function AdminJobsManagementPage() {
   const publishedCount = jobs.filter((j) => j.status === "PUBLISHED").length;
   const draftCount = jobs.filter((j) => j.status === "DRAFT").length;
   const expiredCount = jobs.filter((j) => j.status === "EXPIRED").length;
-  const totalVacancies = jobs.reduce((acc, j) => acc + (j.total_vacancies || 0), 0);
+  const totalVacancies = jobs.reduce((acc, j) => acc + (j.total_vacancies || j.vacancies_count || 0), 0);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 lg:p-8">
@@ -312,20 +445,21 @@ export default function AdminJobsManagementPage() {
                   <th className="px-5 py-3">Vacancies & Pay</th>
                   <th className="px-5 py-3">Deadline</th>
                   <th className="px-5 py-3">Status</th>
+                  <th className="px-5 py-3">WhatsApp Update</th>
                   <th className="px-5 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="px-5 py-10 text-center text-slate-500">
+                    <td colSpan={7} className="px-5 py-10 text-center text-slate-500">
                       <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-blue-500" />
                       Loading verified job notifications...
                     </td>
                   </tr>
                 ) : jobs.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-5 py-10 text-center text-slate-500">
+                    <td colSpan={7} className="px-5 py-10 text-center text-slate-500">
                       No recruitment notices found matching your criteria.
                     </td>
                   </tr>
@@ -379,14 +513,14 @@ export default function AdminJobsManagementPage() {
 
                         <td className="px-5 py-4">
                           <div className="font-bold text-white text-xs">
-                            {job.total_vacancies?.toLocaleString() || "N/A"} Posts
+                            {(job.total_vacancies || job.vacancies_count)?.toLocaleString() || "N/A"} Posts
                           </div>
-                          <div className="text-slate-400 text-[11px] mt-0.5 line-clamp-1">{job.pay_scale || "Govt Rules"}</div>
+                          <div className="text-slate-400 text-[11px] mt-0.5 line-clamp-1">{job.pay_scale || job.salary_range || "Govt Rules"}</div>
                         </td>
 
                         <td className="px-5 py-4">
                           <div className={`font-semibold ${isExpired ? "text-red-400" : isClosingSoon ? "text-amber-400" : "text-slate-300"}`}>
-                            {job.last_date_to_apply ? new Date(job.last_date_to_apply).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "Open"}
+                            {job.last_date_to_apply || job.application_end_date ? new Date(job.last_date_to_apply || job.application_end_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "Open"}
                           </div>
                           {isClosingSoon && (
                             <span className="inline-block px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 mt-0.5">
@@ -410,6 +544,22 @@ export default function AdminJobsManagementPage() {
                           }`}>
                             {job.status}
                           </span>
+                        </td>
+
+                        <td className="px-5 py-4">
+                          <div className="space-y-1.5">
+                            {getWhatsAppBadge(job)}
+                            <div>
+                              <button
+                                onClick={() => openWhatsAppModal(job)}
+                                className="inline-flex items-center space-x-1 px-2.5 py-1 bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-700/60 hover:border-emerald-500 text-emerald-300 hover:text-emerald-200 text-[11px] font-bold rounded-lg transition-colors shadow-sm"
+                                title="Open WhatsApp Update Hub"
+                              >
+                                <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
+                                <span>WhatsApp Post</span>
+                              </button>
+                            </div>
+                          </div>
                         </td>
 
                         <td className="px-5 py-4 text-right">
@@ -667,6 +817,25 @@ export default function AdminJobsManagementPage() {
                 />
               </div>
 
+              {/* Automated WhatsApp Trigger Option */}
+              <div className="p-3 bg-slate-950/90 border border-emerald-900/40 rounded-xl space-y-1">
+                <label className="flex items-center space-x-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={autoNotifyAdminOnCreate}
+                    onChange={(e) => setAutoNotifyAdminOnCreate(e.target.checked)}
+                    className="w-4 h-4 rounded text-emerald-500 bg-slate-900 border-slate-700 focus:ring-0"
+                  />
+                  <span className="text-slate-200 font-bold text-xs flex items-center space-x-1.5">
+                    <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Auto-trigger WhatsApp Notification & Notify Admin on Publish</span>
+                  </span>
+                </label>
+                <p className="text-[11px] text-slate-400 pl-6">
+                  Automatically compiles an attractive WhatsApp post for the ExamHub Channel ({EXAMHUB_WHATSAPP_CHANNEL_URL}) and dispatches an instant alert to Admin WhatsApp.
+                </p>
+              </div>
+
               <div className="pt-4 border-t border-slate-800 flex justify-end space-x-3">
                 <button
                   type="button"
@@ -684,6 +853,137 @@ export default function AdminJobsManagementPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* WhatsApp Job Notification Modal */}
+      {isWhatsAppModalOpen && selectedJobForWhatsApp && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-2xl p-6 shadow-2xl relative my-8 space-y-4">
+            {/* Modal Header */}
+            <div className="flex justify-between items-start pb-4 border-b border-slate-800">
+              <div className="space-y-1">
+                <div className="flex items-center space-x-2">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-600/20">
+                    <MessageCircle className="w-4 h-4" />
+                  </div>
+                  <h2 className="text-base font-black text-white">WhatsApp Job Notification Hub</h2>
+                </div>
+                <p className="text-xs text-slate-400">
+                  Target: <a href={EXAMHUB_WHATSAPP_CHANNEL_URL} target="_blank" rel="noopener noreferrer" className="text-emerald-400 font-bold hover:underline">ExamHub India WhatsApp Channel</a>
+                </p>
+              </div>
+              <button
+                onClick={() => setIsWhatsAppModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Notification Status & Info Banner */}
+            <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-slate-950 border border-slate-800 rounded-xl text-xs">
+              <div className="flex items-center space-x-2">
+                <span className="text-slate-400 font-medium">Notification Status:</span>
+                {getWhatsAppBadge(selectedJobForWhatsApp)}
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => handleRegenerateWhatsApp(selectedJobForWhatsApp.id)}
+                  className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[11px] font-semibold transition-colors flex items-center space-x-1"
+                  title="Recompile message from current job fields"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  <span>Regenerate Text</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Success Dispatch Alert */}
+            {dispatchMsg && (
+              <div className="p-3 bg-emerald-950/90 border border-emerald-800 text-emerald-300 rounded-xl text-xs flex items-center space-x-2">
+                <CheckCircle className="w-4 h-4 shrink-0 text-emerald-400" />
+                <span>{dispatchMsg}</span>
+              </div>
+            )}
+
+            {/* WhatsApp Message Preview Bubble */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-300 flex items-center space-x-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Formatted WhatsApp Notification Preview:</span>
+                </label>
+                <span className="text-[11px] text-slate-500">Auto-generated with live links</span>
+              </div>
+
+              <div className="relative bg-[#0b141a] border border-emerald-900/30 rounded-2xl p-4 shadow-inner max-h-72 overflow-y-auto">
+                <pre className="font-sans text-xs text-slate-200 whitespace-pre-wrap leading-relaxed select-all">
+                  {selectedJobForWhatsApp.whatsapp_message || generateJobWhatsAppMessage(selectedJobForWhatsApp)}
+                </pre>
+              </div>
+            </div>
+
+            {/* Quick Action Shortcuts */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
+              <button
+                onClick={() => handleCopyMessage(selectedJobForWhatsApp.whatsapp_message || generateJobWhatsAppMessage(selectedJobForWhatsApp))}
+                className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-600/30 flex items-center justify-center space-x-2 transition-colors"
+              >
+                {copiedWhatsApp ? (
+                  <>
+                    <Check className="w-4 h-4 text-white" />
+                    <span>Copied to Clipboard!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4" />
+                    <span>1-Click Copy WhatsApp Post</span>
+                  </>
+                )}
+              </button>
+
+              <a
+                href={EXAMHUB_WHATSAPP_CHANNEL_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-700/40 hover:border-emerald-500 rounded-xl text-xs font-bold flex items-center justify-center space-x-2 transition-colors"
+              >
+                <ExternalLink className="w-4 h-4" />
+                <span>Open WhatsApp Channel</span>
+              </a>
+
+              <a
+                href={buildWhatsAppShareUrl(selectedJobForWhatsApp.whatsapp_message || generateJobWhatsAppMessage(selectedJobForWhatsApp))}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold flex items-center justify-center space-x-2 transition-colors"
+              >
+                <Share2 className="w-4 h-4 text-emerald-400" />
+                <span>Share via WhatsApp Web / App</span>
+              </a>
+
+              <button
+                onClick={() => handleDispatchToAdmin(selectedJobForWhatsApp.id)}
+                disabled={dispatchingAdmin}
+                className="w-full py-2.5 px-4 bg-blue-600/90 hover:bg-blue-600 text-white rounded-xl text-xs font-semibold flex items-center justify-center space-x-2 transition-colors disabled:opacity-50"
+              >
+                <Send className="w-4 h-4" />
+                <span>{dispatchingAdmin ? "Sending..." : "Send to Admin WhatsApp"}</span>
+              </button>
+            </div>
+
+            {/* Meta Policy & Anti-Ban Advisory Notice */}
+            <div className="p-3 bg-slate-950/80 border border-amber-900/40 rounded-xl text-[11px] text-slate-400 space-y-1">
+              <div className="flex items-center space-x-1.5 text-amber-300 font-bold">
+                <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                <span>Official Meta WhatsApp Channel Policy & Anti-Ban Architecture</span>
+              </div>
+              <p>
+                Meta currently restricts direct programmatic Channel broadcasting to certified enterprise Business Solution Providers (BSPs). Unofficial browser-scraping scripts (e.g. Puppeteer / Baileys) trigger automated spam heuristics and result in permanent phone number bans. ExamHub India uses this verified 1-click dispatch workflow, ensuring 100% compliance, zero ban risk, and instant publishing.
+              </p>
+            </div>
           </div>
         </div>
       )}

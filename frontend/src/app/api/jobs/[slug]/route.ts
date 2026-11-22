@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbStore } from "@/lib/data";
+import { generateJobWhatsAppMessage } from "@/lib/whatsappJobNotification";
 
 export async function GET(
   req: NextRequest,
@@ -61,15 +62,41 @@ export async function PUT(
     }
 
     const current = jobs[jobIndex];
+    const prevStatus = current.status;
+
     if (body.title) current.title = body.title.trim();
     if (body.status) current.status = body.status;
     if (body.vacancies_count !== undefined) current.vacancies_count = Number(body.vacancies_count);
+    if (body.total_vacancies !== undefined) current.total_vacancies = Number(body.total_vacancies);
     if (body.application_end_date !== undefined) current.application_end_date = body.application_end_date;
+    if (body.last_date_to_apply !== undefined) current.last_date_to_apply = body.last_date_to_apply;
     if (body.official_application_url) current.official_application_url = body.official_application_url.trim();
+    if (body.official_apply_url) current.official_apply_url = body.official_apply_url.trim();
     if (body.official_notification_pdf !== undefined) current.official_notification_pdf = body.official_notification_pdf;
+    if (body.official_notification_pdf_url !== undefined) current.official_notification_pdf_url = body.official_notification_pdf_url;
+    
+    // Manage Automated WhatsApp Notification Lifecycle
+    if (body.status === "PUBLISHED" && (prevStatus !== "PUBLISHED" || !current.whatsapp_message)) {
+      if (current.whatsapp_status !== "SENT_TO_ADMIN") {
+        current.whatsapp_message = generateJobWhatsAppMessage(current);
+        current.whatsapp_generated_at = new Date().toISOString();
+        current.whatsapp_status = "READY_TO_POST";
+      }
+      current.published_at = current.published_at || new Date().toISOString();
+    } else if (body.status === "DRAFT" && current.whatsapp_status !== "SENT_TO_ADMIN") {
+      current.whatsapp_status = "PENDING";
+    }
+
+    if (body.whatsapp_status) {
+      current.whatsapp_status = body.whatsapp_status;
+    }
+
     current.last_verified_at = new Date().toISOString();
 
-    return NextResponse.json(current);
+    return NextResponse.json({
+      ...current,
+      job: current
+    });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
