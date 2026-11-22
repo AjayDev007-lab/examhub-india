@@ -20,8 +20,9 @@ export async function POST(request: Request) {
       (emailClean === admin.email.toLowerCase() || emailClean === "superadmin@examhub.gov.in" || emailClean === "ajaydevvs22102004@gmail.com") &&
       (password === admin.password || password === "SuperAdmin@ExamHub2026!" || password === "superadmin")
     ) {
-      return NextResponse.json({
-        access_token: "examhub_superadmin_secure_token_" + Date.now(),
+      const token = "examhub_superadmin_secure_token_" + Date.now();
+      const res = NextResponse.json({
+        access_token: token,
         token_type: "bearer",
         user_type: "admin",
         user: {
@@ -31,6 +32,10 @@ export async function POST(request: Request) {
           role: admin.role || "SUPER_ADMIN"
         }
       });
+      res.cookies.set("examhub_token", token, { path: "/", httpOnly: false, sameSite: "lax", maxAge: 86400 });
+      res.cookies.set("examhub_admin_token", token, { path: "/", httpOnly: false, sameSite: "lax", maxAge: 86400 });
+      res.cookies.set("examhub_user_type", "admin", { path: "/", httpOnly: false, sameSite: "lax", maxAge: 86400 });
+      return res;
     }
 
     return NextResponse.json(

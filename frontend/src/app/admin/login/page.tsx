@@ -24,6 +24,9 @@ export default function AdminLoginPage() {
       });
       localStorage.setItem("examhub_admin_token", res.access_token);
       localStorage.setItem("examhub_admin_user", JSON.stringify(res.user));
+      document.cookie = `examhub_token=${res.access_token}; path=/; max-age=86400; SameSite=Lax`;
+      document.cookie = `examhub_admin_token=${res.access_token}; path=/; max-age=86400; SameSite=Lax`;
+      document.cookie = `examhub_user_type=admin; path=/; max-age=86400; SameSite=Lax`;
       window.location.href = "/admin/dashboard";
     } catch (err: any) {
       setErrorMsg(err.message || "Invalid administrator credentials");

@@ -45,6 +45,16 @@ const nextConfig = {
         destination: '/',
         permanent: true,
       },
+      {
+        source: '/books',
+        destination: '/school/books',
+        permanent: true,
+      },
+      {
+        source: '/school-results',
+        destination: '/school/results',
+        permanent: true,
+      },
     ];
   },
   async rewrites() {

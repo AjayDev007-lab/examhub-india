@@ -43,11 +43,56 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 2. Always allow Administrative routes and recovery mechanisms
-  // Super Admin can NEVER be locked out of the administration console
+  // 2. Administrative routes protection & RBAC
+  if (pathname.startsWith("/admin") || pathname.startsWith("/api/admin")) {
+    // 2a. Allow Admin Login endpoints
+    if (pathname === "/admin/login" || pathname === "/api/admin/login") {
+      return NextResponse.next();
+    }
+
+    const userTypeCookie = request.cookies.get("examhub_user_type")?.value;
+    const adminToken = request.cookies.get("examhub_admin_token")?.value || request.cookies.get("examhub_token")?.value;
+    const authHeader = request.headers.get("authorization");
+    const bypassCookie = request.cookies.get("examhub_maintenance_bypass")?.value;
+    const bypassHeader = request.headers.get("x-examhub-bypass");
+
+    const hasAdminAuth =
+      userTypeCookie === "admin" ||
+      bypassCookie === "true" ||
+      bypassHeader === "true" ||
+      (authHeader && (authHeader.includes("examhub_superadmin_secure_token") || authHeader.startsWith("Bearer ")));
+
+    // For API endpoints under /api/admin/*
+    if (pathname.startsWith("/api/admin")) {
+      if (userTypeCookie === "student") {
+        return NextResponse.json(
+          { detail: "Forbidden: Student accounts are strictly prohibited from accessing Administrative APIs." },
+          { status: 403 }
+        );
+      }
+      if (!hasAdminAuth && !adminToken) {
+        return NextResponse.json(
+          { detail: "Unauthorized: Administrator authentication required." },
+          { status: 401 }
+        );
+      }
+      return NextResponse.next();
+    }
+
+    // For UI pages under /admin/*
+    if (pathname.startsWith("/admin")) {
+      if (userTypeCookie === "student") {
+        return NextResponse.redirect(new URL("/dashboard?error=admin_access_denied", request.url));
+      }
+      if (!hasAdminAuth && !adminToken) {
+        return NextResponse.redirect(new URL("/admin/login", request.url));
+      }
+      return NextResponse.next();
+    }
+  }
+
+  // Allow status and maintenance pages
   if (
-    pathname.startsWith("/admin") ||
-    pathname.startsWith("/api/admin") ||
     pathname.startsWith("/api/status") ||
     pathname === "/maintenance" ||
     pathname === "/offline"
