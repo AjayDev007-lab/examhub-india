@@ -3,6 +3,7 @@ import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import FloatingAIAssistant from "@/components/FloatingAIAssistant";
+import FloatingWhatsAppButton from "@/components/FloatingWhatsAppButton";
 import VisitorTrackerClient from "@/components/VisitorTrackerClient";
 
 export const metadata: Metadata = {
@@ -23,6 +24,7 @@ export default function RootLayout({
         <main className="flex-1">{children}</main>
         <Footer />
         <FloatingAIAssistant />
+        <FloatingWhatsAppButton />
         <VisitorTrackerClient />
       </body>
     </html>

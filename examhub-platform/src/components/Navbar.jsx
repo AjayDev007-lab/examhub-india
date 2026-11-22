@@ -14,7 +14,8 @@ import {
   ExternalLink,
   Lock,
   ChevronDown,
-  Sparkles
+  Sparkles,
+  MessageCircle
 } from "lucide-react";
 
 export default function Navbar({ onNavigate, currentView, onOpenNotifs }) {
@@ -100,6 +101,18 @@ export default function Navbar({ onNavigate, currentView, onOpenNotifs }) {
 
           {/* Desktop Right Actions */}
           <div className="hidden md:flex items-center space-x-3">
+            {/* WhatsApp Official Channel Link */}
+            <a
+              href="https://whatsapp.com/channel/0029VbA1ZLpJENy3wwL6VC0s"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 text-xs font-bold transition-all shadow-sm group"
+              title="Join ExamHub India Official WhatsApp Channel"
+            >
+              <MessageCircle className="w-4 h-4 text-emerald-400 fill-emerald-400/20 group-hover:scale-110 transition-transform" />
+              <span>WhatsApp Channel</span>
+            </a>
+
             {/* Notifications Pill */}
             <button
               onClick={onOpenNotifs}
