@@ -84,43 +84,49 @@ async def login(req: UserLogin, request: Request, db: AsyncSession = Depends(get
     # 1. First verify if it's a student account
     stmt = select(User).where(User.email == email_clean, User.is_active == True, User.deleted_at.is_(None))
     user = (await db.execute(stmt)).scalar_one_or_none()
-    if user and verify_password(req.password, user.password_hash):
-        token = create_access_token({"sub": str(user.id), "email": user.email, "type": "student"})
-        
-        # Record active student session
-        session = UserSession(
-            user_id=user.id,
-            session_token=secrets.token_hex(32),
-            ip_address=client_ip,
-            user_agent=user_agent,
-            expires_at=datetime.now(timezone.utc) + timedelta(days=1)
-        )
-        db.add(session)
-        await db.commit()
+    if user:
+        if verify_password(req.password, user.password_hash):
+            token = create_access_token({"sub": str(user.id), "email": user.email, "type": "student"})
+            
+            # Record active student session
+            session = UserSession(
+                user_id=user.id,
+                session_token=secrets.token_hex(32),
+                ip_address=client_ip,
+                user_agent=user_agent,
+                expires_at=datetime.now(timezone.utc) + timedelta(days=1)
+            )
+            db.add(session)
+            await db.commit()
 
-        await log_audit_event(
-            db,
-            actor_type="USER",
-            actor_id=user.id,
-            action="USER_LOGIN",
-            target_type="USER",
-            target_id=user.id,
-            ip_address=client_ip
-        )
+            await log_audit_event(
+                db,
+                actor_type="USER",
+                actor_id=user.id,
+                action="USER_LOGIN",
+                target_type="USER",
+                target_id=user.id,
+                ip_address=client_ip
+            )
 
-        return Token(
-            access_token=token,
-            token_type="bearer",
-            user_type="student",
-            user={
-                "id": user.id,
-                "full_name": user.full_name,
-                "email": user.email,
-                "mobile": user.mobile,
-                "is_verified": user.is_verified,
-                "mobile_verified": user.mobile_verified
-            }
-        )
+            return Token(
+                access_token=token,
+                token_type="bearer",
+                user_type="student",
+                user={
+                    "id": user.id,
+                    "full_name": user.full_name,
+                    "email": user.email,
+                    "mobile": user.mobile,
+                    "is_verified": user.is_verified,
+                    "mobile_verified": user.mobile_verified
+                }
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect password entered. Please verify your password."
+            )
 
     # 2. Check if it's an administrator account logging in
     stmt_admin = select(AdminUser).options(selectinload(AdminUser.role)).where(
@@ -132,34 +138,43 @@ async def login(req: UserLogin, request: Request, db: AsyncSession = Depends(get
         stmt_fallback = select(AdminUser).options(selectinload(AdminUser.role)).where(AdminUser.is_active == True)
         admin = (await db.execute(stmt_fallback)).scalars().first()
 
-    if admin and verify_password(req.password, admin.password_hash):
-        admin.last_login_at = datetime.now(timezone.utc)
-        await db.commit()
-        admin_token = create_access_token({"sub": str(admin.id), "email": admin.email, "type": "admin"})
+    if admin:
+        if verify_password(req.password, admin.password_hash):
+            admin.last_login_at = datetime.now(timezone.utc)
+            await db.commit()
+            admin_token = create_access_token({"sub": str(admin.id), "email": admin.email, "type": "admin"})
 
-        await log_audit_event(
-            db,
-            actor_type="ADMIN",
-            actor_id=admin.id,
-            action="ADMIN_LOGIN",
-            target_type="ADMIN",
-            target_id=admin.id,
-            ip_address=client_ip
-        )
+            await log_audit_event(
+                db,
+                actor_type="ADMIN",
+                actor_id=admin.id,
+                action="ADMIN_LOGIN",
+                target_type="ADMIN",
+                target_id=admin.id,
+                ip_address=client_ip
+            )
 
-        return Token(
-            access_token=admin_token,
-            token_type="bearer",
-            user_type="admin",
-            user={
-                "id": admin.id,
-                "full_name": admin.full_name,
-                "email": admin.email,
-                "role": admin.role.name if admin.role else "SUPER_ADMIN"
-            }
-        )
+            return Token(
+                access_token=admin_token,
+                token_type="bearer",
+                user_type="admin",
+                user={
+                    "id": admin.id,
+                    "full_name": admin.full_name,
+                    "email": admin.email,
+                    "role": admin.role.name if admin.role else "SUPER_ADMIN"
+                }
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect password entered. Please verify your password."
+            )
 
-    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="No account found matching this email address. Please check spelling or create an account."
+    )
 
 @router.post("/send-otp")
 async def send_otp(req: SendOtpRequest):

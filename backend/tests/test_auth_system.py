@@ -60,7 +60,7 @@ async def test_complete_login_and_session_flow():
             "password": "WrongPassword!"
         })
         assert bad_login.status_code == 401
-        assert "Invalid email or password" in bad_login.json()["detail"]
+        assert "Incorrect password entered" in bad_login.json()["detail"]
 
         # 2. Valid login
         login_resp = await client.post("/api/auth/login", json={
