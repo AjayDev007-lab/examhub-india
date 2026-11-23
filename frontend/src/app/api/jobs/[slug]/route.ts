@@ -75,15 +75,36 @@ export async function PUT(
     if (body.official_notification_pdf !== undefined) current.official_notification_pdf = body.official_notification_pdf;
     if (body.official_notification_pdf_url !== undefined) current.official_notification_pdf_url = body.official_notification_pdf_url;
     
-    if (body.status === "PUBLISHED" && prevStatus !== "PUBLISHED") {
-      current.published_at = current.published_at || new Date().toISOString();
-      current.telegram_message = formatJobTelegramPost(current);
-      current.telegram_generated_at = new Date().toISOString();
-      const channelResult = await sendTelegramChannelPost(current.telegram_message);
-      current.telegram_channel_status = channelResult.status === "SENT" ? "POSTED_TO_CHANNEL" : "READY_TO_POST";
-      if (channelResult.status === "SENT") {
-        current.telegram_posted_at = new Date().toISOString();
+    const shouldBroadcast = 
+      (body.status === "PUBLISHED" && prevStatus !== "PUBLISHED") ||
+      body.broadcast_to_telegram === true ||
+      body.retry_broadcast === true;
+
+    const endDate = current.application_end_date || current.last_date_to_apply;
+    const isExpired = endDate ? new Date(endDate).getTime() < Date.now() : false;
+
+    if (shouldBroadcast && !isExpired) {
+      try {
+        current.published_at = current.published_at || new Date().toISOString();
+        current.telegram_message = formatJobTelegramPost(current);
+        current.telegram_generated_at = new Date().toISOString();
+        const channelResult = await sendTelegramChannelPost(current.telegram_message);
+        if (channelResult.success) {
+          current.telegram_channel_status = "POSTED_TO_CHANNEL";
+          current.telegram_message_id = channelResult.details?.messageId;
+          current.telegram_posted_at = new Date().toISOString();
+          current.telegram_error = null;
+        } else {
+          current.telegram_channel_status = "FAILED";
+          current.telegram_error = channelResult.message || "Failed to post to Telegram channel";
+        }
+      } catch (err: any) {
+        current.telegram_channel_status = "FAILED";
+        current.telegram_error = err.message || "Network error dispatching Telegram broadcast";
       }
+    } else if (shouldBroadcast && isExpired) {
+      current.telegram_channel_status = "EXPIRED";
+      current.telegram_error = "Job application deadline has passed; not broadcast to channel.";
     }
 
     current.last_verified_at = new Date().toISOString();

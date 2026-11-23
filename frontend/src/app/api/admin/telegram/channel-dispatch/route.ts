@@ -46,18 +46,24 @@ export async function POST(req: NextRequest) {
       // Record status in memory if associated with a job
       if (result.success && targetJob) {
         targetJob.telegram_channel_status = "POSTED_TO_CHANNEL";
+        targetJob.telegram_message_id = result.details?.messageId;
         targetJob.telegram_posted_at = new Date().toISOString();
+        targetJob.telegram_error = null;
+      } else if (!result.success && targetJob) {
+        targetJob.telegram_channel_status = "FAILED";
+        targetJob.telegram_error = result.message || "Failed to post to Telegram channel";
       }
 
       return NextResponse.json({
         success: result.success,
         status: result.status,
         message: result.message,
+        messageId: result.details?.messageId,
         channel: TELEGRAM_PUBLIC_CHANNEL_ID,
         channelUrl: TELEGRAM_PUBLIC_CHANNEL_URL,
         postedAt: targetJob?.telegram_posted_at || new Date().toISOString(),
         details: result.details
-      });
+      }, { status: 200 });
     }
 
     return NextResponse.json({ success: false, error: "Unknown action" }, { status: 400 });

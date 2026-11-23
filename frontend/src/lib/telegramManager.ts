@@ -497,6 +497,14 @@ export function generateTelegramDailyDigest(state: any): string {
     `_This is a private administrative alert delivered strictly to ${TELEGRAM_ADMIN_USERNAME}._`;
 }
 
+function escapeHtml(text?: string | null): string {
+  if (!text) return "";
+  return String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 /**
  * Broadcasts a verified announcement to the public Telegram channel (@india102210).
  * Requires the bot to be an Administrator in the channel with 'Post Messages' permission.
@@ -534,7 +542,7 @@ export async function sendTelegramChannelPost(
       body: JSON.stringify({
         chat_id: channel,
         text: messageText,
-        parse_mode: options?.parseMode || "Markdown",
+        parse_mode: options?.parseMode || "HTML",
         disable_web_page_preview: options?.disablePreview ?? false
       })
     });
@@ -573,41 +581,44 @@ export async function sendTelegramChannelPost(
 
 /**
  * Formats a verified job recruitment notice for broadcast to the public Telegram Channel (@india102210).
+ * Uses HTML formatting with escapeHtml for 100% reliability against entity parse errors.
  */
 export function formatJobTelegramPost(job: any): string {
-  const title = job.title || "Government / IT Recruitment Opening";
-  const org = job.organization_name || job.company || "Official Recruitment Board";
+  const title = escapeHtml(job.title || "Government / IT Recruitment Opening");
+  const org = escapeHtml(job.organization_name || job.company || "Official Recruitment Board");
   const vacancies = job.total_vacancies || job.vacancies_count || null;
-  const qualification = job.qualification || job.educational_qualification || "Graduate / Diploma / 10th / 12th";
-  const salary = job.salary_package || job.pay_scale || null;
-  const location = job.job_location || job.location || "All India";
-  const lastDate = job.last_date_to_apply || job.application_end_date || "Check Official Circular";
+  const qualification = escapeHtml(job.qualification || job.educational_qualification || "Graduate / Diploma / 10th / 12th");
+  const salary = job.salary_package || job.pay_scale || job.salary_range || null;
+  const location = escapeHtml(job.job_location || job.location || "All India");
+  const lastDate = escapeHtml(job.last_date_to_apply || job.application_end_date || "Check Official Circular");
   const applyUrl = job.official_application_url || job.official_apply_url || job.officialCareerUrl || `https://examhub-india.vercel.app/jobs/${job.slug || job.id}`;
   const pdfUrl = job.official_notification_pdf || job.official_notification_pdf_url || null;
+  const examHubUrl = `https://examhub-india.vercel.app/jobs/${job.slug || job.id}`;
 
-  let post = `📢 *EXAMHUB INDIA — NEW VERIFIED JOB ALERT*\n`;
-  post += `🏛️ *Organization:* ${org}\n`;
-  post += `💼 *Post Title:* ${title}\n`;
+  let post = `📢 <b>EXAMHUB INDIA — NEW VERIFIED JOB ALERT</b>\n`;
+  post += `🏛️ <b>Organization:</b> ${org}\n`;
+  post += `💼 <b>Post Title:</b> ${title}\n`;
   post += `━━━━━━━━━━━━━━━━━━━━━━\n\n`;
 
   if (vacancies) {
-    post += `🔢 *Total Vacancies:* ${vacancies} Posts\n`;
+    post += `🔢 <b>Total Vacancies:</b> ${vacancies} Posts\n`;
   }
-  post += `🎓 *Qualification:* ${qualification}\n`;
+  post += `🎓 <b>Qualification:</b> ${qualification}\n`;
   if (salary) {
-    post += `💰 *Pay Scale / Package:* ${salary}\n`;
+    post += `💰 <b>Pay Scale / Package:</b> ${escapeHtml(salary)}\n`;
   }
-  post += `📍 *Location:* ${location}\n`;
-  post += `⏰ *Last Date to Apply:* ${lastDate}\n\n`;
+  post += `📍 <b>Location:</b> ${location}\n`;
+  post += `⏰ <b>Last Date to Apply:</b> ${lastDate}\n\n`;
 
-  post += `🔗 *Apply Online (Official Link):*\n${applyUrl}\n\n`;
+  post += `🔗 <b>Apply Online (Official Link):</b>\n${applyUrl}\n\n`;
   if (pdfUrl) {
-    post += `📄 *Official Notification PDF:*\n${pdfUrl}\n\n`;
+    post += `📄 <b>Official Notification Circular:</b>\n${pdfUrl}\n\n`;
   }
+  post += `🌐 <b>View on ExamHub:</b>\n${examHubUrl}\n\n`;
 
   post += `━━━━━━━━━━━━━━━━━━━━━━\n`;
-  post += `🛡️ *Anti-Fraud Notice:* Government boards never ask for OTPs or fees via private accounts. Apply only through verified portals.\n\n`;
-  post += `📲 *Join for Daily Verified Alerts:* ${TELEGRAM_PUBLIC_CHANNEL_URL}`;
+  post += `🛡️ <b>Anti-Fraud Notice:</b> Government recruitment boards never ask for OTPs or fees via private accounts. Apply only through verified portals.\n\n`;
+  post += `📲 <b>Join for Daily Verified Alerts:</b> ${TELEGRAM_PUBLIC_CHANNEL_URL}`;
 
   return post;
 }

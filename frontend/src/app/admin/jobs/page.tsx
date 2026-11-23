@@ -28,6 +28,7 @@ export default function AdminJobsManagementPage() {
   const [selectedJobForTelegram, setSelectedJobForTelegram] = useState<any | null>(null);
   const [isTelegramModalOpen, setIsTelegramModalOpen] = useState(false);
   const [telegramDispatching, setTelegramDispatching] = useState(false);
+  const [quickBroadcastingId, setQuickBroadcastingId] = useState<number | null>(null);
   const [telegramNotice, setTelegramNotice] = useState("");
   const [copiedTelegram, setCopiedTelegram] = useState(false);
   const [telegramPreviewText, setTelegramPreviewText] = useState("");
@@ -137,14 +138,61 @@ export default function AdminJobsManagementPage() {
       });
       if (res && res.success) {
         setTelegramNotice(res.message || "Broadcast successfully posted to @india102210!");
-        setJobs(jobs.map((j) => (j.id === job.id ? { ...j, telegram_channel_status: "POSTED_TO_CHANNEL" } : j)));
+        setJobs(jobs.map((j) => (j.id === job.id ? { 
+          ...j, 
+          telegram_channel_status: "POSTED_TO_CHANNEL",
+          telegram_message_id: res.messageId,
+          telegram_posted_at: res.postedAt,
+          telegram_error: null
+        } : j)));
       } else {
-        setTelegramNotice("⚠️ " + (res?.message || "Failed to broadcast to Telegram channel."));
+        const errorMsg = res?.message || "Failed to broadcast to Telegram channel.";
+        setTelegramNotice("⚠️ " + errorMsg);
+        setJobs(jobs.map((j) => (j.id === job.id ? { 
+          ...j, 
+          telegram_channel_status: "FAILED",
+          telegram_error: errorMsg
+        } : j)));
       }
     } catch (err: any) {
       setTelegramNotice("⚠️ Error: " + err.message);
     } finally {
       setTelegramDispatching(false);
+    }
+  }
+
+  async function handleQuickBroadcast(job: any) {
+    setQuickBroadcastingId(job.id);
+    setSuccessMsg("");
+    try {
+      const res = await fetchApi("/api/admin/telegram/channel-dispatch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId: job.id, action: "DISPATCH_CHANNEL" })
+      });
+      if (res && res.success) {
+        setJobs(jobs.map((j) => (j.id === job.id ? { 
+          ...j, 
+          telegram_channel_status: "POSTED_TO_CHANNEL",
+          telegram_message_id: res.messageId,
+          telegram_posted_at: res.postedAt,
+          telegram_error: null 
+        } : j)));
+        setSuccessMsg(`✅ Successfully broadcast "${job.title}" to @india102210 (Msg #${res.messageId || 'OK'})!`);
+        setTimeout(() => setSuccessMsg(""), 4000);
+      } else {
+        const errorText = res?.message || "Failed to post to Telegram channel";
+        setJobs(jobs.map((j) => (j.id === job.id ? { 
+          ...j, 
+          telegram_channel_status: "FAILED",
+          telegram_error: errorText 
+        } : j)));
+        alert("⚠️ Telegram Broadcast Error: " + errorText);
+      }
+    } catch (err: any) {
+      alert("⚠️ Error broadcasting to channel: " + err.message);
+    } finally {
+      setQuickBroadcastingId(null);
     }
   }
 
@@ -155,7 +203,17 @@ export default function AdminJobsManagementPage() {
         return (
           <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30">
             <CheckCircle className="w-3 h-3 text-sky-400" />
-            <span>Posted to Channel</span>
+            <span>Posted {job.telegram_message_id ? `#${job.telegram_message_id}` : ""}</span>
+          </span>
+        );
+      case "FAILED":
+        return (
+          <span 
+            className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/20 text-red-300 border border-red-500/30 cursor-help"
+            title={job.telegram_error || "Telegram broadcast failed. Click retry to attempt again."}
+          >
+            <AlertTriangle className="w-3 h-3 text-red-400" />
+            <span>Broadcast Failed</span>
           </span>
         );
       case "READY_TO_POST":
@@ -165,12 +223,20 @@ export default function AdminJobsManagementPage() {
             <span>Ready to Post</span>
           </span>
         );
+      case "EXPIRED":
+        return (
+          <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700">
+            <Clock className="w-3 h-3 text-slate-500" />
+            <span>Expired (Skipped)</span>
+          </span>
+        );
       case "PENDING":
+      case "DRAFT_PENDING":
       default:
         return (
           <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700">
             <Clock className="w-3 h-3 text-slate-500" />
-            <span>Pending</span>
+            <span>Draft</span>
           </span>
         );
     }
@@ -205,6 +271,7 @@ export default function AdminJobsManagementPage() {
         source_name: formSourceName.trim(),
         selection_stages: stagesArray,
         status: formStatus,
+        broadcast_to_telegram: autoBroadcastOnCreate,
       };
 
       const res = await fetchApi("/api/jobs", {
@@ -217,7 +284,11 @@ export default function AdminJobsManagementPage() {
         const createdJob = res.job || res;
         setJobs([createdJob, ...jobs]);
         setIsModalOpen(false);
-        setSuccessMsg("Job notification created and published successfully!");
+        if (createdJob.telegram_channel_status === "POSTED_TO_CHANNEL") {
+          setSuccessMsg(`Job published and broadcast to Telegram channel @india102210 (Msg #${createdJob.telegram_message_id || 'OK'})!`);
+        } else {
+          setSuccessMsg("Job notification created and published successfully!");
+        }
         setTimeout(() => setSuccessMsg(""), 4000);
         // Reset form
         setFormTitle("");
@@ -502,17 +573,37 @@ export default function AdminJobsManagementPage() {
 
                         <td className="px-5 py-4">
                           <div className="space-y-1.5">
-                            {getTelegramBadge(job)}
-                            <div>
+                            <div>{getTelegramBadge(job)}</div>
+                            <div className="flex items-center space-x-1.5">
+                              {job.status === "PUBLISHED" && job.telegram_channel_status !== "POSTED_TO_CHANNEL" && (
+                                <button
+                                  onClick={() => handleQuickBroadcast(job)}
+                                  disabled={quickBroadcastingId === job.id}
+                                  className="inline-flex items-center space-x-1 px-2 py-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-[10px] font-bold rounded transition-colors shadow-sm"
+                                  title="Publish directly to @india102210 now"
+                                >
+                                  {quickBroadcastingId === job.id ? (
+                                    <RefreshCw className="w-3 h-3 animate-spin" />
+                                  ) : (
+                                    <Send className="w-3 h-3" />
+                                  )}
+                                  <span>{job.telegram_channel_status === "FAILED" ? "Retry" : "Broadcast"}</span>
+                                </button>
+                              )}
                               <button
                                 onClick={() => openTelegramModal(job)}
-                                className="inline-flex items-center space-x-1 px-2.5 py-1 bg-sky-950/80 hover:bg-sky-900 border border-sky-700/60 hover:border-sky-500 text-sky-300 hover:text-sky-200 text-[11px] font-bold rounded-lg transition-colors shadow-sm"
+                                className="inline-flex items-center space-x-1 px-2 py-1 bg-sky-950/80 hover:bg-sky-900 border border-sky-700/60 hover:border-sky-500 text-sky-300 hover:text-sky-200 text-[10px] font-bold rounded transition-colors shadow-sm"
                                 title="Open Telegram Channel Broadcast Hub"
                               >
-                                <Send className="w-3.5 h-3.5 text-sky-400" />
-                                <span>Channel Post</span>
+                                <FileText className="w-3 h-3 text-sky-400" />
+                                <span>Preview</span>
                               </button>
                             </div>
+                            {job.telegram_error && job.telegram_channel_status === "FAILED" && (
+                              <p className="text-[10px] text-red-400 line-clamp-1 max-w-[180px]" title={job.telegram_error}>
+                                {job.telegram_error}
+                              </p>
+                            )}
                           </div>
                         </td>
 

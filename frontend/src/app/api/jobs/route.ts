@@ -197,16 +197,31 @@ export async function POST(req: NextRequest) {
     };
 
     // Automated Telegram Channel Publishing (@india102210)
-    if (status === "PUBLISHED") {
-      newJob.telegram_message = formatJobTelegramPost(newJob);
-      newJob.telegram_generated_at = new Date().toISOString();
-      const channelResult = await sendTelegramChannelPost(newJob.telegram_message);
-      newJob.telegram_channel_status = channelResult.status === "SENT" ? "POSTED_TO_CHANNEL" : "READY_TO_POST";
-      if (channelResult.status === "SENT") {
-        newJob.telegram_posted_at = new Date().toISOString();
+    const isExpired = endDate ? new Date(endDate).getTime() < Date.now() : false;
+
+    if (status === "PUBLISHED" && !isExpired && body.broadcast_to_telegram !== false) {
+      try {
+        newJob.telegram_message = formatJobTelegramPost(newJob);
+        newJob.telegram_generated_at = new Date().toISOString();
+        const channelResult = await sendTelegramChannelPost(newJob.telegram_message);
+        if (channelResult.success) {
+          newJob.telegram_channel_status = "POSTED_TO_CHANNEL";
+          newJob.telegram_message_id = channelResult.details?.messageId;
+          newJob.telegram_posted_at = new Date().toISOString();
+          newJob.telegram_error = null;
+        } else {
+          newJob.telegram_channel_status = "FAILED";
+          newJob.telegram_error = channelResult.message || "Failed to post to Telegram channel";
+        }
+      } catch (err: any) {
+        newJob.telegram_channel_status = "FAILED";
+        newJob.telegram_error = err.message || "Network error dispatching Telegram broadcast";
       }
+    } else if (isExpired) {
+      newJob.telegram_channel_status = "EXPIRED";
+      newJob.telegram_error = "Job application deadline has already passed; not broadcast to channel.";
     } else {
-      newJob.telegram_channel_status = "PENDING";
+      newJob.telegram_channel_status = "DRAFT_PENDING";
     }
 
     jobs.unshift(newJob);
