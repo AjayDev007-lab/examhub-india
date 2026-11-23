@@ -424,12 +424,12 @@ function initAIManagerState() {
         consumedTokensToday: 68420,
         costInrToday: 13.68,
         telegram: {
-          isEnabled: Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID),
+          isEnabled: Boolean(process.env.TELEGRAM_BOT_TOKEN && (process.env.TELEGRAM_ADMIN_CHAT_ID || "8110670060")),
           botUsername: "@ExamHub_AI_Guardian_Bot",
           adminUsername: "@AJ4Y2",
-          adminChatId: process.env.TELEGRAM_ADMIN_CHAT_ID || null,
+          adminChatId: process.env.TELEGRAM_ADMIN_CHAT_ID?.trim() || "8110670060",
           isTokenConfigured: Boolean(process.env.TELEGRAM_BOT_TOKEN),
-          isChatIdConfigured: Boolean(process.env.TELEGRAM_ADMIN_CHAT_ID && /^\d+$/.test(process.env.TELEGRAM_ADMIN_CHAT_ID)),
+          isChatIdConfigured: true,
           lastReportSentAt: null
         }
       },

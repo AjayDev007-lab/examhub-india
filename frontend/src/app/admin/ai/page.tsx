@@ -225,11 +225,11 @@ export default function AutonomousAIManagerPage() {
       });
       const json = await res.json();
       if (json.success) {
-        setTelegramNotice(json.message || "Test alert delivered to @AJ4Y2 on Telegram!");
+        setTelegramNotice("✅ " + (json.message || "Test alert delivered to @AJ4Y2 on Telegram!"));
         setTelegramPreview(json.digestContent || "");
         await fetchState();
       } else {
-        setTelegramNotice(json.error || "Failed to dispatch Telegram alert.");
+        setTelegramNotice("❌ " + (json.error || "Failed to dispatch Telegram alert."));
       }
     } catch (err: any) {
       setTelegramNotice("Error dispatching alert: " + err.message);

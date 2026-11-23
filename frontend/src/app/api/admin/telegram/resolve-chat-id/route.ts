@@ -85,15 +85,19 @@ async function handleResolve(req: NextRequest, body: any) {
     const updatesResult = await fetchTelegramUpdates();
 
     if (!updatesResult.success) {
+      let friendlyError = updatesResult.error || "Unable to query Telegram Bot API.";
+      if (friendlyError.toLowerCase().includes("not found")) {
+        friendlyError = "Telegram API returned 'Not Found'. This indicates TELEGRAM_BOT_TOKEN in Vercel environment variables is invalid or formatted incorrectly. Please check Vercel Project Settings > Environment Variables and ensure TELEGRAM_BOT_TOKEN matches the exact token from @BotFather (e.g. 123456789:ABC...) without surrounding quotes.";
+      }
       return NextResponse.json({
         success: false,
         found: false,
         status: "API_ERROR",
-        error: updatesResult.error || "Unable to query Telegram Bot API.",
+        error: friendlyError,
         webhookCleared: updatesResult.webhookCleared,
         botUsername: TELEGRAM_BOT_USERNAME,
         adminUsername: TELEGRAM_ADMIN_USERNAME
-      }, { status: 502 });
+      }, { status: 200 });
     }
 
     const match = resolveAdminChatIdFromUpdates(updatesResult.updates, TELEGRAM_ADMIN_USERNAME);

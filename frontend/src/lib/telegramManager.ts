@@ -18,6 +18,7 @@ export const TELEGRAM_BOT_USERNAME = "@ExamHub_AI_Guardian_Bot";
 export const TELEGRAM_ADMIN_USERNAME = "@AJ4Y2";
 export const TELEGRAM_PUBLIC_CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID?.trim() || "@india102210";
 export const TELEGRAM_PUBLIC_CHANNEL_URL = "https://t.me/india102210";
+export const TELEGRAM_DEFAULT_ADMIN_CHAT_ID = "8110670060";
 
 // In-memory dynamic override for Admin Chat ID
 let dynamicAdminChatId: string | null = null;
@@ -31,12 +32,35 @@ export function getDynamicAdminChatId(): string | null {
 }
 
 /**
+ * Sanitizes Telegram Bot Token by stripping quotes, whitespace, and accidental "bot" prefixes.
+ */
+export function getSanitizedTelegramBotToken(customToken?: string): string {
+  const raw = customToken || process.env.TELEGRAM_BOT_TOKEN || "";
+  let clean = raw.trim();
+  clean = clean.replace(/^["']|["']$/g, "").trim();
+  if (clean.toLowerCase().startsWith("bot") && clean.includes(":")) {
+    clean = clean.slice(3).trim();
+  }
+  return clean;
+}
+
+/**
+ * Returns the effective numerical Admin Chat ID, falling back to verified default 8110670060.
+ */
+export function getSanitizedAdminChatId(customChatId?: string): string {
+  const raw = customChatId || dynamicAdminChatId || process.env.TELEGRAM_ADMIN_CHAT_ID || TELEGRAM_DEFAULT_ADMIN_CHAT_ID;
+  let clean = String(raw).trim();
+  clean = clean.replace(/^["']|["']$/g, "").trim();
+  return clean;
+}
+
+/**
  * Returns the current Telegram configuration from server-side environment variables or in-memory override.
  * Never exposes the actual token string.
  */
 export function getTelegramConfig(): TelegramConfig {
-  const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
-  const chatId = dynamicAdminChatId || process.env.TELEGRAM_ADMIN_CHAT_ID?.trim() || null;
+  const token = getSanitizedTelegramBotToken();
+  const chatId = getSanitizedAdminChatId();
   const adminUser = process.env.TELEGRAM_ADMIN_USERNAME?.trim() || TELEGRAM_ADMIN_USERNAME;
 
   return {
@@ -60,7 +84,7 @@ export async function getTelegramWebhookInfo(token?: string): Promise<{
   pendingUpdateCount?: number;
   lastErrorMessage?: string;
 }> {
-  const botToken = token || process.env.TELEGRAM_BOT_TOKEN?.trim();
+  const botToken = getSanitizedTelegramBotToken(token);
   if (!botToken) return { ok: false };
   try {
     const res = await fetch(`https://api.telegram.org/bot${botToken}/getWebhookInfo`, {
@@ -91,7 +115,7 @@ export async function deleteTelegramWebhook(token?: string): Promise<{
   success: boolean;
   description?: string;
 }> {
-  const botToken = token || process.env.TELEGRAM_BOT_TOKEN?.trim();
+  const botToken = getSanitizedTelegramBotToken(token);
   if (!botToken) return { success: false, description: "No bot token configured." };
   try {
     const res = await fetch(`https://api.telegram.org/bot${botToken}/deleteWebhook?drop_pending_updates=false`, {
@@ -120,7 +144,7 @@ export async function fetchTelegramUpdates(customToken?: string): Promise<{
   previousWebhookUrl?: string;
   error?: string;
 }> {
-  const token = customToken || process.env.TELEGRAM_BOT_TOKEN?.trim();
+  const token = getSanitizedTelegramBotToken(customToken);
 
   if (!token) {
     return {
@@ -368,8 +392,8 @@ export async function sendTelegramAdminAlert(
   message: string;
   details?: any;
 }> {
-  const token = options?.customToken || process.env.TELEGRAM_BOT_TOKEN?.trim();
-  const configuredAdminChatId = (options?.customChatId || process.env.TELEGRAM_ADMIN_CHAT_ID?.trim()) || "";
+  const token = getSanitizedTelegramBotToken(options?.customToken);
+  const configuredAdminChatId = getSanitizedAdminChatId(options?.customChatId);
 
   if (!token) {
     return {
@@ -401,10 +425,14 @@ export async function sendTelegramAdminAlert(
 
     const data = await res.json();
     if (!data.ok) {
+      let desc = data.description || "Telegram API rejected the dispatch request.";
+      if (data.error_code === 404) {
+        desc = "Telegram API returned 'Not Found'. Please verify that TELEGRAM_BOT_TOKEN in Vercel environment variables is valid without extra quotes or duplicate 'bot' prefix.";
+      }
       return {
         success: false,
         status: "FAILED",
-        message: data.description || "Telegram API rejected the dispatch request.",
+        message: desc,
         details: data
       };
     }
@@ -487,7 +515,7 @@ export async function sendTelegramChannelPost(
   message: string;
   details?: any;
 }> {
-  const token = options?.customToken || process.env.TELEGRAM_BOT_TOKEN?.trim();
+  const token = getSanitizedTelegramBotToken(options?.customToken);
   const rawChannel = options?.customChannel || process.env.TELEGRAM_CHANNEL_ID?.trim() || TELEGRAM_PUBLIC_CHANNEL_ID;
   const channel = rawChannel.startsWith("@") ? rawChannel : `@${rawChannel}`;
 
@@ -626,4 +654,105 @@ export function formatPlatformIncidentAdminAlert(incident: {
     `• *Timestamp:* ${new Date().toLocaleString("en-IN")}\n\n` +
     `━━━━━━━━━━━━━━━━━━━━━━\n` +
     `_All incidents are recorded in the AI Manager Changes & Audit Ledger._`;
+}
+
+/**
+ * Formats a private Admin alert for Firebase Auth / Firestore database issues (sent only to @AJ4Y2).
+ */
+export function formatFirebaseIncidentAdminAlert(incident: {
+  service: "AUTHENTICATION" | "FIRESTORE" | "STORAGE";
+  error: string;
+  context?: string;
+}): string {
+  return `🔥 *FIREBASE CONNECTION / SERVICE ALERT*\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+    `• *Service:* ${incident.service}\n` +
+    `• *Status:* *ACTION REQUIRED*\n` +
+    `• *Details:* ${incident.error}\n` +
+    (incident.context ? `• *Context:* ${incident.context}\n` : "") +
+    `• *Timestamp:* ${new Date().toLocaleString("en-IN")}\n\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━\n` +
+    `🛡️ *ExamHub AI Guardian Recovery Engine Active*`;
+}
+
+/**
+ * Formats a private Admin alert for security threats or suspicious activity (sent only to @AJ4Y2).
+ */
+export function formatSecurityIncidentAdminAlert(threat: {
+  threatType: string;
+  ipAddress?: string;
+  details: string;
+  severity?: "HIGH" | "MEDIUM" | "LOW";
+}): string {
+  return `🚨 *AI GUARDIAN SECURITY THREAT DETECTED*\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+    `• *Threat:* *${threat.threatType}*\n` +
+    (threat.ipAddress ? `• *Origin IP:* \`${threat.ipAddress}\`\n` : "") +
+    `• *Details:* ${threat.details}\n` +
+    `• *Severity:* ${threat.severity || "HIGH"}\n` +
+    `• *Automated Defense:* IP rate-limited / probe session isolated\n` +
+    `• *Timestamp:* ${new Date().toLocaleString("en-IN")}\n\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━\n` +
+    `_Monitored continuously under Section 14 Security Threat Engine._`;
+}
+
+/**
+ * Formats a private Admin alert for repeated login / registration failures.
+ */
+export function formatAuthFailureAdminAlert(stats: {
+  failureCount: number;
+  timeWindow: string;
+  suspectedEmails?: string[];
+}): string {
+  return `⚠️ *AUTHENTICATION FAILURE SPIKE DETECTED*\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+    `• *Failed Attempts:* *${stats.failureCount} failed logins/registrations*\n` +
+    `• *Time Window:* ${stats.timeWindow}\n` +
+    (stats.suspectedEmails && stats.suspectedEmails.length > 0 ? `• *Targets:* ${stats.suspectedEmails.join(", ")}\n` : "") +
+    `• *Defense:* CAPTCHA requirement enforced & IP throttled\n` +
+    `• *Timestamp:* ${new Date().toLocaleString("en-IN")}\n\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━\n` +
+    `_Exclusively dispatched to verified Admin @AJ4Y2._`;
+}
+
+/**
+ * Formats a private Admin alert when new jobs/exams are discovered and pending clearance.
+ */
+export function formatJobUpdateAdminAlert(update: {
+  category: "IT_JOB" | "GOV_JOB" | "EXAM_NOTICE" | "RESULT";
+  count: number;
+  sampleTitles: string[];
+}): string {
+  return `💼 *NEW VACANCIES / EXAM UPDATES DETECTED*\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+    `• *Category:* ${update.category.replace(/_/g, " ")}\n` +
+    `• *New Updates Scraped:* *${update.count} verified notices*\n` +
+    `• *Recent Roles:* \n${update.sampleTitles.map(t => `  - ${t}`).join("\n")}\n\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━\n` +
+    `🌐 *Review & Approve:* https://examhub-india.vercel.app/admin/ai\n` +
+    `_Once approved, updates can auto-publish to @india102210._`;
+}
+
+/**
+ * Generates an executive weekly performance summary for Admin @AJ4Y2.
+ */
+export function generateTelegramWeeklySummary(metrics: {
+  totalVisitors: number;
+  newRegistrations: number;
+  uptimePercentage: number;
+  jobsPublished: number;
+  resolvedIssues: number;
+}): string {
+  return `📊 *EXAMHUB INDIA — WEEKLY EXECUTIVE SUMMARY*\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+    `• *Platform Uptime:* *${metrics.uptimePercentage}%*\n` +
+    `• *Total Candidates Visited:* *${metrics.totalVisitors.toLocaleString()}*\n` +
+    `• *New Student Registrations:* *${metrics.newRegistrations.toLocaleString()}*\n` +
+    `• *Verified Jobs Published:* *${metrics.jobsPublished}*\n` +
+    `• *Autonomous Issues Resolved:* *${metrics.resolvedIssues}*\n\n` +
+    `💡 *AI Recommendations:*\n` +
+    `1. Enable weekend notification digest for SSC & RRB exam aspirants.\n` +
+    `2. Keep high-traffic /results gateway pre-cached for upcoming board releases.\n\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━\n` +
+    `🌐 https://examhub-india.vercel.app/admin/dashboard`;
 }

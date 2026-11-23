@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const config = getTelegramConfig();
 
-    const targetChatId = body.chatId || config.adminChatId;
+    const targetChatId = body.chatId || config.adminChatId || "8110670060";
 
     if (!config.isTokenConfigured) {
       return NextResponse.json({
@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
       error: dispatchResult.message,
       botUsername: TELEGRAM_BOT_USERNAME,
       adminUsername: TELEGRAM_ADMIN_USERNAME
-    }, { status: 500 });
+    }, { status: 200 });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
