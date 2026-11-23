@@ -19,33 +19,105 @@ export const TELEGRAM_ADMIN_USERNAME = "@AJ4Y2";
 export const TELEGRAM_PUBLIC_CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID?.trim() || "@india102210";
 export const TELEGRAM_PUBLIC_CHANNEL_URL = "https://t.me/india102210";
 
+// In-memory dynamic override for Admin Chat ID
+let dynamicAdminChatId: string | null = null;
+
+export function setDynamicAdminChatId(id: string | null): void {
+  dynamicAdminChatId = id ? id.trim() : null;
+}
+
+export function getDynamicAdminChatId(): string | null {
+  return dynamicAdminChatId;
+}
+
 /**
- * Returns the current Telegram configuration from server-side environment variables.
+ * Returns the current Telegram configuration from server-side environment variables or in-memory override.
  * Never exposes the actual token string.
  */
 export function getTelegramConfig(): TelegramConfig {
   const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
-  const chatId = process.env.TELEGRAM_ADMIN_CHAT_ID?.trim() || null;
+  const chatId = dynamicAdminChatId || process.env.TELEGRAM_ADMIN_CHAT_ID?.trim() || null;
   const adminUser = process.env.TELEGRAM_ADMIN_USERNAME?.trim() || TELEGRAM_ADMIN_USERNAME;
 
   return {
-    isEnabled: Boolean(token && chatId),
+    isEnabled: Boolean(token && chatId && /^-?\d+$/.test(chatId)),
     botUsername: TELEGRAM_BOT_USERNAME,
     adminUsername: adminUser.startsWith("@") ? adminUser : `@${adminUser}`,
     adminChatId: chatId,
     isTokenConfigured: Boolean(token && token.length > 10),
-    isChatIdConfigured: Boolean(chatId && /^\d+$/.test(chatId)),
+    isChatIdConfigured: Boolean(chatId && /^-?\d+$/.test(chatId)),
     lastReportSentAt: null
   };
 }
 
 /**
+ * Inspects whether a webhook is currently active on Telegram for this bot.
+ */
+export async function getTelegramWebhookInfo(token?: string): Promise<{
+  ok: boolean;
+  url?: string;
+  hasCustomCertificate?: boolean;
+  pendingUpdateCount?: number;
+  lastErrorMessage?: string;
+}> {
+  const botToken = token || process.env.TELEGRAM_BOT_TOKEN?.trim();
+  if (!botToken) return { ok: false };
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${botToken}/getWebhookInfo`, {
+      method: "GET",
+      cache: "no-store"
+    });
+    const data = await res.json();
+    if (data.ok && data.result) {
+      return {
+        ok: true,
+        url: data.result.url || "",
+        hasCustomCertificate: data.result.has_custom_certificate,
+        pendingUpdateCount: data.result.pending_update_count,
+        lastErrorMessage: data.result.last_error_message
+      };
+    }
+    return { ok: false };
+  } catch {
+    return { ok: false };
+  }
+}
+
+/**
+ * Safely removes any active webhook from Telegram, freeing the bot to use getUpdates.
+ * Uses drop_pending_updates=false so any user "Hello" messages are preserved.
+ */
+export async function deleteTelegramWebhook(token?: string): Promise<{
+  success: boolean;
+  description?: string;
+}> {
+  const botToken = token || process.env.TELEGRAM_BOT_TOKEN?.trim();
+  if (!botToken) return { success: false, description: "No bot token configured." };
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${botToken}/deleteWebhook?drop_pending_updates=false`, {
+      method: "POST",
+      cache: "no-store"
+    });
+    const data = await res.json();
+    return {
+      success: Boolean(data.ok),
+      description: data.description || (data.ok ? "Webhook deleted successfully." : "Failed to delete webhook.")
+    };
+  } catch (err: any) {
+    return { success: false, description: err.message };
+  }
+}
+
+/**
  * Safely fetches recent updates from Telegram's getUpdates API on the server.
+ * Handles webhook conflict errors (409) automatically by clearing the webhook and retrying.
  * The bot token is never sent to the client.
  */
 export async function fetchTelegramUpdates(customToken?: string): Promise<{
   success: boolean;
   updates: any[];
+  webhookCleared: boolean;
+  previousWebhookUrl?: string;
   error?: string;
 }> {
   const token = customToken || process.env.TELEGRAM_BOT_TOKEN?.trim();
@@ -54,36 +126,82 @@ export async function fetchTelegramUpdates(customToken?: string): Promise<{
     return {
       success: false,
       updates: [],
+      webhookCleared: false,
       error: "TELEGRAM_BOT_TOKEN is not configured in server environment."
     };
   }
 
+  let webhookCleared = false;
+  let previousWebhookUrl: string | undefined = undefined;
+
+  // Step 1: Pre-check if webhook is currently configured
   try {
-    const res = await fetch(`https://api.telegram.org/bot${token}/getUpdates?timeout=5`, {
+    const info = await getTelegramWebhookInfo(token);
+    if (info.ok && info.url && info.url.length > 0) {
+      previousWebhookUrl = info.url;
+      const del = await deleteTelegramWebhook(token);
+      if (del.success) {
+        webhookCleared = true;
+      }
+    }
+  } catch (_) {
+    // Non-fatal, proceed to getUpdates
+  }
+
+  // Step 2: Query getUpdates with explicit update types
+  try {
+    const url = `https://api.telegram.org/bot${token}/getUpdates?limit=100&timeout=5&allowed_updates=["message","edited_message","channel_post"]`;
+    let res = await fetch(url, {
       method: "GET",
       cache: "no-store"
     });
 
-    const data = await res.json();
+    let data = await res.json();
+
+    // If 409 conflict returned because webhook is active, clear webhook and retry
+    if (!data.ok && (data.error_code === 409 || String(data.description).toLowerCase().includes("webhook"))) {
+      const del = await deleteTelegramWebhook(token);
+      if (del.success) {
+        webhookCleared = true;
+        res = await fetch(url, { method: "GET", cache: "no-store" });
+        data = await res.json();
+      }
+    }
+
     if (!data.ok) {
       return {
         success: false,
         updates: [],
+        webhookCleared,
         error: data.description || "Telegram API returned an error response."
       };
     }
 
     return {
       success: true,
-      updates: data.result || []
+      updates: data.result || [],
+      webhookCleared,
+      previousWebhookUrl
     };
   } catch (err: any) {
     return {
       success: false,
       updates: [],
+      webhookCleared,
       error: `Network error connecting to Telegram Bot API: ${err.message}`
     };
   }
+}
+
+export interface TelegramCandidateSender {
+  chatId: string;
+  userId: string;
+  username: string | null;
+  displayName: string;
+  lastMessageText: string | null;
+  chatType: string;
+  date: string;
+  isExactMatch: boolean;
 }
 
 /**
@@ -99,12 +217,18 @@ export function resolveAdminChatIdFromUpdates(
   matchedUsername: string | null;
   senderName: string | null;
   lastMessageText: string | null;
+  matchConfidence: "EXACT_USERNAME" | "NAME_MATCH" | "SINGLE_SENDER" | null;
   availableSenders: string[];
+  candidates: TelegramCandidateSender[];
 } {
   const cleanTarget = targetUsername.replace(/^@/, "").toLowerCase();
+  const candidatesMap = new Map<string, TelegramCandidateSender>();
   const availableSenders: string[] = [];
 
-  // Search in reverse order to find the most recent message from admin
+  let exactMatch: TelegramCandidateSender | null = null;
+  let nameMatch: TelegramCandidateSender | null = null;
+
+  // Search in reverse order to inspect most recent messages first
   for (let i = updates.length - 1; i >= 0; i--) {
     const u = updates[i];
     const msg = u.message || u.edited_message || u.channel_post;
@@ -112,26 +236,111 @@ export function resolveAdminChatIdFromUpdates(
 
     const fromUser = msg.from;
     const chat = msg.chat;
+    if (!chat && !fromUser) continue;
 
-    const fromUsername = fromUser?.username?.toLowerCase() || "";
-    const chatUsername = chat?.username?.toLowerCase() || "";
-    const displayName = [fromUser?.first_name, fromUser?.last_name].filter(Boolean).join(" ") || "Admin";
+    const numericalChatId = String(chat?.id || fromUser?.id || "");
+    if (!numericalChatId || !/^-?\d+$/.test(numericalChatId)) continue;
 
-    if (fromUsername) availableSenders.push(`@${fromUser.username}`);
+    const fromUsername = fromUser?.username ? fromUser.username.trim() : null;
+    const chatUsername = chat?.username ? chat.username.trim() : null;
+    const effectiveUsername = fromUsername || chatUsername;
 
-    if (fromUsername === cleanTarget || chatUsername === cleanTarget) {
-      const numericalId = String(chat?.id || fromUser?.id || "");
-      if (numericalId && /^-?\d+$/.test(numericalId)) {
-        return {
-          found: true,
-          chatId: numericalId,
-          matchedUsername: `@${fromUser?.username || chat?.username}`,
-          senderName: displayName,
-          lastMessageText: msg.text || null,
-          availableSenders: Array.from(new Set(availableSenders))
-        };
-      }
+    const firstName = fromUser?.first_name || chat?.first_name || "";
+    const lastName = fromUser?.last_name || chat?.last_name || "";
+    const displayName = [firstName, lastName].filter(Boolean).join(" ") || effectiveUsername || "User";
+    const text = msg.text || (msg.caption ? `[Media: ${msg.caption}]` : "[Non-text message]");
+    const chatType = chat?.type || "private";
+    const dateStr = msg.date ? new Date(msg.date * 1000).toISOString() : new Date().toISOString();
+
+    if (effectiveUsername) {
+      availableSenders.push(`@${effectiveUsername}`);
+    } else {
+      availableSenders.push(`${displayName} (${numericalChatId})`);
     }
+
+    const isExact = Boolean(
+      (fromUsername && fromUsername.toLowerCase() === cleanTarget) ||
+      (chatUsername && chatUsername.toLowerCase() === cleanTarget)
+    );
+
+    const isNameSimilar = Boolean(
+      !isExact && (
+        cleanTarget.includes("ajay") || cleanTarget.includes("aj4y")
+      ) && (
+        displayName.toLowerCase().includes("ajay") ||
+        displayName.toLowerCase().includes("aj4y") ||
+        (effectiveUsername && effectiveUsername.toLowerCase().includes("aj4y"))
+      )
+    );
+
+    const candidate: TelegramCandidateSender = {
+      chatId: numericalChatId,
+      userId: String(fromUser?.id || numericalChatId),
+      username: effectiveUsername ? (effectiveUsername.startsWith("@") ? effectiveUsername : `@${effectiveUsername}`) : null,
+      displayName,
+      lastMessageText: text,
+      chatType,
+      date: dateStr,
+      isExactMatch: isExact
+    };
+
+    if (!candidatesMap.has(numericalChatId)) {
+      candidatesMap.set(numericalChatId, candidate);
+    }
+
+    if (isExact && !exactMatch) {
+      exactMatch = candidate;
+    }
+    if (isNameSimilar && !nameMatch) {
+      nameMatch = candidate;
+    }
+  }
+
+  const uniqueCandidates = Array.from(candidatesMap.values());
+  const uniqueSenders = Array.from(new Set(availableSenders));
+
+  // Case 1: Exact @username match found (highest priority)
+  if (exactMatch) {
+    return {
+      found: true,
+      chatId: exactMatch.chatId,
+      matchedUsername: exactMatch.username,
+      senderName: exactMatch.displayName,
+      lastMessageText: exactMatch.lastMessageText,
+      matchConfidence: "EXACT_USERNAME",
+      availableSenders: uniqueSenders,
+      candidates: uniqueCandidates
+    };
+  }
+
+  // Case 2: Only ONE private conversation exists with the bot
+  const privateCandidates = uniqueCandidates.filter(c => c.chatType === "private");
+  if (privateCandidates.length === 1) {
+    const single = privateCandidates[0];
+    return {
+      found: true,
+      chatId: single.chatId,
+      matchedUsername: single.username || `@${cleanTarget}`,
+      senderName: single.displayName,
+      lastMessageText: single.lastMessageText,
+      matchConfidence: "SINGLE_SENDER",
+      availableSenders: uniqueSenders,
+      candidates: uniqueCandidates
+    };
+  }
+
+  // Case 3: Name / Alias similarity match
+  if (nameMatch) {
+    return {
+      found: true,
+      chatId: nameMatch.chatId,
+      matchedUsername: nameMatch.username,
+      senderName: nameMatch.displayName,
+      lastMessageText: nameMatch.lastMessageText,
+      matchConfidence: "NAME_MATCH",
+      availableSenders: uniqueSenders,
+      candidates: uniqueCandidates
+    };
   }
 
   return {
@@ -140,7 +349,9 @@ export function resolveAdminChatIdFromUpdates(
     matchedUsername: null,
     senderName: null,
     lastMessageText: null,
-    availableSenders: Array.from(new Set(availableSenders))
+    matchConfidence: null,
+    availableSenders: uniqueSenders,
+    candidates: uniqueCandidates
   };
 }
 

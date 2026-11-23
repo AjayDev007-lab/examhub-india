@@ -21,6 +21,8 @@ export default function AutonomousAIManagerPage() {
   const [resolvingTelegram, setResolvingTelegram] = useState<boolean>(false);
   const [sendingTestTelegram, setSendingTestTelegram] = useState<boolean>(false);
   const [telegramNotice, setTelegramNotice] = useState<string>("");
+  const [telegramCandidates, setTelegramCandidates] = useState<any[]>([]);
+  const [savingTelegramChatId, setSavingTelegramChatId] = useState<boolean>(false);
   const [telegramPreview, setTelegramPreview] = useState<string>("");
   const [newMemoryKey, setNewMemoryKey] = useState<string>("");
   const [newMemoryVal, setNewMemoryVal] = useState<string>("");
@@ -161,20 +163,54 @@ export default function AutonomousAIManagerPage() {
   async function handleResolveTelegramChatId() {
     setResolvingTelegram(true);
     setTelegramNotice("");
+    setTelegramCandidates([]);
     try {
       const res = await fetch("/api/admin/telegram/resolve-chat-id", { method: "POST" });
       const json = await res.json();
       if (json.found && json.chatId) {
         setTelegramChatId(json.chatId);
-        setTelegramNotice(`✅ Found numerical Chat ID for @AJ4Y2: ${json.chatId}!`);
+        setTelegramNotice(`✅ Found numerical Chat ID for ${json.senderName || json.matchedUsername || "@AJ4Y2"}: ${json.chatId}!`);
+        if (json.candidates) setTelegramCandidates(json.candidates);
         await fetchState();
       } else {
+        if (json.candidates && json.candidates.length > 0) {
+          setTelegramCandidates(json.candidates);
+        }
         setTelegramNotice(json.message || json.error || "No messages found yet. Please open @ExamHub_AI_Guardian_Bot on Telegram, tap Start, and send Hello.");
       }
     } catch (err: any) {
       setTelegramNotice("Failed to query Telegram API: " + err.message);
     } finally {
       setResolvingTelegram(false);
+    }
+  }
+
+  async function handleSaveTelegramChatId(chatIdToSave?: string) {
+    const id = (chatIdToSave || telegramChatId || "").trim();
+    if (!id || !/^-?\d+$/.test(id)) {
+      setTelegramNotice("❌ Please enter a valid numerical Chat ID (e.g. 682918392).");
+      return;
+    }
+    setSavingTelegramChatId(true);
+    setTelegramNotice("");
+    try {
+      const res = await fetch("/api/admin/telegram/resolve-chat-id", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "SET_CHAT_ID", chatId: id })
+      });
+      const json = await res.json();
+      if (json.success) {
+        setTelegramChatId(json.chatId);
+        setTelegramNotice(`✅ Chat ID ${json.chatId} is now saved and active! You can now dispatch test alerts.`);
+        await fetchState();
+      } else {
+        setTelegramNotice(json.error || "Failed to save Chat ID.");
+      }
+    } catch (err: any) {
+      setTelegramNotice("Error saving Chat ID: " + err.message);
+    } finally {
+      setSavingTelegramChatId(false);
     }
   }
 
@@ -1050,12 +1086,16 @@ export default function AutonomousAIManagerPage() {
                   </span>
                 </div>
 
-                <div className="p-3 rounded-lg bg-sky-950/30 border border-sky-800/30 text-sky-300 text-[11px] space-y-1">
-                  <div className="font-bold">Instructions to Link Your Account:</div>
+                <div className="p-3 rounded-lg bg-sky-950/30 border border-sky-800/30 text-sky-300 text-[11px] space-y-1.5">
+                  <div className="font-bold flex items-center justify-between">
+                    <span>Instructions to Link Your Telegram Account:</span>
+                    <span className="text-[10px] text-slate-400 font-normal">Method A (Auto) or Method B (Direct)</span>
+                  </div>
                   <ol className="list-decimal list-inside space-y-0.5 text-slate-300">
                     <li>Open <a href="https://t.me/ExamHub_AI_Guardian_Bot" target="_blank" rel="noopener noreferrer" className="text-sky-400 font-bold underline">@ExamHub_AI_Guardian_Bot</a> in Telegram.</li>
                     <li>Press <span className="text-white font-bold">Start</span> and send message <span className="text-white font-bold">&quot;Hello&quot;</span>.</li>
-                    <li>Click <span className="text-white font-bold">Auto-Detect My Telegram Chat ID</span> below.</li>
+                    <li>Click <span className="text-white font-bold">Auto-Detect Chat ID</span> below.</li>
+                    <li><span className="text-slate-400 italic">Alternative:</span> Message <a href="https://t.me/userinfobot" target="_blank" rel="noopener noreferrer" className="text-sky-400 font-bold underline">@userinfobot</a> to get your numeric ID, paste it below and click <span className="text-white font-bold">Save &amp; Activate</span>.</li>
                   </ol>
                 </div>
 
@@ -1072,16 +1112,56 @@ export default function AutonomousAIManagerPage() {
                   </div>
 
                   <div>
-                    <label className="text-slate-400 text-[11px] font-semibold">Resolved Numerical Chat ID (Server-Side Env):</label>
-                    <input
-                      type="text"
-                      value={telegramChatId}
-                      onChange={(e) => setTelegramChatId(e.target.value)}
-                      placeholder="e.g. 1092847192 (Auto-detected)"
-                      className="w-full mt-1 bg-slate-900 border border-slate-800 rounded-lg p-2 text-white font-mono"
-                    />
+                    <div className="flex items-center justify-between">
+                      <label className="text-slate-400 text-[11px] font-semibold">Numerical Chat ID:</label>
+                      {telegramChatId && (
+                        <span className="text-[10px] text-emerald-400 font-bold">ACTIVE FOR DISPATCH</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <input
+                        type="text"
+                        value={telegramChatId}
+                        onChange={(e) => setTelegramChatId(e.target.value)}
+                        placeholder="e.g. 682918392"
+                        className="flex-1 bg-slate-900 border border-slate-800 rounded-lg p-2 text-white font-mono text-xs focus:border-sky-500 focus:outline-none"
+                      />
+                      <button
+                        onClick={() => handleSaveTelegramChatId()}
+                        disabled={savingTelegramChatId || !telegramChatId}
+                        className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 border border-slate-700 font-bold text-xs whitespace-nowrap transition-all"
+                      >
+                        {savingTelegramChatId ? "Saving..." : "Save & Activate"}
+                      </button>
+                    </div>
                   </div>
                 </div>
+
+                {telegramCandidates.length > 0 && !telegramChatId && (
+                  <div className="p-3 rounded-lg bg-sky-950/40 border border-sky-800/40 space-y-2">
+                    <div className="text-[11px] font-bold text-sky-300">Detected Recent Senders:</div>
+                    <div className="space-y-1.5">
+                      {telegramCandidates.map((cand: any) => (
+                        <div key={cand.chatId} className="p-2 rounded bg-slate-900 border border-slate-800 flex items-center justify-between gap-2">
+                          <div className="space-y-0.5 min-w-0">
+                            <div className="font-bold text-white text-[11px] truncate">
+                              {cand.displayName} {cand.username ? `(${cand.username})` : ""}
+                            </div>
+                            <div className="text-[10px] font-mono text-slate-400">
+                              ID: {cand.chatId} • &quot;{cand.lastMessageText || 'Hello'}&quot;
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleSaveTelegramChatId(cand.chatId)}
+                            className="px-2.5 py-1 rounded bg-sky-600 hover:bg-sky-500 text-white font-bold text-[10px] shrink-0"
+                          >
+                            Use This ID
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
                   <button
