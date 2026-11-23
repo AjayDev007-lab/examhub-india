@@ -19,11 +19,12 @@ export const TELEGRAM_ADMIN_USERNAME = "@AJ4Y2";
 export const TELEGRAM_PUBLIC_CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID?.trim() || "@india102210";
 export const TELEGRAM_PUBLIC_CHANNEL_URL = "https://t.me/india102210";
 export const TELEGRAM_DEFAULT_ADMIN_CHAT_ID = "8110670060";
-export const TELEGRAM_SECONDARY_ADMIN_CHAT_ID = "9283986705";
+export const TELEGRAM_BOT_ID = "9283986705";
 
 /**
  * Checks whether a Telegram sender is authorized as the Admin (@AJ4Y2).
- * Verifies against numerical Admin Chat IDs (8110670060 / 9283986705) and username.
+ * Verifies strictly against numerical Admin Chat ID (8110670060) and username (@AJ4Y2).
+ * The Bot ID (9283986705) is explicitly rejected from admin actions.
  */
 export function isAuthorizedAdminSender(sender?: {
   id?: number | string | null;
@@ -33,11 +34,15 @@ export function isAuthorizedAdminSender(sender?: {
   const senderId = String(sender.id || "").trim();
   const rawUser = String(sender.username || "").replace(/^@/, "").toLowerCase().trim();
 
-  // Check numerical IDs
+  // Safety rule: The bot itself can NEVER be authorized as the human admin
+  if (senderId === TELEGRAM_BOT_ID) {
+    return false;
+  }
+
+  // Check verified Admin Chat ID
   if (
     senderId === TELEGRAM_DEFAULT_ADMIN_CHAT_ID ||
-    senderId === TELEGRAM_SECONDARY_ADMIN_CHAT_ID ||
-    (dynamicAdminChatId && senderId === dynamicAdminChatId)
+    (dynamicAdminChatId && senderId === dynamicAdminChatId && senderId !== TELEGRAM_BOT_ID)
   ) {
     return true;
   }
@@ -81,6 +86,13 @@ export function getSanitizedAdminChatId(customChatId?: string): string {
   const raw = customChatId || dynamicAdminChatId || process.env.TELEGRAM_ADMIN_CHAT_ID || TELEGRAM_DEFAULT_ADMIN_CHAT_ID;
   let clean = String(raw).trim();
   clean = clean.replace(/^["']|["']$/g, "").trim();
+
+  // Safety protection: Never send to the bot's own ID (9283986705).
+  // Always redirect to verified human admin chat 8110670060.
+  if (clean === TELEGRAM_BOT_ID) {
+    clean = TELEGRAM_DEFAULT_ADMIN_CHAT_ID;
+  }
+
   return clean;
 }
 

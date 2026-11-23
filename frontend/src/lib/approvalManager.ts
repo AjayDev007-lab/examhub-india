@@ -10,7 +10,7 @@ import { dbStore } from "./data";
 import {
   TELEGRAM_ADMIN_USERNAME,
   TELEGRAM_DEFAULT_ADMIN_CHAT_ID,
-  TELEGRAM_SECONDARY_ADMIN_CHAT_ID,
+  TELEGRAM_BOT_ID,
   sendTelegramInteractiveApproval,
   editTelegramMessageText,
   formatJobTelegramPost,
