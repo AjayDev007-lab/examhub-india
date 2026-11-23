@@ -345,14 +345,15 @@ export async function resolveApproval(
       };
     }
 
-    // Dynamically reconstruct approval item
-    const titleMatch = rawText.match(/Action:\s*([^\n]+)/i);
+    // Dynamically reconstruct approval item from clean text
+    const cleanText = rawText.replace(/<\/?b>/gi, "");
+    const titleMatch = cleanText.match(/Action:\s*([^\n]+)/i);
     const actionTitle = titleMatch ? titleMatch[1].trim() : "Verified Recruitment Notice";
 
-    const descMatch = rawText.match(/What AI Wants to Do:\s*([\s\S]*?)(?=\n\n|\n💡|\n❓|$)/i);
+    const descMatch = cleanText.match(/What AI Wants to Do:\s*([\s\S]*?)(?=\n\n|\n💡|\n❓|$)/i);
     const actionDesc = descMatch ? descMatch[1].trim() : actionTitle;
 
-    const riskMatch = rawText.match(/Risk Level:\s*[^\s]*\s*([A-Z]+)/i);
+    const riskMatch = cleanText.match(/Risk Level:\s*[^\s]*\s*([A-Z]+)/i);
     const riskLvl = (riskMatch ? riskMatch[1].trim() : "LOW") as ApprovalRiskLevel;
 
     const urlMatch = rawText.match(/https?:\/\/[^\s\n]+/i);
