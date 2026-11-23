@@ -26,10 +26,16 @@ export default function AutonomousAIManagerPage() {
   const [telegramPreview, setTelegramPreview] = useState<string>("");
   const [newMemoryKey, setNewMemoryKey] = useState<string>("");
   const [newMemoryVal, setNewMemoryVal] = useState<string>("");
+  const [approvals, setApprovals] = useState<any[]>([]);
+  const [loadingApprovals, setLoadingApprovals] = useState<boolean>(false);
+  const [webhookInfo, setWebhookInfo] = useState<any>(null);
+  const [settingWebhook, setSettingWebhook] = useState<boolean>(false);
+  const [dispatchingTestApproval, setDispatchingTestApproval] = useState<boolean>(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchState();
+    fetchApprovals();
   }, []);
 
   useEffect(() => {
@@ -235,6 +241,117 @@ export default function AutonomousAIManagerPage() {
       setTelegramNotice("Error dispatching alert: " + err.message);
     } finally {
       setSendingTestTelegram(false);
+    }
+  }
+
+  async function fetchApprovals() {
+    try {
+      setLoadingApprovals(true);
+      const res = await fetch("/api/admin/approvals");
+      const json = await res.json();
+      if (json.success) {
+        setApprovals(json.all || []);
+        if (json.webhookInfo) setWebhookInfo(json.webhookInfo);
+      }
+    } catch (err) {
+      console.error("Failed to load approvals:", err);
+    } finally {
+      setLoadingApprovals(false);
+    }
+  }
+
+  async function handleResolveApproval(id: string, decision: "APPROVE" | "REJECT") {
+    setActionNotice(`Resolving approval ${id}...`);
+    try {
+      const res = await fetch("/api/admin/approvals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "RESOLVE", id, decision })
+      });
+      const json = await res.json();
+      if (json.success) {
+        setActionNotice(json.message);
+        await fetchApprovals();
+      } else {
+        setActionNotice(`Error: ${json.message || json.error}`);
+      }
+    } catch (err: any) {
+      setActionNotice(`Error resolving approval: ${err.message}`);
+    } finally {
+      setTimeout(() => setActionNotice(""), 6000);
+    }
+  }
+
+  async function handleDispatchTestApproval() {
+    setDispatchingTestApproval(true);
+    setActionNotice("Sending live interactive approval prompt to Admin Telegram chat (@AJ4Y2)...");
+    try {
+      const res = await fetch("/api/admin/approvals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "TEST_PROMPT" })
+      });
+      const json = await res.json();
+      if (json.success) {
+        setActionNotice("✅ " + json.message);
+        await fetchApprovals();
+      } else {
+        setActionNotice("❌ Failed: " + (json.error || json.message));
+      }
+    } catch (err: any) {
+      setActionNotice("❌ Error dispatching test approval: " + err.message);
+    } finally {
+      setDispatchingTestApproval(false);
+      setTimeout(() => setActionNotice(""), 7000);
+    }
+  }
+
+  async function handleSetupWebhook() {
+    setSettingWebhook(true);
+    setActionNotice("Registering webhook with Telegram Bot API...");
+    try {
+      const webhookUrl = `${window.location.origin}/api/telegram/webhook`;
+      const res = await fetch("/api/admin/approvals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "SETUP_WEBHOOK", webhookUrl })
+      });
+      const json = await res.json();
+      if (json.success) {
+        setActionNotice(`✅ Webhook active: ${json.description || "Registered"}`);
+        await fetchApprovals();
+      } else {
+        setActionNotice(`❌ Failed: ${json.description || json.error}`);
+      }
+    } catch (err: any) {
+      setActionNotice(`❌ Error: ${err.message}`);
+    } finally {
+      setSettingWebhook(false);
+      setTimeout(() => setActionNotice(""), 6000);
+    }
+  }
+
+  async function handleDeleteWebhook() {
+    setSettingWebhook(true);
+    setActionNotice("Clearing Telegram webhook...");
+    try {
+      const res = await fetch("/api/admin/approvals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "DELETE_WEBHOOK" })
+      });
+      const json = await res.json();
+      if (json.success) {
+        setActionNotice("✅ Webhook cleared. Bot returned to direct updates.");
+        await fetchApprovals();
+      } else {
+        setActionNotice(`❌ Failed: ${json.description || json.error}`);
+      }
+    } catch (err: any) {
+      setActionNotice(`❌ Error: ${err.message}`);
+    } finally {
+      setSettingWebhook(false);
+      setTimeout(() => setActionNotice(""), 6000);
     }
   }
 
@@ -1204,6 +1321,212 @@ export default function AutonomousAIManagerPage() {
                     `• Gov Portals: 4 Gateways (OPSC, KPSC, ISRO, DRDO)\n\n` +
                     `_All private digests delivered strictly to @AJ4Y2._`
                   )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ================================================================= */}
+        {/* SECTION 12.1: TELEGRAM AI GUARDIAN APPROVAL & AUDIT LEDGER        */}
+        {/* ================================================================= */}
+        {(activeTab === "ALL" || activeTab === "TELEGRAM") && (
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-3 gap-3">
+              <div>
+                <h2 className="text-base font-bold text-white flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                  <span>Section 12.1: Telegram AI Guardian Interactive Approval & Audit Ledger</span>
+                </h2>
+                <p className="text-xs text-slate-400">
+                  Automated single-use authorization pipeline • 15-Minute Expiration TTL • Inline Callbacks (🟢 APPROVE / 🔴 REJECT) • Admin: <span className="text-sky-300 font-bold">@AJ4Y2</span>
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${
+                  webhookInfo?.url
+                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                    : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                }`}>
+                  {webhookInfo?.url ? "WEBHOOK ACTIVE" : "WEBHOOK INACTIVE"}
+                </span>
+
+                <button
+                  onClick={handleDispatchTestApproval}
+                  disabled={dispatchingTestApproval}
+                  className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-emerald-900/30 transition-all disabled:opacity-50"
+                >
+                  {dispatchingTestApproval ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                  <span>Test Live Approval Prompt</span>
+                </button>
+
+                <button
+                  onClick={handleSetupWebhook}
+                  disabled={settingWebhook}
+                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs flex items-center gap-1.5 transition-all disabled:opacity-50"
+                  title="Configure Telegram Bot Webhook endpoint for live buttons & commands"
+                >
+                  <Bot className="w-3.5 h-3.5 text-sky-400" />
+                  <span>{settingWebhook ? "Configuring..." : "Configure Webhook"}</span>
+                </button>
+
+                <button
+                  onClick={fetchApprovals}
+                  disabled={loadingApprovals}
+                  className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-all"
+                  title="Refresh Approvals & Audit Ledger"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loadingApprovals ? "animate-spin" : ""}`} />
+                </button>
+              </div>
+            </div>
+
+            {/* Pending Approvals Queue */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-amber-400" />
+                  <span>Pending Approval Queue ({approvals.filter((a: any) => a.status === "PENDING").length})</span>
+                </h3>
+                <span className="text-[11px] text-slate-400">15-minute single-use TTL enforced</span>
+              </div>
+
+              {approvals.filter((a: any) => a.status === "PENDING").length === 0 ? (
+                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800/80 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  <span>All AI Guardian actions are currently cleared. When new high-risk actions arise, interactive approval buttons will appear here and in your Telegram chat.</span>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-3">
+                  {approvals.filter((a: any) => a.status === "PENDING").map((appr: any) => (
+                    <div key={appr.id} className="p-4 rounded-xl bg-slate-950 border border-amber-500/30 space-y-3 text-xs">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                            appr.riskLevel === "CRITICAL"
+                              ? "bg-red-500/20 text-red-300 border border-red-500/30"
+                              : appr.riskLevel === "HIGH"
+                              ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                              : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                          }`}>
+                            {appr.riskLevel} RISK
+                          </span>
+                          <span className="font-bold text-white text-sm">{appr.title}</span>
+                          <span className="text-[10px] font-mono text-slate-400">ID: {appr.id}</span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleResolveApproval(appr.id, "APPROVE")}
+                            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1 transition-all"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            <span>🟢 APPROVE</span>
+                          </button>
+                          <button
+                            onClick={() => handleResolveApproval(appr.id, "REJECT")}
+                            className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold text-xs flex items-center gap-1 transition-all"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                            <span>🔴 REJECT</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3 rounded-lg bg-slate-900 border border-slate-800 text-slate-300">
+                        <div>
+                          <span className="text-slate-400 text-[10px] block font-semibold">What AI Wants to Do:</span>
+                          <p className="mt-0.5 text-white">{appr.description}</p>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 text-[10px] block font-semibold">Detailed Explanation & Reason:</span>
+                          <p className="mt-0.5">{appr.explanation}</p>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 text-[10px] block font-semibold">Expected Result:</span>
+                          <p className="mt-0.5 text-emerald-300">{appr.expectedResult}</p>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 text-[10px] block font-semibold">Target / Expiration:</span>
+                          <p className="mt-0.5 font-mono text-[11px] text-amber-300">
+                            Expires: {new Date(appr.expiresAt).toLocaleTimeString("en-IN")} IST
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Historical Approval & Audit Ledger */}
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <History className="w-4 h-4 text-sky-400" />
+                  <span>AI Guardian Approval & Audit Ledger ({approvals.length})</span>
+                </h3>
+                <span className="text-[11px] text-slate-400">Immutable execution record</span>
+              </div>
+
+              <div className="rounded-xl bg-slate-950 border border-slate-800 overflow-hidden text-xs">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead className="bg-slate-900/80 text-slate-400 border-b border-slate-800 text-[11px] font-semibold">
+                      <tr>
+                        <th className="py-2.5 px-3">Status</th>
+                        <th className="py-2.5 px-3">Action Title</th>
+                        <th className="py-2.5 px-3">Risk</th>
+                        <th className="py-2.5 px-3">Resolved By</th>
+                        <th className="py-2.5 px-3">Result / Details</th>
+                        <th className="py-2.5 px-3 whitespace-nowrap">Timestamp</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
+                      {approvals.map((appr: any) => (
+                        <tr key={appr.id} className="hover:bg-slate-900/40 transition-colors">
+                          <td className="py-2 px-3 whitespace-nowrap">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              appr.status === "EXECUTED" || appr.status === "APPROVED"
+                                ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                                : appr.status === "REJECTED"
+                                ? "bg-red-500/10 text-red-400 border border-red-500/20"
+                                : appr.status === "EXPIRED"
+                                ? "bg-slate-800 text-slate-400"
+                                : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                            }`}>
+                              {appr.status}
+                            </span>
+                          </td>
+                          <td className="py-2 px-3 font-sans text-white font-medium max-w-xs truncate" title={appr.title}>
+                            {appr.title}
+                          </td>
+                          <td className="py-2 px-3 whitespace-nowrap">
+                            <span className={`text-[10px] font-bold ${
+                              appr.riskLevel === "CRITICAL" ? "text-red-400" : appr.riskLevel === "HIGH" ? "text-amber-400" : "text-emerald-400"
+                            }`}>
+                              {appr.riskLevel}
+                            </span>
+                          </td>
+                          <td className="py-2 px-3 text-slate-400 whitespace-nowrap">
+                            {appr.resolvedBy || "AI Engine"}
+                          </td>
+                          <td className="py-2 px-3 font-sans text-slate-300 max-w-sm truncate" title={appr.executionResult || appr.description}>
+                            {appr.executionResult || appr.description}
+                          </td>
+                          <td className="py-2 px-3 text-slate-400 whitespace-nowrap">
+                            {new Date(appr.resolvedAt || appr.createdAt).toLocaleDateString("en-IN", {
+                              day: "numeric",
+                              month: "short",
+                              hour: "2-digit",
+                              minute: "2-digit"
+                            })}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>

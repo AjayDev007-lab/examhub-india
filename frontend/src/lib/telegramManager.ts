@@ -19,6 +19,36 @@ export const TELEGRAM_ADMIN_USERNAME = "@AJ4Y2";
 export const TELEGRAM_PUBLIC_CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID?.trim() || "@india102210";
 export const TELEGRAM_PUBLIC_CHANNEL_URL = "https://t.me/india102210";
 export const TELEGRAM_DEFAULT_ADMIN_CHAT_ID = "8110670060";
+export const TELEGRAM_SECONDARY_ADMIN_CHAT_ID = "9283986705";
+
+/**
+ * Checks whether a Telegram sender is authorized as the Admin (@AJ4Y2).
+ * Verifies against numerical Admin Chat IDs (8110670060 / 9283986705) and username.
+ */
+export function isAuthorizedAdminSender(sender?: {
+  id?: number | string | null;
+  username?: string | null;
+}): boolean {
+  if (!sender) return false;
+  const senderId = String(sender.id || "").trim();
+  const rawUser = String(sender.username || "").replace(/^@/, "").toLowerCase().trim();
+
+  // Check numerical IDs
+  if (
+    senderId === TELEGRAM_DEFAULT_ADMIN_CHAT_ID ||
+    senderId === TELEGRAM_SECONDARY_ADMIN_CHAT_ID ||
+    (dynamicAdminChatId && senderId === dynamicAdminChatId)
+  ) {
+    return true;
+  }
+
+  // Check username match with @AJ4Y2
+  if (rawUser === "aj4y2" || rawUser === "ajay2") {
+    return true;
+  }
+
+  return false;
+}
 
 // In-memory dynamic override for Admin Chat ID
 let dynamicAdminChatId: string | null = null;
@@ -766,4 +796,174 @@ export function generateTelegramWeeklySummary(metrics: {
     `2. Keep high-traffic /results gateway pre-cached for upcoming board releases.\n\n` +
     `━━━━━━━━━━━━━━━━━━━━━━\n` +
     `🌐 https://examhub-india.vercel.app/admin/dashboard`;
+}
+
+/**
+ * Sends an interactive approval request message with inline buttons:
+ * 🟢 APPROVE / 🔴 REJECT
+ * Strictly sent only to verified Admin Chat ID.
+ */
+export async function sendTelegramInteractiveApproval(params: {
+  htmlText: string;
+  approvalId: string;
+  customToken?: string;
+  customChatId?: string;
+}): Promise<{
+  success: boolean;
+  messageId?: number;
+  chatId?: string;
+  error?: string;
+}> {
+  const token = getSanitizedTelegramBotToken(params.customToken);
+  const chatId = getSanitizedAdminChatId(params.customChatId);
+
+  if (!token) {
+    return { success: false, error: "TELEGRAM_BOT_TOKEN is not configured." };
+  }
+  if (!chatId) {
+    return { success: false, error: "Admin Chat ID is not configured." };
+  }
+
+  // Telegram callback_data limit is 64 bytes.
+  // We use "appr_" + id and "rejc_" + id.
+  const inlineKeyboard = [
+    [
+      { text: "🟢 APPROVE", callback_data: `appr_${params.approvalId}` },
+      { text: "🔴 REJECT", callback_data: `rejc_${params.approvalId}` }
+    ]
+  ];
+
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: params.htmlText,
+        parse_mode: "HTML",
+        disable_web_page_preview: true,
+        reply_markup: {
+          inline_keyboard: inlineKeyboard
+        }
+      })
+    });
+
+    const data = await res.json();
+    if (!data.ok) {
+      return { success: false, error: data.description || "Failed to send approval message to Telegram." };
+    }
+
+    return {
+      success: true,
+      messageId: data.result?.message_id,
+      chatId: String(data.result?.chat?.id || chatId)
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Updates an existing Telegram message in-place (e.g. to update status and remove inline buttons once clicked).
+ */
+export async function editTelegramMessageText(params: {
+  chatId: string | number;
+  messageId: number;
+  text: string;
+  parseMode?: "HTML" | "Markdown";
+  inlineKeyboard?: any[][];
+  customToken?: string;
+}): Promise<{ success: boolean; result?: any; error?: string }> {
+  const token = getSanitizedTelegramBotToken(params.customToken);
+  if (!token) return { success: false, error: "TELEGRAM_BOT_TOKEN is not configured." };
+
+  try {
+    const body: any = {
+      chat_id: params.chatId,
+      message_id: params.messageId,
+      text: params.text,
+      parse_mode: params.parseMode || "HTML",
+      disable_web_page_preview: true
+    };
+
+    if (params.inlineKeyboard && params.inlineKeyboard.length > 0) {
+      body.reply_markup = { inline_keyboard: params.inlineKeyboard };
+    } else {
+      // Remove inline keyboard by leaving reply_markup empty or omitting
+      body.reply_markup = { inline_keyboard: [] };
+    }
+
+    const res = await fetch(`https://api.telegram.org/bot${token}/editMessageText`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+
+    const data = await res.json();
+    if (!data.ok) {
+      return { success: false, error: data.description || "Failed to edit message in Telegram." };
+    }
+    return { success: true, result: data.result };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Responds to a Telegram callback query (from inline button click).
+ * Immediately removes loading spinner on Telegram UI.
+ */
+export async function answerTelegramCallbackQuery(params: {
+  callbackQueryId: string;
+  text?: string;
+  showAlert?: boolean;
+  customToken?: string;
+}): Promise<{ success: boolean; error?: string }> {
+  const token = getSanitizedTelegramBotToken(params.customToken);
+  if (!token) return { success: false, error: "TELEGRAM_BOT_TOKEN is not configured." };
+
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        callback_query_id: params.callbackQueryId,
+        text: params.text || "Processed",
+        show_alert: params.showAlert ?? false
+      })
+    });
+    const data = await res.json();
+    return { success: Boolean(data.ok), error: data.ok ? undefined : data.description };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Registers a webhook URL with Telegram for instant bidirectional interaction.
+ */
+export async function setTelegramWebhookUrl(
+  webhookUrl: string,
+  customToken?: string
+): Promise<{ success: boolean; description?: string }> {
+  const token = getSanitizedTelegramBotToken(customToken);
+  if (!token) return { success: false, description: "No bot token configured." };
+
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url: webhookUrl,
+        allowed_updates: ["message", "callback_query"]
+      })
+    });
+    const data = await res.json();
+    return {
+      success: Boolean(data.ok),
+      description: data.description || (data.ok ? "Webhook registered successfully." : "Failed to register webhook.")
+    };
+  } catch (err: any) {
+    return { success: false, description: err.message };
+  }
 }

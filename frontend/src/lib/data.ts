@@ -2470,6 +2470,7 @@ declare global {
     examApplications: any[];
     studentApplications: any[];
     countdowns: any[];
+    approvals: any[];
     logs: any[];
   } | undefined;
 }
@@ -3389,6 +3390,7 @@ if (!global.__examhubStore) {
     examApplications: [...initialExamApplications],
     studentApplications: [...initialStudentApplications],
     countdowns: [...initialCountdowns],
+    approvals: [],
     savedWebsites: [
       { userId: 1, websiteId: 11, createdAt: new Date().toISOString() }, // UPSC saved by default student
       { userId: 1, websiteId: 25, createdAt: new Date().toISOString() }  // NTA saved by default student
