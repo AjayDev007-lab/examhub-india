@@ -30,12 +30,15 @@ export const dynamic = "force-dynamic";
 // GET /api/telegram/webhook - Webhook health & status check
 export async function GET() {
   const token = getSanitizedTelegramBotToken();
+  const tokenPrefix = token ? token.slice(0, 10) : "NONE";
   return NextResponse.json({
     status: "ONLINE",
     bot: TELEGRAM_BOT_USERNAME,
     admin: TELEGRAM_ADMIN_USERNAME,
     channel: TELEGRAM_PUBLIC_CHANNEL_ID,
     isTokenConfigured: Boolean(token && token.length > 10),
+    tokenPrefix,
+    tokenLength: token.length,
     timestamp: new Date().toISOString()
   });
 }
