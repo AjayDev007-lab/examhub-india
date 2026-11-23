@@ -63,22 +63,16 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true, reason: "unauthorized_callback" });
       }
 
-      // Initial instant answer to dismiss Telegram UI loader
-      await answerTelegramCallbackQuery({
-        callbackQueryId: cb.id,
-        text: "⚡ Processing decision with AI Guardian Engine...",
-        showAlert: false
-      });
-
       const adminLabel = `@${sender.username || "AJ4Y2"} (${sender.id})`;
 
       if (data.startsWith("appr_")) {
         const approvalId = data.replace(/^appr_/, "");
-        const res = await resolveApproval(approvalId, "APPROVE", adminLabel);
+        const res = await resolveApproval(approvalId, "APPROVE", adminLabel, cb.message);
 
+        // Acknowledge callback query with single clear status
         await answerTelegramCallbackQuery({
           callbackQueryId: cb.id,
-          text: res.success ? `✅ Approved: ${res.message}` : `⚠️ ${res.message}`,
+          text: res.success ? "✅ Approved & executed!" : `⚠️ ${res.message}`,
           showAlert: !res.success
         });
 
@@ -87,11 +81,12 @@ export async function POST(req: NextRequest) {
 
       if (data.startsWith("rejc_")) {
         const approvalId = data.replace(/^rejc_/, "");
-        const res = await resolveApproval(approvalId, "REJECT", adminLabel);
+        const res = await resolveApproval(approvalId, "REJECT", adminLabel, cb.message);
 
+        // Acknowledge callback query with single clear status
         await answerTelegramCallbackQuery({
           callbackQueryId: cb.id,
-          text: res.success ? "🔴 Action rejected. System cancelled." : `⚠️ ${res.message}`,
+          text: res.success ? "🔴 Action rejected and cancelled." : `⚠️ ${res.message}`,
           showAlert: !res.success
         });
 

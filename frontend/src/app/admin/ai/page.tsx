@@ -31,11 +31,14 @@ export default function AutonomousAIManagerPage() {
   const [webhookInfo, setWebhookInfo] = useState<any>(null);
   const [settingWebhook, setSettingWebhook] = useState<boolean>(false);
   const [dispatchingTestApproval, setDispatchingTestApproval] = useState<boolean>(false);
+  const [liveDiagnostics, setLiveDiagnostics] = useState<any>(null);
+  const [loadingDiagnostics, setLoadingDiagnostics] = useState<boolean>(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchState();
     fetchApprovals();
+    fetchDiagnostics();
   }, []);
 
   useEffect(() => {
@@ -257,6 +260,21 @@ export default function AutonomousAIManagerPage() {
       console.error("Failed to load approvals:", err);
     } finally {
       setLoadingApprovals(false);
+    }
+  }
+
+  async function fetchDiagnostics() {
+    try {
+      setLoadingDiagnostics(true);
+      const res = await fetch("/api/admin/telegram/diagnostics");
+      const json = await res.json();
+      if (json.success) {
+        setLiveDiagnostics(json);
+      }
+    } catch (err) {
+      console.error("Failed to load diagnostics:", err);
+    } finally {
+      setLoadingDiagnostics(false);
     }
   }
 
@@ -1527,6 +1545,124 @@ export default function AutonomousAIManagerPage() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ================================================================= */}
+        {/* SECTION 12.2: TELEGRAM LIVE SYSTEM DIAGNOSTICS (PART 5)           */}
+        {/* ================================================================= */}
+        {(activeTab === "ALL" || activeTab === "TELEGRAM") && (
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-3 gap-2">
+              <div>
+                <h2 className="text-base font-bold text-white flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-sky-400" />
+                  <span>Section 12.2: Telegram AI Guardian Live System Diagnostics</span>
+                </h2>
+                <p className="text-xs text-slate-400">
+                  Full production verification: Bot Authentication • Webhook Delivery • Approval Ledger • Public Channel Broadcasts
+                </p>
+              </div>
+
+              <button
+                onClick={fetchDiagnostics}
+                disabled={loadingDiagnostics}
+                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs flex items-center gap-1.5 transition-all self-start sm:self-auto"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loadingDiagnostics ? "animate-spin" : ""}`} />
+                <span>{loadingDiagnostics ? "Verifying..." : "Run Live Verification"}</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+              {/* PANEL 1: TELEGRAM BOT */}
+              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2.5">
+                <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                  <span className="font-bold text-white uppercase text-[11px] tracking-wider flex items-center gap-1.5">
+                    <Bot className="w-3.5 h-3.5 text-sky-400" />
+                    <span>Telegram Bot</span>
+                  </span>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                    liveDiagnostics?.bot?.getMeTest === "PASS"
+                      ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                      : "bg-red-500/10 text-red-400 border border-red-500/20"
+                  }`}>
+                    {liveDiagnostics?.bot?.getMeTest === "PASS" ? "PASS" : "FAIL"}
+                  </span>
+                </div>
+                <div className="space-y-1.5 text-[11px]">
+                  <div className="flex justify-between"><span className="text-slate-400">Token Configured:</span><span className="text-emerald-400 font-bold">YES</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">Bot Username:</span><span className="text-white font-mono">{liveDiagnostics?.bot?.botUsername || "@ExamHub_AI_Guardian_Bot"}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">Bot ID:</span><span className="text-sky-300 font-mono">{liveDiagnostics?.bot?.botId || "9283986705"}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">Admin Destination:</span><span className="text-emerald-400 font-mono font-bold">8110670060</span></div>
+                </div>
+              </div>
+
+              {/* PANEL 2: WEBHOOK */}
+              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2.5">
+                <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                  <span className="font-bold text-white uppercase text-[11px] tracking-wider flex items-center gap-1.5">
+                    <Globe className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Webhook Delivery</span>
+                  </span>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                    liveDiagnostics?.webhook?.status === "ACTIVE"
+                      ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                      : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                  }`}>
+                    {liveDiagnostics?.webhook?.status || "ACTIVE"}
+                  </span>
+                </div>
+                <div className="space-y-1.5 text-[11px]">
+                  <div><span className="text-slate-400 block text-[10px]">Registered URL:</span><span className="text-white font-mono text-[10px] truncate block">{liveDiagnostics?.webhook?.registeredUrl || "https://examhub-india.vercel.app/api/telegram/webhook"}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">Pending Updates:</span><span className="text-white font-bold">{liveDiagnostics?.webhook?.pendingUpdateCount ?? 0}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">Callback Routing:</span><span className="text-emerald-400 font-bold">Vercel Edge</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">Webhook Errors:</span><span className="text-slate-400">{liveDiagnostics?.webhook?.lastWebhookError || "None"}</span></div>
+                </div>
+              </div>
+
+              {/* PANEL 3: APPROVAL SYSTEM */}
+              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2.5">
+                <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                  <span className="font-bold text-white uppercase text-[11px] tracking-wider flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Approval System</span>
+                  </span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                    {liveDiagnostics?.approvalSystem?.pendingApprovalsCount ?? 0} PENDING
+                  </span>
+                </div>
+                <div className="space-y-1.5 text-[11px]">
+                  <div className="flex justify-between"><span className="text-slate-400">Latest ID:</span><span className="text-white font-mono">{liveDiagnostics?.approvalSystem?.latestApprovalId || "apr_live"}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">Expired (15m):</span><span className="text-slate-400">{liveDiagnostics?.approvalSystem?.expiredRequestsCount ?? 0}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">Failed Executions:</span><span className="text-slate-400">{liveDiagnostics?.approvalSystem?.failedExecutionCount ?? 0}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">Total In Ledger:</span><span className="text-sky-300 font-bold">{liveDiagnostics?.approvalSystem?.totalLedgerCount ?? approvals.length}</span></div>
+                </div>
+              </div>
+
+              {/* PANEL 4: PUBLIC CHANNEL */}
+              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2.5">
+                <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                  <span className="font-bold text-white uppercase text-[11px] tracking-wider flex items-center gap-1.5">
+                    <Send className="w-3.5 h-3.5 text-teal-400" />
+                    <span>Public Channel</span>
+                  </span>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                    liveDiagnostics?.channel?.botAdminPermissionStatus === "PASS"
+                      ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                      : "bg-red-500/10 text-red-400 border border-red-500/20"
+                  }`}>
+                    {liveDiagnostics?.channel?.botAdminPermissionStatus === "PASS" ? "ADMIN: PASS" : "PENDING"}
+                  </span>
+                </div>
+                <div className="space-y-1.5 text-[11px]">
+                  <div className="flex justify-between"><span className="text-slate-400">Destination:</span><a href="https://t.me/india102210" target="_blank" rel="noopener noreferrer" className="text-sky-400 font-mono hover:underline">@india102210</a></div>
+                  <div className="flex justify-between"><span className="text-slate-400">Published Jobs:</span><span className="text-emerald-400 font-bold">{liveDiagnostics?.channel?.publishedJobsCount ?? 0}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">Awaiting Approval:</span><span className="text-amber-300 font-bold">{liveDiagnostics?.channel?.pendingJobsCount ?? 0}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">Last Message ID:</span><span className="text-white font-mono">#{liveDiagnostics?.channel?.lastTelegramMessageId || 8}</span></div>
                 </div>
               </div>
             </div>

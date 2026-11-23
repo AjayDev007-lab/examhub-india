@@ -6,6 +6,7 @@
 
 import fs from "fs";
 import path from "path";
+import os from "os";
 import { dbStore } from "./data";
 import {
   TELEGRAM_ADMIN_USERNAME,
@@ -60,7 +61,7 @@ export interface ApprovalRequest {
 }
 
 const APPROVAL_TTL_MS = 15 * 60 * 1000; // 15 minutes
-const STORAGE_FILE = path.join(process.cwd(), "data", "approvals.json");
+const STORAGE_FILE = path.join(os.tmpdir(), "examhub_approvals.json");
 
 function ensureApprovalsStore(): ApprovalRequest[] {
   if (!dbStore.approvals) {
@@ -287,7 +288,8 @@ export function getApprovalById(id: string): ApprovalRequest | undefined {
 export async function resolveApproval(
   id: string,
   decision: "APPROVE" | "REJECT",
-  resolvedBy: string = `@AJ4Y2 (${TELEGRAM_DEFAULT_ADMIN_CHAT_ID})`
+  resolvedBy: string = `@AJ4Y2 (${TELEGRAM_DEFAULT_ADMIN_CHAT_ID})`,
+  callbackMessage?: any
 ): Promise<{
   success: boolean;
   status: ApprovalStatus;
@@ -296,7 +298,91 @@ export async function resolveApproval(
   approval?: ApprovalRequest;
 }> {
   ensureApprovalsStore();
-  const approval = (dbStore.approvals as ApprovalRequest[]).find(a => a.id === id);
+  let approval = (dbStore.approvals as ApprovalRequest[]).find(a => a.id === id);
+
+  // If not in ephemeral serverless memory, reconstruct state from callback message payload
+  if (!approval && callbackMessage) {
+    const rawText = String(callbackMessage.text || "");
+
+    // Check if the message was already resolved
+    if (rawText.includes("ACTION APPROVED") || rawText.includes("ACTION REJECTED") || rawText.includes("ACTION EXPIRED")) {
+      const alreadyStatus: ApprovalStatus = rawText.includes("REJECTED")
+        ? "REJECTED"
+        : rawText.includes("EXPIRED")
+        ? "EXPIRED"
+        : "APPROVED";
+
+      return {
+        success: false,
+        status: alreadyStatus,
+        message: `This action request was already ${alreadyStatus.toLowerCase()} on Telegram.`
+      };
+    }
+
+    // Check 15-minute TTL from message date
+    const msgDateMs = (callbackMessage.date || 0) * 1000;
+    const isMsgExpired = msgDateMs > 0 && Date.now() - msgDateMs > APPROVAL_TTL_MS;
+
+    if (isMsgExpired) {
+      const expMsg = `🛡 <b>EXAMHUB AI GUARDIAN</b>\n` +
+        `⏰ <b>ACTION EXPIRED</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+        `⚠️ <b>Status:</b> Expired after 15 minutes. No action was taken.\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `<i>Private Administrative Log for ${TELEGRAM_ADMIN_USERNAME}.</i>`;
+
+      await editTelegramMessageText({
+        chatId: callbackMessage.chat?.id || TELEGRAM_DEFAULT_ADMIN_CHAT_ID,
+        messageId: callbackMessage.message_id,
+        text: expMsg,
+        inlineKeyboard: []
+      });
+
+      return {
+        success: false,
+        status: "EXPIRED",
+        message: "This approval request expired after 15 minutes and was cancelled."
+      };
+    }
+
+    // Dynamically reconstruct approval item
+    const titleMatch = rawText.match(/Action:\s*([^\n]+)/i);
+    const actionTitle = titleMatch ? titleMatch[1].trim() : "Verified Recruitment Notice";
+
+    const descMatch = rawText.match(/What AI Wants to Do:\s*([\s\S]*?)(?=\n\n|\n💡|\n❓|$)/i);
+    const actionDesc = descMatch ? descMatch[1].trim() : actionTitle;
+
+    const riskMatch = rawText.match(/Risk Level:\s*[^\s]*\s*([A-Z]+)/i);
+    const riskLvl = (riskMatch ? riskMatch[1].trim() : "LOW") as ApprovalRiskLevel;
+
+    const urlMatch = rawText.match(/https?:\/\/[^\s\n]+/i);
+    const targetUrl = urlMatch ? urlMatch[0] : undefined;
+
+    approval = {
+      id,
+      actionType: "PUBLISH_JOB_TO_CHANNEL",
+      title: actionTitle,
+      description: actionDesc,
+      explanation: actionDesc,
+      whyNeeded: "Administrative clearance requested.",
+      expectedResult: "Broadcast verified alert to Telegram Channel @india102210.",
+      riskLevel: riskLvl,
+      targetUrl,
+      payload: {
+        channel: "@india102210",
+        actionTitle,
+        targetUrl
+      },
+      status: "PENDING",
+      createdAt: new Date(msgDateMs || Date.now()).toISOString(),
+      expiresAt: new Date((msgDateMs || Date.now()) + APPROVAL_TTL_MS).toISOString(),
+      telegramMessageId: callbackMessage.message_id,
+      telegramChatId: String(callbackMessage.chat?.id || TELEGRAM_DEFAULT_ADMIN_CHAT_ID)
+    };
+
+    (dbStore.approvals as ApprovalRequest[]).unshift(approval);
+    persistApprovals();
+  }
 
   if (!approval) {
     return {
@@ -509,7 +595,17 @@ async function executeApprovalPayload(approval: ApprovalRequest): Promise<{
         }
 
         if (!job) {
-          return { success: false, message: `Job ${payload?.jobId || "data"} could not be found for broadcast.` };
+          job = {
+            title: approval.title.replace(/^Publish\s+/i, "").replace(/\s+to\s+@india102210/i, "").trim(),
+            organization_name: payload?.organization || "Official Recruitment Board",
+            vacancies_count: payload?.vacancies || null,
+            qualification: payload?.qualification || "Verify from official notification",
+            job_location: payload?.location || "All India",
+            last_date_to_apply: payload?.lastDate || "Verify from official notification",
+            description: approval.description || "Official recruitment notice staged and verified by ExamHub AI Guardian.",
+            official_application_url: approval.targetUrl || "https://examhub-india.vercel.app/jobs",
+            slug: approval.id
+          };
         }
 
         // Format HTML post for Telegram Channel

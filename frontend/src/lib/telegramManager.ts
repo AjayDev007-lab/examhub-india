@@ -626,41 +626,29 @@ export async function sendTelegramChannelPost(
  * Uses HTML formatting with escapeHtml for 100% reliability against entity parse errors.
  */
 export function formatJobTelegramPost(job: any): string {
-  const title = escapeHtml(job.title || "Government / IT Recruitment Opening");
-  const org = escapeHtml(job.organization_name || job.company || "Official Recruitment Board");
+  const title = escapeHtml(job.title || job.job_title || "Recruitment Opening");
+  const org = escapeHtml(job.organization_name || job.organization || job.company || "Official Recruitment Board");
   const vacancies = job.total_vacancies || job.vacancies_count || null;
-  const qualification = escapeHtml(job.qualification || job.educational_qualification || "Graduate / Diploma / 10th / 12th");
-  const salary = job.salary_package || job.pay_scale || job.salary_range || null;
+  const qualification = escapeHtml(job.qualification || job.educational_qualification || "Verify from official notification");
   const location = escapeHtml(job.job_location || job.location || "All India");
-  const lastDate = escapeHtml(job.last_date_to_apply || job.application_end_date || "Check Official Circular");
+  const lastDate = escapeHtml(job.last_date_to_apply || job.application_end_date || "Verify from official notification");
+  const details = escapeHtml(job.description || job.summary || job.short_description || `Official recruitment notification released by ${org}.`);
   const applyUrl = job.official_application_url || job.official_apply_url || job.officialCareerUrl || `https://examhub-india.vercel.app/jobs/${job.slug || job.id}`;
   const pdfUrl = job.official_notification_pdf || job.official_notification_pdf_url || null;
-  const examHubUrl = `https://examhub-india.vercel.app/jobs/${job.slug || job.id}`;
+  const officialLink = pdfUrl || applyUrl;
 
-  let post = `📢 <b>EXAMHUB INDIA — NEW VERIFIED JOB ALERT</b>\n`;
-  post += `🏛️ <b>Organization:</b> ${org}\n`;
-  post += `💼 <b>Post Title:</b> ${title}\n`;
-  post += `━━━━━━━━━━━━━━━━━━━━━━\n\n`;
-
+  let post = `🚨 <b>NEW JOB NOTIFICATION</b>\n\n`;
+  post += `🏢 <b>Organization:</b> ${org}\n\n`;
+  post += `💼 <b>Job Title:</b> ${title}\n\n`;
   if (vacancies) {
-    post += `🔢 <b>Total Vacancies:</b> ${vacancies} Posts\n`;
+    post += `👥 <b>Vacancies:</b> ${vacancies}\n\n`;
   }
-  post += `🎓 <b>Qualification:</b> ${qualification}\n`;
-  if (salary) {
-    post += `💰 <b>Pay Scale / Package:</b> ${escapeHtml(salary)}\n`;
-  }
-  post += `📍 <b>Location:</b> ${location}\n`;
-  post += `⏰ <b>Last Date to Apply:</b> ${lastDate}\n\n`;
-
-  post += `🔗 <b>Apply Online (Official Link):</b>\n${applyUrl}\n\n`;
-  if (pdfUrl) {
-    post += `📄 <b>Official Notification Circular:</b>\n${pdfUrl}\n\n`;
-  }
-  post += `🌐 <b>View on ExamHub:</b>\n${examHubUrl}\n\n`;
-
-  post += `━━━━━━━━━━━━━━━━━━━━━━\n`;
-  post += `🛡️ <b>Anti-Fraud Notice:</b> Government recruitment boards never ask for OTPs or fees via private accounts. Apply only through verified portals.\n\n`;
-  post += `📲 <b>Join for Daily Verified Alerts:</b> ${TELEGRAM_PUBLIC_CHANNEL_URL}`;
+  post += `🎓 <b>Qualification:</b> ${qualification}\n\n`;
+  post += `📍 <b>Location:</b> ${location}\n\n`;
+  post += `📅 <b>Last Date:</b> ${lastDate}\n\n`;
+  post += `📝 <b>Details:</b>\n${details}\n\n`;
+  post += `🔗 <b>Official Notification:</b>\n${officialLink}\n\n`;
+  post += `🌐 <b>ExamHub India:</b>\nhttps://examhub-india.vercel.app`;
 
   return post;
 }
