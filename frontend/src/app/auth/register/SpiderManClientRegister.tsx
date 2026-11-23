@@ -192,6 +192,18 @@ export default function SpiderManClientRegister() {
             setRegisterSuccess(true);
             setSpiderAction("celebrate");
 
+            // Dispatch private registration alert to Admin Telegram (@AJ4Y2)
+            fetch("/api/auth/register-notify", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                fullName: fullName.trim(),
+                email: emailClean,
+                mobile: mobile.trim() || undefined,
+                uid: cred.user.uid
+              })
+            }).catch(() => {});
+
             setTimeout(() => {
               window.location.href = "/dashboard";
             }, 1400);

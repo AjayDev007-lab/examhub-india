@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Award, ExternalLink, ShieldAlert, Phone, Mail, MessageCircle } from "lucide-react";
+import { Award, ExternalLink, ShieldAlert, Mail, Send } from "lucide-react";
 
 export default function Footer() {
   const pathname = usePathname();
@@ -43,8 +43,17 @@ export default function Footer() {
             <p className="text-slate-400 text-xs leading-relaxed max-w-sm">
               All your examination documents, results, admit cards, and job updates in one place. An independent information resource for students across India.
             </p>
-            <div className="pt-2 text-[11px] text-slate-500">
-              <p>Designed for fast access on Indian mobile networks.</p>
+            <div className="pt-2 space-y-2">
+              <a
+                href="https://t.me/india102210"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center space-x-2 px-3 py-2 rounded-xl bg-sky-950/80 border border-sky-800 text-sky-300 text-xs font-bold hover:bg-sky-900/60 transition-colors shadow-sm"
+              >
+                <Send className="w-3.5 h-3.5 text-sky-400" />
+                <span>Join Telegram Channel (@india102210)</span>
+              </a>
+              <p className="text-[11px] text-slate-500">Instant notifications on verified govt jobs, exams & admit cards.</p>
             </div>
           </div>
 

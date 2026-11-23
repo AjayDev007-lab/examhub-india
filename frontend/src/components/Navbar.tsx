@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { 
   Award, FileText, Briefcase, FolderArchive, LogIn, User, 
   Menu, X, Moon, Sun, ChevronDown, Check, LogOut, ShieldAlert,
-  MessageCircle
+  Send
 } from "lucide-react";
 import { Language, translations } from "@/lib/i18n";
 import { logoutUser } from "@/lib/firebase";
@@ -197,6 +197,18 @@ export default function Navbar() {
               {isDarkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-600" />}
             </button>
 
+            {/* Telegram Channel Shortcut */}
+            <a
+              href="https://t.me/india102210"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden sm:inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-sky-50 dark:bg-sky-950/60 border border-sky-300 dark:border-sky-800 text-sky-700 dark:text-sky-300 text-xs font-bold hover:bg-sky-100 dark:hover:bg-sky-900/50 transition-colors shadow-sm"
+              title="Join ExamHub India Telegram Channel for instant job and exam alerts"
+            >
+              <Send className="w-3.5 h-3.5 text-sky-500" />
+              <span>Telegram Channel</span>
+            </a>
+
             {/* User Profile or Log In / Sign Up */}
             {currentUser ? (
               <div className="relative" ref={userRef}>
@@ -300,6 +312,16 @@ export default function Navbar() {
                 </Link>
               );
             })}
+            <a
+              href="https://t.me/india102210"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-bold bg-sky-50 dark:bg-sky-950/60 border border-sky-300 dark:border-sky-800 text-sky-700 dark:text-sky-300"
+            >
+              <Send className="w-4 h-4 text-sky-500" />
+              <span>Join Telegram Channel (@india102210)</span>
+            </a>
           </nav>
 
           {/* Mobile Language Selector */}

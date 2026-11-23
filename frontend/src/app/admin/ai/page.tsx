@@ -1020,7 +1020,7 @@ export default function AutonomousAIManagerPage() {
                   <span>Section 12: Private Admin Telegram AI Guardian Integration</span>
                 </h2>
                 <p className="text-xs text-slate-400">
-                  Bot: <span className="text-sky-300 font-mono">@ExamHub_AI_Guardian_Bot</span> • Private Admin: <a href="https://t.me/AJ4Y2" target="_blank" rel="noopener noreferrer" className="text-sky-400 font-bold hover:underline">@AJ4Y2</a>
+                  Bot: <span className="text-sky-300 font-mono">@ExamHub_AI_Guardian_Bot</span> • Private Admin: <a href="https://t.me/AJ4Y2" target="_blank" rel="noopener noreferrer" className="text-sky-400 font-bold hover:underline">@AJ4Y2</a> • Public Channel: <a href="https://t.me/india102210" target="_blank" rel="noopener noreferrer" className="text-sky-400 font-bold hover:underline">@india102210</a>
                 </p>
               </div>
               <div className="flex items-center gap-2">

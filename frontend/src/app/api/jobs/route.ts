@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbStore } from "@/lib/data";
+import { sendTelegramChannelPost, formatJobTelegramPost } from "@/lib/telegramManager";
 
 export async function GET(req: NextRequest) {
   try {
@@ -194,6 +195,19 @@ export async function POST(req: NextRequest) {
       published_at: status === "PUBLISHED" ? new Date().toISOString() : null,
       last_verified_at: new Date().toISOString(),
     };
+
+    // Automated Telegram Channel Publishing (@india102210)
+    if (status === "PUBLISHED") {
+      newJob.telegram_message = formatJobTelegramPost(newJob);
+      newJob.telegram_generated_at = new Date().toISOString();
+      const channelResult = await sendTelegramChannelPost(newJob.telegram_message);
+      newJob.telegram_channel_status = channelResult.status === "SENT" ? "POSTED_TO_CHANNEL" : "READY_TO_POST";
+      if (channelResult.status === "SENT") {
+        newJob.telegram_posted_at = new Date().toISOString();
+      }
+    } else {
+      newJob.telegram_channel_status = "PENDING";
+    }
 
     jobs.unshift(newJob);
 

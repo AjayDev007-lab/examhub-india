@@ -5,7 +5,8 @@ import Link from "next/link";
 import { 
   Briefcase, ArrowLeft, Plus, Search, Filter, ShieldCheck, 
   ExternalLink, CheckCircle, AlertTriangle, Clock, RefreshCw, 
-  Edit3, Trash2, Eye, Building, FileText, ChevronRight, X, Info
+  Edit3, Trash2, Eye, Building, FileText, ChevronRight, X, Info,
+  Send, Copy, Check, MessageSquare, Sparkles, Share2
 } from "lucide-react";
 import { fetchApi } from "@/lib/api";
 
@@ -22,6 +23,15 @@ export default function AdminJobsManagementPage() {
   const [submitting, setSubmitting] = useState(false);
   const [modalError, setModalError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+
+  // Telegram Channel Broadcast State (@india102210)
+  const [selectedJobForTelegram, setSelectedJobForTelegram] = useState<any | null>(null);
+  const [isTelegramModalOpen, setIsTelegramModalOpen] = useState(false);
+  const [telegramDispatching, setTelegramDispatching] = useState(false);
+  const [telegramNotice, setTelegramNotice] = useState("");
+  const [copiedTelegram, setCopiedTelegram] = useState(false);
+  const [telegramPreviewText, setTelegramPreviewText] = useState("");
+  const [autoBroadcastOnCreate, setAutoBroadcastOnCreate] = useState(true);
 
   // Form State
   const [formTitle, setFormTitle] = useState("");
@@ -88,6 +98,81 @@ export default function AdminJobsManagementPage() {
       }
     } catch (err: any) {
       alert("Failed to update status: " + (err.message || "Unknown error"));
+    }
+  }
+
+  async function openTelegramModal(job: any) {
+    setSelectedJobForTelegram(job);
+    setIsTelegramModalOpen(true);
+    setTelegramNotice("");
+    setCopiedTelegram(false);
+
+    try {
+      const res = await fetchApi("/api/admin/telegram/channel-dispatch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId: job.id, action: "PREVIEW" })
+      });
+      if (res && res.previewText) {
+        setTelegramPreviewText(res.previewText);
+      }
+    } catch (_) {}
+  }
+
+  function handleCopyTelegram(text: string) {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopiedTelegram(true);
+    setTimeout(() => setCopiedTelegram(false), 3000);
+  }
+
+  async function handleDispatchToTelegramChannel(job: any) {
+    setTelegramDispatching(true);
+    setTelegramNotice("");
+    try {
+      const res = await fetchApi("/api/admin/telegram/channel-dispatch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId: job.id, messageText: telegramPreviewText, action: "DISPATCH_CHANNEL" })
+      });
+      if (res && res.success) {
+        setTelegramNotice(res.message || "Broadcast successfully posted to @india102210!");
+        setJobs(jobs.map((j) => (j.id === job.id ? { ...j, telegram_channel_status: "POSTED_TO_CHANNEL" } : j)));
+      } else {
+        setTelegramNotice("⚠️ " + (res?.message || "Failed to broadcast to Telegram channel."));
+      }
+    } catch (err: any) {
+      setTelegramNotice("⚠️ Error: " + err.message);
+    } finally {
+      setTelegramDispatching(false);
+    }
+  }
+
+  function getTelegramBadge(job: any) {
+    const status = job.telegram_channel_status || (job.status === "PUBLISHED" ? "READY_TO_POST" : "PENDING");
+    switch (status) {
+      case "POSTED_TO_CHANNEL":
+        return (
+          <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30">
+            <CheckCircle className="w-3 h-3 text-sky-400" />
+            <span>Posted to Channel</span>
+          </span>
+        );
+      case "READY_TO_POST":
+        return (
+          <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+            <Send className="w-3 h-3 text-emerald-400" />
+            <span>Ready to Post</span>
+          </span>
+        );
+      case "PENDING":
+      default:
+        return (
+          <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700">
+            <Clock className="w-3 h-3 text-slate-500" />
+            <span>Pending</span>
+          </span>
+        );
     }
   }
 
@@ -314,20 +399,21 @@ export default function AdminJobsManagementPage() {
                   <th className="px-5 py-3">Vacancies & Pay</th>
                   <th className="px-5 py-3">Deadline</th>
                   <th className="px-5 py-3">Status</th>
+                  <th className="px-5 py-3">Telegram Channel</th>
                   <th className="px-5 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="px-5 py-10 text-center text-slate-500">
+                    <td colSpan={7} className="px-5 py-10 text-center text-slate-500">
                       <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-blue-500" />
                       Loading verified job notifications...
                     </td>
                   </tr>
                 ) : jobs.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-5 py-10 text-center text-slate-500">
+                    <td colSpan={7} className="px-5 py-10 text-center text-slate-500">
                       No recruitment notices found matching your criteria.
                     </td>
                   </tr>
@@ -412,6 +498,22 @@ export default function AdminJobsManagementPage() {
                           }`}>
                             {job.status}
                           </span>
+                        </td>
+
+                        <td className="px-5 py-4">
+                          <div className="space-y-1.5">
+                            {getTelegramBadge(job)}
+                            <div>
+                              <button
+                                onClick={() => openTelegramModal(job)}
+                                className="inline-flex items-center space-x-1 px-2.5 py-1 bg-sky-950/80 hover:bg-sky-900 border border-sky-700/60 hover:border-sky-500 text-sky-300 hover:text-sky-200 text-[11px] font-bold rounded-lg transition-colors shadow-sm"
+                                title="Open Telegram Channel Broadcast Hub"
+                              >
+                                <Send className="w-3.5 h-3.5 text-sky-400" />
+                                <span>Channel Post</span>
+                              </button>
+                            </div>
+                          </div>
                         </td>
 
                         <td className="px-5 py-4 text-right">
@@ -669,6 +771,25 @@ export default function AdminJobsManagementPage() {
                 />
               </div>
 
+              {/* Automated Telegram Channel Trigger Option */}
+              <div className="p-3 bg-slate-950/90 border border-sky-900/40 rounded-xl space-y-1">
+                <label className="flex items-center space-x-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={autoBroadcastOnCreate}
+                    onChange={(e) => setAutoBroadcastOnCreate(e.target.checked)}
+                    className="w-4 h-4 rounded text-sky-500 bg-slate-900 border-slate-700 focus:ring-0"
+                  />
+                  <span className="text-slate-200 font-bold text-xs flex items-center space-x-1.5">
+                    <Send className="w-3.5 h-3.5 text-sky-400" />
+                    <span>Auto-broadcast to Public Telegram Channel (@india102210) on Publish</span>
+                  </span>
+                </label>
+                <p className="text-[11px] text-slate-400 pl-6">
+                  Automatically formats a verified job post and publishes it directly to the ExamHub India Public Telegram Channel.
+                </p>
+              </div>
+
               <div className="pt-4 border-t border-slate-800 flex justify-end space-x-3">
                 <button
                   type="button"
@@ -686,6 +807,120 @@ export default function AdminJobsManagementPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Telegram Channel Broadcast Modal (@india102210) */}
+      {isTelegramModalOpen && selectedJobForTelegram && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-2xl p-6 shadow-2xl relative my-8 space-y-4">
+            {/* Modal Header */}
+            <div className="flex justify-between items-start pb-4 border-b border-slate-800">
+              <div className="space-y-1">
+                <div className="flex items-center space-x-2">
+                  <div className="w-8 h-8 rounded-xl bg-sky-600 flex items-center justify-center text-white shadow-lg shadow-sky-600/20">
+                    <Send className="w-4 h-4" />
+                  </div>
+                  <h2 className="text-base font-black text-white">Telegram Public Channel Broadcast Hub</h2>
+                </div>
+                <p className="text-xs text-slate-400">
+                  Target Channel: <a href="https://t.me/india102210" target="_blank" rel="noopener noreferrer" className="text-sky-400 font-bold hover:underline">@india102210</a>
+                </p>
+              </div>
+              <button
+                onClick={() => setIsTelegramModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Notification Status */}
+            <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-slate-950 border border-slate-800 rounded-xl text-xs">
+              <div className="flex items-center space-x-2">
+                <span className="text-slate-400 font-medium">Channel Status:</span>
+                {getTelegramBadge(selectedJobForTelegram)}
+              </div>
+              <a
+                href="https://t.me/india102210"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sky-400 hover:underline flex items-center space-x-1 text-xs"
+              >
+                <span>Open Channel in Telegram</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+
+            {/* Notice / Feedback */}
+            {telegramNotice && (
+              <div className="p-3 bg-slate-950 border border-sky-500/40 text-sky-200 rounded-xl text-xs flex items-center space-x-2">
+                <Info className="w-4 h-4 text-sky-400 shrink-0" />
+                <span>{telegramNotice}</span>
+              </div>
+            )}
+
+            {/* Formatted Telegram Message Preview */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-300 flex items-center space-x-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-sky-400" />
+                  <span>Formatted Telegram Channel Broadcast Preview:</span>
+                </label>
+                <span className="text-[11px] text-slate-500">Includes official links & anti-fraud advisory</span>
+              </div>
+
+              <div className="relative bg-[#0e1621] border border-sky-900/40 rounded-2xl p-4 shadow-inner max-h-72 overflow-y-auto">
+                <pre className="font-sans text-xs text-sky-100 whitespace-pre-wrap leading-relaxed select-all">
+                  {telegramPreviewText || "Loading formatted Telegram broadcast..."}
+                </pre>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 border-t border-slate-800">
+              <button
+                onClick={() => handleDispatchToTelegramChannel(selectedJobForTelegram)}
+                disabled={telegramDispatching}
+                className="w-full py-3 px-4 bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 disabled:opacity-50 text-white rounded-xl text-xs font-black shadow-lg shadow-sky-600/30 flex items-center justify-center space-x-2 transition-all"
+              >
+                {telegramDispatching ? (
+                  <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                ) : (
+                  <Send className="w-4 h-4 text-white" />
+                )}
+                <span>{telegramDispatching ? "Publishing to Telegram..." : "Broadcast to @india102210"}</span>
+              </button>
+
+              <button
+                onClick={() => handleCopyTelegram(telegramPreviewText)}
+                className="w-full py-3 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold flex items-center justify-center space-x-2 transition-colors"
+              >
+                {copiedTelegram ? (
+                  <>
+                    <Check className="w-4 h-4 text-emerald-400" />
+                    <span className="text-emerald-300">Copied to Clipboard!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4 text-slate-400" />
+                    <span>Copy Telegram Post</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Permission Requirement Notice */}
+            <div className="p-3 bg-slate-950/80 border border-sky-900/30 rounded-xl text-[11px] text-slate-400 space-y-1">
+              <div className="flex items-center space-x-1.5 text-sky-300 font-bold">
+                <ShieldCheck className="w-3.5 h-3.5 text-sky-400" />
+                <span>Channel Administrator Permission Requirement</span>
+              </div>
+              <p>
+                To broadcast directly to <strong>@india102210</strong>, please ensure <strong>@ExamHub_AI_Guardian_Bot</strong> is added as an Administrator in your channel with <strong>&quot;Post Messages&quot;</strong> permission enabled.
+              </p>
+            </div>
           </div>
         </div>
       )}

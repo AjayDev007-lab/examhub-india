@@ -269,6 +269,33 @@ export default function StudentDashboardPage() {
                 </div>
               </div>
 
+              {/* Telegram Verified Student Broadcast Channel Banner */}
+              <div className="bg-gradient-to-r from-sky-950/60 via-slate-900 to-sky-900/40 border border-sky-800/40 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 rounded-xl bg-sky-600 flex items-center justify-center text-white shrink-0 shadow-md shadow-sky-600/30">
+                    <Send className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                      <span>Official Telegram Channel</span>
+                      <span className="text-[10px] bg-sky-500/20 text-sky-300 border border-sky-500/30 px-2 py-0.5 rounded-full font-bold">@india102210</span>
+                    </h3>
+                    <p className="text-xs text-sky-200/80 mt-0.5">
+                      Get real-time alerts for admit card releases, verified recruitment circulars, and exam result announcements.
+                    </p>
+                  </div>
+                </div>
+                <a
+                  href="https://t.me/india102210"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs flex items-center justify-center space-x-1.5 transition-all shadow-md shrink-0"
+                >
+                  <span>Join Channel</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              </div>
+
               {/* Three Dashboard Action Cards */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 

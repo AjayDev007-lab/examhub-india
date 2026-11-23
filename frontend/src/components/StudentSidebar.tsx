@@ -17,7 +17,7 @@ import {
   Menu,
   X,
   ChevronRight,
-  MessageCircle,
+  Send,
   ExternalLink
 } from "lucide-react";
 
@@ -59,6 +59,7 @@ export default function StudentSidebar() {
     { name: "Jobs", href: "/jobs", icon: Briefcase },
     { name: "Documents", href: "/dashboard?tab=vault", icon: FolderArchive },
     { name: "Help", href: "/dashboard?tab=support", icon: HelpCircle },
+    { name: "Telegram Channel", href: "https://t.me/india102210", icon: Send, isExternal: true },
   ];
 
   const handleLogout = () => {
@@ -123,6 +124,25 @@ export default function StudentSidebar() {
           {navItems.map((item) => {
             const isActive = pathname === item.href;
             const Icon = item.icon;
+
+            if ((item as any).isExternal) {
+              return (
+                <a
+                  key={item.name}
+                  href={item.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setIsMobileOpen(false)}
+                  className="flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all group text-sky-200 hover:bg-sky-950/60 hover:text-white"
+                >
+                  <div className="flex items-center space-x-2.5">
+                    <Icon className="w-4 h-4 text-sky-400 group-hover:text-white" />
+                    <span>{item.name}</span>
+                  </div>
+                  <ExternalLink className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100 transition-opacity" />
+                </a>
+              );
+            }
 
             return (
               <Link

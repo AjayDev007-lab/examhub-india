@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbStore } from "@/lib/data";
+import { sendTelegramChannelPost, formatJobTelegramPost } from "@/lib/telegramManager";
 
 export async function GET(
   req: NextRequest,
@@ -76,6 +77,13 @@ export async function PUT(
     
     if (body.status === "PUBLISHED" && prevStatus !== "PUBLISHED") {
       current.published_at = current.published_at || new Date().toISOString();
+      current.telegram_message = formatJobTelegramPost(current);
+      current.telegram_generated_at = new Date().toISOString();
+      const channelResult = await sendTelegramChannelPost(current.telegram_message);
+      current.telegram_channel_status = channelResult.status === "SENT" ? "POSTED_TO_CHANNEL" : "READY_TO_POST";
+      if (channelResult.status === "SENT") {
+        current.telegram_posted_at = new Date().toISOString();
+      }
     }
 
     current.last_verified_at = new Date().toISOString();
