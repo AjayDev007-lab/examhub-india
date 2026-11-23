@@ -52,6 +52,14 @@ import StudentSidebar from "@/components/StudentSidebar";
 import StudentHeader from "@/components/StudentHeader";
 
 export default function StudentDashboardPage() {
+  return (
+    <React.Suspense fallback={<div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center text-slate-400 font-medium">Loading Student Dashboard...</div>}>
+      <StudentDashboardContent />
+    </React.Suspense>
+  );
+}
+
+function StudentDashboardContent() {
   const searchParams = useSearchParams();
   const tabFromUrl = searchParams?.get("tab");
   const [activeTab, setActiveTab] = useState("overview");

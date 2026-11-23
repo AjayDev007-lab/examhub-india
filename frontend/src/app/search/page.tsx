@@ -10,6 +10,14 @@ import {
 import { GlobalSearchResultItem } from "@/lib/platformData";
 
 export default function GlobalSearchPage() {
+  return (
+    <React.Suspense fallback={<div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-400">Loading Search...</div>}>
+      <GlobalSearchContent />
+    </React.Suspense>
+  );
+}
+
+function GlobalSearchContent() {
   const searchParams = useSearchParams();
   const initialQ = searchParams?.get("q") || "";
 
