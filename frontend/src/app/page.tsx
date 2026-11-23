@@ -1,554 +1,509 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { 
-  Search, Award, FileText, CheckCircle2, Briefcase, 
-  ChevronRight, ArrowRight, ExternalLink, SlidersHorizontal,
-  X, AlertCircle, RefreshCw, ChevronDown
+import { useRouter } from "next/navigation";
+import {
+  Search, Briefcase, Laptop, GraduationCap, BookOpen, Sparkles,
+  ArrowRight, CheckCircle2, Building2, MapPin, Calendar, Clock,
+  DollarSign, Download, ShieldCheck, ChevronRight, Send, ArrowUpRight,
+  ExternalLink, Layers
 } from "lucide-react";
-import { fetchApi } from "@/lib/api";
+import { initialITJobs, initialUniversityQuestionPapers, initialSchoolChapters } from "@/lib/platformData";
 
 export default function HomePage() {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("");
-  const [selectedState, setSelectedState] = useState("");
-  const [showFilters, setShowFilters] = useState(false);
-
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [hasSearched, setHasSearched] = useState(false);
-
-  const [states, setStates] = useState<any[]>([]);
-  const [categories, setCategories] = useState<any[]>([]);
-  const [featuredExams, setFeaturedExams] = useState<any[]>([]);
-  const [featuredJobs, setFeaturedJobs] = useState<any[]>([]);
-  const [activeFaq, setActiveFaq] = useState<number | null>(null);
-
-  const searchInputRef = useRef<HTMLInputElement>(null);
+  const [govtJobs, setGovtJobs] = useState<any[]>([]);
+  const [itJobs] = useState<any[]>(initialITJobs.slice(0, 4));
+  const [univPapers] = useState<any[]>(initialUniversityQuestionPapers.slice(0, 4));
 
   useEffect(() => {
-    async function loadData() {
-      try {
-        const [statesData, catsData, examsData, jobsData] = await Promise.all([
-          fetchApi("/api/states").catch(() => []),
-          fetchApi("/api/categories").catch(() => []),
-          fetchApi("/api/exams?limit=6").catch(() => []),
-          fetchApi("/api/jobs?limit=4").catch(() => [])
-        ]);
-        setStates(statesData || []);
-        setCategories(catsData || []);
-        setFeaturedExams(examsData || []);
-        const rawJobs = Array.isArray(jobsData) ? jobsData : (jobsData?.jobs || []);
-        setFeaturedJobs(rawJobs);
-      } catch (err) {
-        console.error("Failed to load initial directory data:", err);
-      }
-    }
-    loadData();
+    fetch("/api/jobs?limit=4")
+      .then(r => r.json())
+      .then(d => {
+        const list = Array.isArray(d) ? d : (d.jobs || []);
+        setGovtJobs(list);
+      })
+      .catch(() => {});
   }, []);
 
-  const handleSearch = async (e?: React.FormEvent, customQuery?: string) => {
-    if (e) e.preventDefault();
-    const query = customQuery !== undefined ? customQuery : searchQuery;
-    if (!query.trim() && !selectedCategory && !selectedState) return;
-
-    setIsSearching(true);
-    setHasSearched(true);
-    try {
-      const params = new URLSearchParams();
-      if (query.trim()) params.append("q", query.trim());
-      if (selectedCategory) params.append("category_id", selectedCategory);
-      if (selectedState) params.append("state_id", selectedState);
-
-      const results = await fetchApi(`/api/exams/search?${params.toString()}`);
-      setSearchResults(results || []);
-    } catch (err) {
-      console.error("Search error:", err);
-      setSearchResults([]);
-    } finally {
-      setIsSearching(false);
+  function handleSearchSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
     }
-  };
+  }
 
-  const handleTagClick = (tag: string) => {
-    setSearchQuery(tag);
-    handleSearch(undefined, tag);
-  };
-
-  const clearSearch = () => {
-    setSearchQuery("");
-    setSelectedCategory("");
-    setSelectedState("");
-    setHasSearched(false);
-    setSearchResults([]);
-    searchInputRef.current?.focus();
-  };
-
-  const officialExternalLinks = [
-    { name: "NTA", fullName: "National Testing Agency", url: "https://nta.ac.in/" },
-    { name: "CBSE", fullName: "Central Board of Secondary Education", url: "https://www.cbse.gov.in/" },
-    { name: "UPSC", fullName: "Union Public Service Commission", url: "https://upsc.gov.in/" },
-    { name: "SSC", fullName: "Staff Selection Commission", url: "https://ssc.gov.in/" },
-  ];
-
-  const mainServices = [
+  const primaryPillars = [
     {
-      title: "Results",
-      description: "Check the latest examination results.",
-      buttonText: "Explore Results",
-      href: "/results",
-      icon: Award,
-      color: "text-blue-600 dark:text-blue-400",
-      bgColor: "bg-blue-50 dark:bg-blue-900/30",
-    },
-    {
-      title: "Admit Cards",
-      description: "Find and download examination hall tickets.",
-      buttonText: "Find Admit Cards",
-      href: "/hall-tickets",
-      icon: FileText,
-      color: "text-emerald-600 dark:text-emerald-400",
-      bgColor: "bg-emerald-50 dark:bg-emerald-900/30",
-    },
-    {
-      title: "Answer Keys",
-      description: "Access provisional and final answer keys.",
-      buttonText: "View Answer Keys",
-      href: "/results",
-      icon: CheckCircle2,
-      color: "text-amber-600 dark:text-amber-400",
-      bgColor: "bg-amber-50 dark:bg-amber-900/30",
-    },
-    {
-      title: "Jobs",
-      description: "Explore government and private job opportunities.",
-      buttonText: "Explore Jobs",
+      title: "Government Jobs",
+      description: "Central, State, Railway, SSC, UPSC, Banking & Defence notifications with official PDF links.",
       href: "/jobs",
+      badge: "Verified Vacancies",
       icon: Briefcase,
-      color: "text-purple-600 dark:text-purple-400",
-      bgColor: "bg-purple-50 dark:bg-purple-900/30",
+      color: "from-blue-600 to-indigo-700",
+      accent: "text-blue-400"
     },
+    {
+      title: "IT & Tech Careers",
+      description: "Software Engineer, Full Stack, Data Analyst & AI roles for freshers and experienced pros.",
+      href: "/jobs/it",
+      badge: "Top Tech Employers",
+      icon: Laptop,
+      color: "from-sky-600 to-blue-700",
+      accent: "text-sky-400"
+    },
+    {
+      title: "University Question Papers",
+      description: "Previous semester examination question papers for Anna University, Madras, Bharathiar & more.",
+      href: "/university",
+      badge: "Semesters 1 - 8",
+      icon: GraduationCap,
+      color: "from-purple-600 to-indigo-700",
+      accent: "text-purple-400"
+    },
+    {
+      title: "School Learning & Notes",
+      description: "CBSE & State Board Classes 6-12 chapter summaries, YouTube lessons, NCERT PDFs & quizzes.",
+      href: "/school",
+      badge: "Classes 6 to 12",
+      icon: BookOpen,
+      color: "from-emerald-600 to-teal-700",
+      accent: "text-emerald-400"
+    },
+    {
+      title: "AI Career Tools",
+      description: "AI Job Eligibility Checker, custom career roadmaps, and automated deadline rescue trackers.",
+      href: "/ai-tools",
+      badge: "100% Free for Students",
+      icon: Sparkles,
+      color: "from-amber-600 to-orange-700",
+      accent: "text-amber-400"
+    }
   ];
 
   return (
-    <div className="space-y-12 pb-16 font-sans selection:bg-blue-600 selection:text-white">
+    <div className="space-y-16 pb-20 font-sans selection:bg-blue-600 selection:text-white">
+      {/* ================================================================= */}
+      {/* 1. HERO SECTION & SMART GLOBAL SEARCH                             */}
+      {/* ================================================================= */}
+      <section className="bg-gradient-to-b from-[#081629] via-[#0f2746] to-[#081629] text-white pt-16 pb-20 px-4 sm:px-6 lg:px-8 border-b border-blue-900/40 relative overflow-hidden">
+        {/* Subtle Background Glow */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-96 bg-blue-500/10 blur-3xl pointer-events-none rounded-full"></div>
 
-      {/* ================================================================= */}
-      {/* 1. HERO SECTION & PROMINENT SEARCH                                */}
-      {/* ================================================================= */}
-      <section className="bg-gradient-to-b from-[#0B1E3F] via-[#102D59] to-[#0A162B] text-white pt-12 pb-16 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto text-center space-y-4">
-          
-          {/* Headline (Max 2 lines, ~40px desktop, ~28px mobile) */}
-          <h1 className="text-[28px] sm:text-[40px] font-black tracking-tight text-white leading-tight max-w-2xl mx-auto">
-            Your Exams. Your Results.<br className="hidden sm:inline" /> Everything in One Place.
+        <div className="max-w-5xl mx-auto text-center space-y-6 relative z-10">
+          <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-blue-500/10 border border-blue-400/20 text-blue-300 text-xs font-semibold shadow-sm">
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <span>Official Government Portals • Top IT Drives • College Archives • School Education</span>
+          </div>
+
+          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white leading-tight">
+            Everything You Need for <br className="hidden sm:inline" />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-sky-300 to-emerald-300">
+              Exams, Careers & Learning
+            </span>
           </h1>
 
-          {/* Supporting Text */}
-          <p className="text-sm sm:text-base text-blue-100/90 max-w-xl mx-auto leading-relaxed">
-            Find examination results, admit cards, answer keys and job opportunities easily.
+          <p className="text-sm sm:text-base text-slate-300 max-w-2xl mx-auto leading-relaxed">
+            ExamHub India is your centralized educational technology platform. Access verified government recruitment, IT tech jobs, university semester question papers, and school learning resources.
           </p>
 
-          {/* Primary Action: One Prominent Search Box */}
-          <div className="pt-4 max-w-2xl mx-auto">
-            <form onSubmit={handleSearch} className="relative shadow-xl rounded-2xl">
-              <div className="relative flex items-center">
-                <Search className="absolute left-4 w-5 h-5 text-slate-400 pointer-events-none" />
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search exam, e.g. NEET"
-                  className="w-full pl-12 pr-28 py-3.5 sm:py-4 rounded-2xl bg-white text-slate-900 placeholder-slate-400 text-sm sm:text-base font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-md transition-all"
-                />
-
-                {/* Clear Button */}
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery("")}
-                    className="absolute right-24 text-slate-400 hover:text-slate-600 p-1"
-                    title="Clear search"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-
-                {/* Submit Search Button */}
-                <button
-                  type="submit"
-                  disabled={isSearching}
-                  className="absolute right-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs sm:text-sm shadow-sm transition-all flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
-                >
-                  {isSearching ? (
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <span>Search</span>
-                  )}
-                </button>
-              </div>
-
-              {/* Collapsible Filters Toggle */}
-              <div className="pt-2 flex items-center justify-between text-xs text-blue-200">
-                <button
-                  type="button"
-                  onClick={() => setShowFilters(!showFilters)}
-                  className="inline-flex items-center space-x-1 hover:text-white font-semibold transition-colors"
-                >
-                  <SlidersHorizontal className="w-3.5 h-3.5" />
-                  <span>{showFilters ? "Hide Filters" : "Filters (Category & State)"}</span>
-                  <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showFilters ? "rotate-180" : ""}`} />
-                </button>
-
-                {/* Trending tags hint */}
-                <span className="hidden sm:inline text-blue-200/70 text-[11px]">
-                  Popular: NEET, UPSC, SSC CGL, JEE, CBSE
-                </span>
-              </div>
-
-              {/* Collapsible Filters Container */}
-              {showFilters && (
-                <div className="mt-2.5 p-3.5 bg-white/10 backdrop-blur-md rounded-2xl border border-white/15 grid grid-cols-1 sm:grid-cols-2 gap-3 text-left animate-fadeIn">
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-blue-200 mb-1">
-                      Examination Category
-                    </label>
-                    <select
-                      value={selectedCategory}
-                      onChange={(e) => setSelectedCategory(e.target.value)}
-                      className="w-full py-2 px-3 rounded-xl bg-slate-900/90 text-white border border-blue-400/30 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-blue-400"
-                    >
-                      <option value="">All Categories</option>
-                      {categories.map((c) => (
-                        <option key={c.id} value={c.id}>{c.name}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-blue-200 mb-1">
-                      State / Union Territory
-                    </label>
-                    <select
-                      value={selectedState}
-                      onChange={(e) => setSelectedState(e.target.value)}
-                      className="w-full py-2 px-3 rounded-xl bg-slate-900/90 text-white border border-blue-400/30 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-blue-400"
-                    >
-                      <option value="">All States & UTs</option>
-                      {states.map((s) => (
-                        <option key={s.id} value={s.id}>{s.name} ({s.code})</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              )}
-            </form>
-
-            {/* Quick Keyword Suggestions */}
-            <div className="flex flex-wrap items-center justify-center gap-1.5 pt-4 text-xs">
-              {["NEET", "UPSC Civil Services", "SSC CGL", "JEE Main", "CBSE 10th", "RRB NTPC"].map((tag) => (
-                <button
-                  key={tag}
-                  onClick={() => handleTagClick(tag)}
-                  className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-blue-100 text-[11px] font-medium transition-colors"
-                >
-                  {tag}
-                </button>
-              ))}
+          {/* Unified Global Search Bar */}
+          <form onSubmit={handleSearchSubmit} className="max-w-2xl mx-auto flex flex-col sm:flex-row items-center gap-2 pt-2">
+            <div className="relative w-full">
+              <Search className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Search jobs, subjects (e.g. 12th Physics), universities, or IT companies..."
+                className="w-full pl-12 pr-4 py-4 rounded-2xl bg-slate-900/90 border border-slate-700 text-white placeholder-slate-400 text-sm focus:outline-none focus:border-blue-500 shadow-2xl transition-all"
+              />
             </div>
+            <button
+              type="submit"
+              className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm transition-all shadow-lg shadow-blue-600/30 shrink-0"
+            >
+              Explore
+            </button>
+          </form>
 
-          </div>
-        </div>
-      </section>
-
-      {/* ================================================================= */}
-      {/* SEARCH RESULTS DROPDOWN (Shown When Search Is Active)            */}
-      {/* ================================================================= */}
-      {hasSearched && (
-        <section className="max-w-6xl mx-auto px-4 -mt-8 animate-fadeIn">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 p-6">
-            <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-100 dark:border-slate-800">
-              <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <Search className="w-4 h-4 text-blue-600" />
-                <span>Search Results ({searchResults.length})</span>
-              </h2>
-              <button 
-                onClick={clearSearch}
-                className="text-xs text-blue-600 hover:underline font-semibold"
+          {/* Quick Search Tags */}
+          <div className="flex flex-wrap items-center justify-center gap-2 pt-1 text-xs text-slate-400">
+            <span>Trending:</span>
+            {[
+              { label: "UPSC CSE 2026", q: "UPSC" },
+              { label: "SSC CGL", q: "SSC" },
+              { label: "Zoho Careers", q: "Zoho" },
+              { label: "Anna University Papers", q: "Anna University" },
+              { label: "Class 10 Science", q: "Electricity Class 10" }
+            ].map((t, idx) => (
+              <button
+                key={idx}
+                onClick={() => router.push(`/search?q=${encodeURIComponent(t.q)}`)}
+                className="hover:text-blue-300 underline underline-offset-4 transition-colors"
               >
-                Clear Results
+                {t.label}
               </button>
-            </div>
-
-            {searchResults.length === 0 ? (
-              <div className="text-center py-8 text-slate-500 text-xs">
-                <AlertCircle className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-                <p className="font-semibold text-sm text-slate-700 dark:text-slate-300">No matching examinations found.</p>
-                <p className="text-slate-400 mt-1">Try another examination name or keyword.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {searchResults.map((exam) => (
-                  <div 
-                    key={exam.id} 
-                    className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-blue-400 transition-all flex flex-col justify-between space-y-3"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
-                        <span className="font-bold text-blue-600">{exam.organization_code}</span>
-                        <span>{exam.year}</span>
-                      </div>
-                      <h3 className="font-bold text-slate-900 dark:text-white text-sm line-clamp-1">{exam.name}</h3>
-                      <p className="text-xs text-slate-500 mt-0.5">{exam.organization_name}</p>
-                    </div>
-
-                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center gap-2">
-                      <Link
-                        href={`/results?exam_id=${exam.id}`}
-                        className="flex-1 text-center py-2 px-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-lg transition-colors"
-                      >
-                        Check Result
-                      </Link>
-                      <Link
-                        href={`/hall-tickets?exam_id=${exam.id}`}
-                        className="flex-1 text-center py-2 px-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-800 dark:text-slate-200 text-xs font-semibold rounded-lg transition-colors"
-                      >
-                        Admit Card
-                      </Link>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </section>
-      )}
-
-      {/* ================================================================= */}
-      {/* 2. MAIN SERVICE CARDS (4 LARGE CARDS DIRECTLY BELOW SEARCH)        */}
-      {/* ================================================================= */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {mainServices.map((card) => {
-            const Icon = card.icon;
-            return (
-              <div
-                key={card.title}
-                className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-blue-300 dark:hover:border-blue-600 transition-all flex flex-col justify-between group"
-              >
-                <div className="space-y-4">
-                  <div className={`w-12 h-12 rounded-xl ${card.bgColor} ${card.color} flex items-center justify-center group-hover:scale-105 transition-transform`}>
-                    <Icon className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                      {card.title}
-                    </h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed min-h-[36px]">
-                      {card.description}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="pt-5 mt-4 border-t border-slate-100 dark:border-slate-800">
-                  <Link
-                    href={card.href}
-                    className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-sm transition-all flex items-center justify-center space-x-1.5 group-hover:bg-blue-700"
-                  >
-                    <span>{card.buttonText}</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </Link>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* ================================================================= */}
-      {/* 3. OFFICIAL EXTERNAL EXAM AUTHORITY LINKS                         */}
-      {/* ================================================================= */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-slate-50 dark:bg-slate-900/60 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
-            <div>
-              <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-                Official Examination Authorities
-              </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Always verify schedules, results and notices on the official website of the conducting examination body.
-              </p>
-            </div>
-            <span className="text-[11px] text-slate-400">External Official Portals</span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {officialExternalLinks.map((org) => (
-              <a
-                key={org.name}
-                href={org.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-3.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-blue-400 hover:shadow-sm transition-all flex items-center justify-between group"
-              >
-                <div>
-                  <div className="font-extrabold text-sm text-slate-900 dark:text-white group-hover:text-blue-600 transition-colors">
-                    {org.name}
-                  </div>
-                  <div className="text-[11px] text-slate-500 truncate max-w-[180px]">
-                    {org.fullName}
-                  </div>
-                </div>
-                <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition-colors shrink-0" />
-              </a>
             ))}
           </div>
         </div>
       </section>
 
       {/* ================================================================= */}
-      {/* 4. RECENTLY INDEXED EXAMINATIONS & JOB UPDATES                    */}
+      {/* 2. FIVE PRIMARY PLATFORM PILLARS                                  */}
       {/* ================================================================= */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          
-          {/* Latest Examinations */}
-          <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-              <h3 className="font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">
-                <Award className="w-4 h-4 text-blue-600" />
-                <span>Popular Examinations</span>
-              </h3>
-              <Link href="/results" className="text-xs font-semibold text-blue-600 hover:underline">
-                View All Results →
-              </Link>
-            </div>
-
-            <div className="space-y-2.5 text-xs">
-              {featuredExams.slice(0, 4).map((exam) => (
-                <div
-                  key={exam.id}
-                  className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between"
-                >
-                  <div>
-                    <div className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm">
-                      {exam.name}
-                    </div>
-                    <div className="text-[11px] text-slate-500">
-                      {exam.organization_code} • {exam.year}
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Link
-                      href={`/results?exam_id=${exam.id}`}
-                      className="px-3 py-1.5 rounded-lg bg-blue-600 text-white font-bold text-xs hover:bg-blue-500 transition-colors"
-                    >
-                      Results
-                    </Link>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Latest Job Opportunities */}
-          <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-              <h3 className="font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">
-                <Briefcase className="w-4 h-4 text-purple-600" />
-                <span>Recent Job Opportunities</span>
-              </h3>
-              <Link href="/jobs" className="text-xs font-semibold text-purple-600 hover:underline">
-                View All Jobs →
-              </Link>
-            </div>
-
-            <div className="space-y-2.5 text-xs">
-              {featuredJobs.slice(0, 4).map((job: any) => (
-                <div
-                  key={job.id}
-                  className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between"
-                >
-                  <div>
-                    <div className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm line-clamp-1">
-                      {job.title}
-                    </div>
-                    <div className="text-[11px] text-slate-500">
-                      {job.organization_name || job.company} • {job.qualification || "Graduate"}
-                    </div>
-                  </div>
-                  <Link
-                    href={`/jobs/${job.slug || job.id}`}
-                    className="px-3 py-1.5 rounded-lg bg-purple-600 text-white font-bold text-xs hover:bg-purple-500 transition-colors shrink-0"
-                  >
-                    Details
-                  </Link>
-                </div>
-              ))}
-            </div>
-          </div>
-
-        </div>
-      </section>
-
-      {/* ================================================================= */}
-      {/* 5. FREQUENTLY ASKED QUESTIONS                                     */}
-      {/* ================================================================= */}
-      <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center space-y-1.5 mb-6">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-            Frequently Asked Questions
-          </h2>
-          <p className="text-xs text-slate-500">
-            Clear, transparent information about ExamHub India
-          </p>
-        </div>
-
-        <div className="space-y-2.5 text-xs">
-          {[
-            {
-              q: "Is ExamHub India an official government website?",
-              a: "No. ExamHub India is an independent educational information platform. We organize and index links to official government exam results, admit cards, and job notifications for Indian students."
-            },
-            {
-              q: "How do I check my examination results?",
-              a: "Navigate to the Results section or click 'Explore Results'. Select your target examination, enter your roll number or hall ticket number, and view your result details."
-            },
-            {
-              q: "How can I verify if an examination notification is authentic?",
-              a: "We provide direct links to the verified official websites of bodies like NTA, CBSE, UPSC, and SSC. We advise every student to verify closing dates and official circulars on the conducting authority's official domain."
-            },
-            {
-              q: "Is there any fee to check results or admit cards on ExamHub India?",
-              a: "No. ExamHub India is completely free to use. We do not charge students for accessing examination results, hall ticket links, or job notices."
-            }
-          ].map((faq, i) => {
-            const isOpen = activeFaq === i;
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-12 relative z-20">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          {primaryPillars.map((pillar, idx) => {
+            const Icon = pillar.icon;
             return (
-              <div
-                key={i}
-                className="rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden"
+              <Link
+                key={idx}
+                href={pillar.href}
+                className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-blue-500 dark:hover:border-blue-500 shadow-xl hover:shadow-2xl transition-all flex flex-col justify-between space-y-4 group"
               >
-                <button
-                  onClick={() => setActiveFaq(isOpen ? null : i)}
-                  className="w-full p-4 text-left font-bold text-slate-900 dark:text-white flex items-center justify-between text-xs sm:text-sm hover:text-blue-600 transition-colors"
-                >
-                  <span>{faq.q}</span>
-                  <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`} />
-                </button>
-                {isOpen && (
-                  <div className="px-4 pb-4 pt-1 text-slate-600 dark:text-slate-300 leading-relaxed border-t border-slate-100 dark:border-slate-800">
-                    {faq.a}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/80 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                      <Icon className="w-5 h-5" />
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                      {pillar.badge}
+                    </span>
                   </div>
-                )}
-              </div>
+
+                  <h3 className="text-base font-black text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                    {pillar.title}
+                  </h3>
+
+                  <p className="text-xs text-slate-500 leading-relaxed line-clamp-3">
+                    {pillar.description}
+                  </p>
+                </div>
+
+                <div className="flex items-center text-xs font-bold text-blue-600 dark:text-blue-400 group-hover:translate-x-1 transition-transform">
+                  <span>Enter Section</span>
+                  <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                </div>
+              </Link>
             );
           })}
         </div>
       </section>
 
+      {/* ================================================================= */}
+      {/* 3. LATEST GOVERNMENT RECRUITMENT NOTIFICATIONS                   */}
+      {/* ================================================================= */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4 gap-2">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+              <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
+                Latest Government Recruitment
+              </h2>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+              Central & State official notifications verified from UPSC, SSC, Railways, Banking, and Posts.
+            </p>
+          </div>
+
+          <Link
+            href="/jobs"
+            className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 self-start sm:self-auto"
+          >
+            <span>View All Government Jobs</span>
+            <ChevronRight className="w-4 h-4" />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {govtJobs.map(job => (
+            <div
+              key={job.id}
+              className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800/90 hover:border-blue-400 dark:hover:border-blue-600 transition-all shadow-sm hover:shadow-md flex flex-col justify-between space-y-4"
+            >
+              <div className="space-y-2.5">
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
+                    {job.organization_name}
+                  </span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                    {job.vacancies_count ? `${job.vacancies_count.toLocaleString()} Posts` : "Recruitment"}
+                  </span>
+                </div>
+
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white line-clamp-1">
+                  {job.title}
+                </h3>
+
+                <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2">
+                  {job.job_description}
+                </p>
+
+                <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 pt-1">
+                  <span className="flex items-center gap-1">
+                    <MapPin className="w-3.5 h-3.5 text-slate-400" /> {job.location}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5 text-slate-400" /> Deadline: {job.application_end_date ? new Date(job.application_end_date).toLocaleDateString("en-IN") : "Active"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
+                <span className="text-emerald-600 dark:text-emerald-400 font-semibold text-[11px] flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> Official Source Verified
+                </span>
+
+                <div className="flex items-center gap-2">
+                  <Link
+                    href={`/jobs/${job.slug || job.id}`}
+                    className="px-3.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs transition-all"
+                  >
+                    Details
+                  </Link>
+                  <a
+                    href={job.official_application_url || "https://upsc.gov.in"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1 shadow-sm"
+                  >
+                    <span>Apply</span>
+                    <ArrowUpRight className="w-3 h-3" />
+                  </a>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ================================================================= */}
+      {/* 4. VERIFIED IT & TECH CAREERS                                     */}
+      {/* ================================================================= */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4 gap-2">
+          <div>
+            <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+              <Laptop className="w-6 h-6 text-sky-500" />
+              <span>IT & Software Industry Openings</span>
+            </h2>
+            <p className="text-xs text-slate-500 mt-1">
+              Fresher hiring drives, product software roles, and remote opportunities from verified tech firms.
+            </p>
+          </div>
+
+          <Link
+            href="/jobs/it"
+            className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 self-start sm:self-auto"
+          >
+            <span>Explore All IT Jobs</span>
+            <ChevronRight className="w-4 h-4" />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {itJobs.map(job => (
+            <div
+              key={job.id}
+              className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800/90 hover:border-blue-400 dark:hover:border-blue-600 transition-all shadow-sm hover:shadow-md flex flex-col justify-between space-y-4"
+            >
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
+                    {job.category_display}
+                  </span>
+                  <span className="text-[10px] font-semibold text-slate-400">{job.work_mode}</span>
+                </div>
+
+                <div>
+                  <h4 className="text-xs font-bold text-slate-500 uppercase">{job.company_name}</h4>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white line-clamp-1 mt-0.5">
+                    {job.title}
+                  </h3>
+                </div>
+
+                <div className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                  {job.salary_range}
+                </div>
+
+                <p className="text-xs text-slate-500 line-clamp-2">
+                  {job.job_description}
+                </p>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                <span className="text-[10px] text-slate-400 font-mono">{job.experience_level}</span>
+                <Link
+                  href={`/jobs/it?id=${job.id}`}
+                  className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1 shadow-sm"
+                >
+                  <span>View Role</span>
+                  <ArrowRight className="w-3 h-3" />
+                </Link>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ================================================================= */}
+      {/* 5. COLLEGE & UNIVERSITY QUESTION PAPERS                           */}
+      {/* ================================================================= */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4 gap-2">
+          <div>
+            <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+              <GraduationCap className="w-6 h-6 text-purple-500" />
+              <span>Popular University Semester Question Papers</span>
+            </h2>
+            <p className="text-xs text-slate-500 mt-1">
+              Download previous year examination papers for Engineering, Science, Arts & Commerce degrees.
+            </p>
+          </div>
+
+          <Link
+            href="/university"
+            className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 self-start sm:self-auto"
+          >
+            <span>Browse Full University Archive</span>
+            <ChevronRight className="w-4 h-4" />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {univPapers.map(paper => (
+            <div
+              key={paper.id}
+              className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800/90 hover:border-purple-400 dark:hover:border-purple-600 transition-all shadow-sm hover:shadow-md flex flex-col justify-between space-y-4"
+            >
+              <div className="space-y-2">
+                <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 block uppercase">
+                  {paper.university_name}
+                </span>
+
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white line-clamp-1">
+                  {paper.subject_name}
+                </h3>
+
+                <div className="flex items-center gap-1.5 text-[11px] font-mono text-slate-500">
+                  <span className="font-bold text-slate-700 dark:text-slate-300">{paper.subject_code}</span>
+                  <span>•</span>
+                  <span>{paper.degree} Sem {paper.semester}</span>
+                </div>
+
+                <p className="text-xs text-slate-500 line-clamp-2">
+                  {paper.description}
+                </p>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
+                <span className="text-[11px] text-slate-400 font-mono">{paper.exam_year} {paper.exam_session}</span>
+                <Link
+                  href={`/university?paper_id=${paper.id}`}
+                  className="px-3.5 py-1.5 rounded-xl bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300 font-bold text-xs border border-purple-200 dark:border-purple-800 hover:bg-purple-100 flex items-center gap-1"
+                >
+                  <Download className="w-3 h-3" />
+                  <span>Download</span>
+                </Link>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ================================================================= */}
+      {/* 6. SCHOOL LEARNING BY BOARDS & CLASSES                            */}
+      {/* ================================================================= */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4 gap-2">
+          <div>
+            <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+              <BookOpen className="w-6 h-6 text-emerald-500" />
+              <span>School Education: CBSE & State Boards</span>
+            </h2>
+            <p className="text-xs text-slate-500 mt-1">
+              Select your education board to access chapter notes, YouTube lessons, and practice quizzes for Classes 6 to 12.
+            </p>
+          </div>
+
+          <Link
+            href="/school"
+            className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 self-start sm:self-auto"
+          >
+            <span>Go to School Learning Portal</span>
+            <ChevronRight className="w-4 h-4" />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-center">
+          {[
+            { code: "CBSE", name: "CBSE National Board", state: "All India", href: "/school" },
+            { code: "TNSB", name: "Tamil Nadu State Board", state: "Tamil Nadu", href: "/school/chapter/tn-10-sci-ch01" },
+            { code: "ICSE", name: "ICSE / ISC Board", state: "National", href: "/school" },
+            { code: "KSEEB", name: "Karnataka State Board", state: "Karnataka", href: "/school" },
+            { code: "DHSE", name: "Kerala State Board", state: "Kerala", href: "/school" },
+            { code: "BIEAP", name: "Andhra & Telangana", state: "AP / TS", href: "/school" }
+          ].map((board, idx) => (
+            <Link
+              key={idx}
+              href={board.href}
+              className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800/90 hover:border-emerald-500 dark:hover:border-emerald-500 transition-all shadow-sm hover:shadow-md flex flex-col items-center justify-center space-y-1 group"
+            >
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-black text-xs">
+                {board.code}
+              </div>
+              <h4 className="text-xs font-bold text-slate-800 dark:text-white group-hover:text-emerald-600 transition-colors">
+                {board.name}
+              </h4>
+              <span className="text-[10px] text-slate-400">{board.state}</span>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      {/* ================================================================= */}
+      {/* 7. 24/7 AI GUARDIAN & OFFICIAL TELEGRAM CHANNEL BANNER            */}
+      {/* ================================================================= */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="p-8 sm:p-10 rounded-3xl bg-gradient-to-r from-[#081629] via-[#0f2746] to-[#081629] text-white border border-blue-900/60 shadow-2xl flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="space-y-3 max-w-xl">
+            <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-sky-500/10 border border-sky-400/20 text-sky-300 text-xs font-bold">
+              <Send className="w-3.5 h-3.5" />
+              <span>Official Telegram Job & Exam Broadcasts</span>
+            </div>
+            <h3 className="text-2xl sm:text-3xl font-black text-white leading-tight">
+              Get Instant Job Alerts & Exam Dates on Telegram
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+              Join over thousands of students receiving verified government recruitment notifications, IT drive announcements, and hall ticket releases directly on <strong>@india102210</strong>. Monitored 24/7 by AI Guardian.
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center gap-3 shrink-0">
+            <a
+              href="https://t.me/india102210"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-6 py-3.5 rounded-2xl bg-sky-500 hover:bg-sky-400 text-white font-bold text-xs sm:text-sm flex items-center gap-2 shadow-lg shadow-sky-500/30 transition-all"
+            >
+              <Send className="w-4 h-4" />
+              <span>Join @india102210 Channel</span>
+            </a>
+
+            <Link
+              href="/ai-tools"
+              className="px-6 py-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs sm:text-sm flex items-center gap-2 border border-slate-700 transition-all"
+            >
+              <Sparkles className="w-4 h-4 text-amber-400" />
+              <span>Try AI Tools</span>
+            </Link>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

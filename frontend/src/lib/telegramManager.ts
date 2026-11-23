@@ -434,7 +434,7 @@ export function resolveAdminChatIdFromUpdates(
  */
 export async function sendTelegramAdminAlert(
   messageText: string,
-  options?: { customToken?: string; customChatId?: string }
+  options?: { customToken?: string; customChatId?: string; parseMode?: "Markdown" | "HTML" | "NONE" }
 ): Promise<{
   success: boolean;
   status: "SENT" | "PENDING_CONFIG" | "UNAUTHORIZED_RECIPIENT" | "FAILED";
@@ -460,19 +460,43 @@ export async function sendTelegramAdminAlert(
     };
   }
 
+  // Detect whether message uses HTML tags or Markdown
+  const isHtml = messageText.includes("<b>") || messageText.includes("</b>") || messageText.includes("<i>");
+  const preferredParseMode = options?.parseMode || (isHtml ? "HTML" : "Markdown");
+
   try {
-    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    const payload: any = {
+      chat_id: configuredAdminChatId,
+      text: messageText,
+      disable_web_page_preview: false
+    };
+    if (preferredParseMode !== "NONE") {
+      payload.parse_mode = preferredParseMode;
+    }
+
+    let res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: configuredAdminChatId,
-        text: messageText,
-        parse_mode: "Markdown",
-        disable_web_page_preview: false
-      })
+      body: JSON.stringify(payload)
     });
 
-    const data = await res.json();
+    let data = await res.json();
+
+    // Fail-safe self-recovery: If formatting entity parsing fails, retry cleanly with plain text
+    if (!data.ok && data.description && data.description.toLowerCase().includes("can't parse entities")) {
+      const plainText = messageText.replace(/<\/?[^>]+(>|$)/g, "").replace(/[*_`\[\]()]/g, "");
+      res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: configuredAdminChatId,
+          text: plainText,
+          disable_web_page_preview: false
+        })
+      });
+      data = await res.json();
+    }
+
     if (!data.ok) {
       let desc = data.description || "Telegram API rejected the dispatch request.";
       if (data.error_code === 404) {

@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { 
   Award, FileText, Briefcase, FolderArchive, LogIn, User, 
   Menu, X, Moon, Sun, ChevronDown, Check, LogOut, ShieldAlert,
-  Send
+  Send, Search, Laptop, GraduationCap, BookOpen, Sparkles, Bookmark
 } from "lucide-react";
 import { Language, translations } from "@/lib/i18n";
 import { logoutUser } from "@/lib/firebase";
@@ -91,10 +91,11 @@ export default function Navbar() {
   };
 
   const navLinks = [
-    { name: "Results", href: "/results", icon: Award },
-    { name: "Admit Cards", href: "/hall-tickets", icon: FileText },
-    { name: "Jobs", href: "/jobs", icon: Briefcase },
-    { name: "Documents", href: "/dashboard?tab=vault", icon: FolderArchive },
+    { name: "Govt Jobs", href: "/jobs", icon: Briefcase },
+    { name: "IT Jobs", href: "/jobs/it", icon: Laptop },
+    { name: "University Papers", href: "/university", icon: GraduationCap },
+    { name: "School Learning", href: "/school", icon: BookOpen },
+    { name: "AI Career Tools", href: "/ai-tools", icon: Sparkles },
   ];
 
   const languages = [
@@ -197,6 +198,15 @@ export default function Navbar() {
               {isDarkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-600" />}
             </button>
 
+            {/* Search Link */}
+            <Link
+              href="/search"
+              className="p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border border-slate-200 dark:border-slate-700"
+              title="Smart Global Search"
+            >
+              <Search className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            </Link>
+
             {/* Telegram Channel Shortcut */}
             <a
               href="https://t.me/india102210"
@@ -232,13 +242,31 @@ export default function Navbar() {
                       <span>Student Dashboard</span>
                     </Link>
                     <Link
-                      href="/dashboard?tab=vault"
+                      href="/dashboard?tab=saved"
                       onClick={() => setUserDropdownOpen(false)}
                       className="flex items-center space-x-2 px-3 py-2 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
                     >
-                      <FolderArchive className="w-4 h-4 text-emerald-600" />
-                      <span>Personal Vault</span>
+                      <Bookmark className="w-4 h-4 text-amber-500" />
+                      <span>Saved Items</span>
                     </Link>
+                    <Link
+                      href="/dashboard?tab=applications"
+                      onClick={() => setUserDropdownOpen(false)}
+                      className="flex items-center space-x-2 px-3 py-2 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    >
+                      <FileText className="w-4 h-4 text-purple-500" />
+                      <span>My Applications</span>
+                    </Link>
+                    {currentUser?.role === "admin" && (
+                      <Link
+                        href="/admin/ai"
+                        onClick={() => setUserDropdownOpen(false)}
+                        className="flex items-center space-x-2 px-3 py-2 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      >
+                        <ShieldAlert className="w-4 h-4 text-cyan-500" />
+                        <span>AI Guardian Cockpit</span>
+                      </Link>
+                    )}
                     <div className="border-t border-slate-100 dark:border-slate-800 my-1" />
                     <button
                       onClick={handleLogout}

@@ -18,7 +18,17 @@ import {
   X,
   ChevronRight,
   Send,
-  ExternalLink
+  ExternalLink,
+  Laptop,
+  GraduationCap,
+  BookOpen,
+  Sparkles,
+  Bookmark,
+  Clock,
+  FileCheck2,
+  TrendingUp,
+  User,
+  Settings
 } from "lucide-react";
 
 export default function StudentSidebar() {
@@ -50,15 +60,19 @@ export default function StudentSidebar() {
     }
   };
 
-  // Exactly 6 Sidebar Navigation Groups as required:
-  // 1. Home, 2. My Exams, 3. Results, 4. Jobs, 5. Documents, 6. Help
   const navItems = [
-    { name: "Home", href: "/dashboard", icon: LayoutDashboard },
-    { name: "My Exams", href: "/student/my-exams", icon: Calendar },
-    { name: "Results", href: "/results", icon: Award },
-    { name: "Jobs", href: "/jobs", icon: Briefcase },
-    { name: "Documents", href: "/dashboard?tab=vault", icon: FolderArchive },
-    { name: "Help", href: "/dashboard?tab=support", icon: HelpCircle },
+    { name: "Dashboard Overview", href: "/dashboard", icon: LayoutDashboard },
+    { name: "Government Jobs", href: "/jobs", icon: Briefcase },
+    { name: "IT & Tech Jobs", href: "/jobs/it", icon: Laptop },
+    { name: "College & University", href: "/university", icon: GraduationCap },
+    { name: "School Learning", href: "/school", icon: BookOpen },
+    { name: "AI Career Tools", href: "/ai-tools", icon: Sparkles },
+    { name: "Saved Items", href: "/dashboard?tab=saved", icon: Bookmark },
+    { name: "My Deadlines & Reminders", href: "/dashboard?tab=reminders", icon: Clock },
+    { name: "My Applications", href: "/dashboard?tab=applications", icon: FileCheck2 },
+    { name: "Learning Progress", href: "/dashboard?tab=learning", icon: TrendingUp },
+    { name: "My Profile", href: "/dashboard?tab=profile", icon: User },
+    { name: "Settings", href: "/dashboard?tab=settings", icon: Settings },
     { name: "Telegram Channel", href: "https://t.me/india102210", icon: Send, isExternal: true },
   ];
 

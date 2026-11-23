@@ -7,48 +7,38 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   sendTelegramAdminAlert,
-  generateTelegramDailyDigest,
   TELEGRAM_ADMIN_USERNAME,
   TELEGRAM_DEFAULT_ADMIN_CHAT_ID
 } from "@/lib/telegramManager";
+import { runFullSystemHealthCheck, formatDailyHealthReport } from "@/lib/guardianMonitoring";
 import { dbStore } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
-    // Optional bearer secret verification if CRON_SECRET is configured
     const authHeader = req.headers.get("authorization");
     const cronSecret = process.env.CRON_SECRET;
     if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-      // In development or when triggered by Vercel cron without header, still proceed if internal
+      // Internal or development bypass
     }
 
-    const state = {
-      healthMetrics: {
-        uptimePercentage: 99.98,
-        averageLatencyMs: 38,
-        securityScore: 98
-      },
-      detectedIssues: [],
-      discoveredITJobs: [],
-      discoveredPortals: []
-    };
-
-    const digest = generateTelegramDailyDigest(state);
-    const sendRes = await sendTelegramAdminAlert(digest);
+    // Run real-time full system health check
+    const health = await runFullSystemHealthCheck();
+    const reportText = formatDailyHealthReport(health);
+    const sendRes = await sendTelegramAdminAlert(reportText);
 
     // Record audit log
     if (dbStore.auditLogs) {
       dbStore.auditLogs.unshift({
         id: Date.now(),
-        action: "CRON_DAILY_REPORT_SENT",
+        action: "CRON_DAILY_HEALTH_REPORT_SENT",
         target: TELEGRAM_ADMIN_USERNAME,
         performed_by: "VERCEL_CRON",
         risk: "LOW",
         status: sendRes.success ? "SUCCESS" : "FAILED",
         timestamp: new Date().toISOString(),
-        details: `Daily dispatch status: ${sendRes.status}`
+        details: `Daily dispatch status: ${sendRes.status}, overall health: ${health.overallStatus}`
       });
     }
 
@@ -58,6 +48,14 @@ export async function GET(req: NextRequest) {
       recipient: TELEGRAM_ADMIN_USERNAME,
       chatId: TELEGRAM_DEFAULT_ADMIN_CHAT_ID,
       deliveryStatus: sendRes.status,
+      overallStatus: health.overallStatus,
+      metrics: {
+        website: health.overallStatus,
+        bot: health.telegramBot.status,
+        database: health.database.status,
+        scanner: health.jobScanner.status,
+        pipeline: health.publishingPipeline.status
+      },
       message: sendRes.message
     });
   } catch (err: any) {
