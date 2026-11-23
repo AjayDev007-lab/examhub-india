@@ -172,9 +172,50 @@ export default function AdminJobsManagementPage() {
     }
   }
 
+  async function handleAutoPostToChannel(job: any) {
+    const text = job.whatsapp_message || generateJobWhatsAppMessage(job);
+    try {
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(text);
+        setCopiedWhatsApp(true);
+        setTimeout(() => setCopiedWhatsApp(false), 3500);
+      }
+    } catch (err) {
+      console.error("Clipboard copy error:", err);
+    }
+
+    if (typeof window !== "undefined") {
+      window.open(EXAMHUB_WHATSAPP_CHANNEL_URL, "_blank");
+    }
+
+    try {
+      const res = await fetchApi("/api/admin/jobs/whatsapp-dispatch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId: job.id, action: "AUTO_POST_CHANNEL" }),
+      });
+      if (res && res.success) {
+        setDispatchMsg("⚡ Post copied to clipboard and Channel launched in new tab! Press Ctrl + V to publish.");
+        setJobs(jobs.map((j) => (j.id === job.id ? { ...j, whatsapp_status: "POSTED_TO_CHANNEL" } : j)));
+        if (selectedJobForWhatsApp && (selectedJobForWhatsApp.id === job.id || selectedJobForWhatsApp.slug === job.slug)) {
+          setSelectedJobForWhatsApp({ ...selectedJobForWhatsApp, whatsapp_status: "POSTED_TO_CHANNEL" });
+        }
+      }
+    } catch (err: any) {
+      console.error("Auto post error:", err);
+    }
+  }
+
   function getWhatsAppBadge(job: any) {
     const status = job.whatsapp_status || (job.status === "PUBLISHED" ? "READY_TO_POST" : "PENDING");
     switch (status) {
+      case "POSTED_TO_CHANNEL":
+        return (
+          <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+            <CheckCircle className="w-3 h-3 text-emerald-400" />
+            <span>Posted to Channel</span>
+          </span>
+        );
       case "SENT_TO_ADMIN":
         return (
           <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">
@@ -262,10 +303,11 @@ export default function AdminJobsManagementPage() {
         setFormOrg("");
         setFormSlug("");
 
-        // If published, automatically open WhatsApp modal and dispatch to admin if enabled
+        // If published, automatically open WhatsApp modal and auto-post to channel if enabled
         if (createdJob.status === "PUBLISHED") {
           openWhatsAppModal(createdJob);
           if (autoNotifyAdminOnCreate) {
+            handleAutoPostToChannel(createdJob);
             handleDispatchToAdmin(createdJob.id);
           }
         }
@@ -925,8 +967,19 @@ export default function AdminJobsManagementPage() {
               </div>
             </div>
 
+            {/* ⚡ Instant 1-Click Auto-Post Action */}
+            <div className="pt-2">
+              <button
+                onClick={() => handleAutoPostToChannel(selectedJobForWhatsApp)}
+                className="w-full py-3 px-4 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 hover:from-emerald-500 hover:to-teal-400 text-white rounded-xl text-xs font-black shadow-lg shadow-emerald-600/30 flex items-center justify-center space-x-2 transition-all transform hover:-translate-y-0.5 active:translate-y-0"
+              >
+                <Sparkles className="w-4 h-4 text-emerald-200" />
+                <span>⚡ Auto-Post to WhatsApp Channel (Auto-Copy & Launch Channel)</span>
+              </button>
+            </div>
+
             {/* Quick Action Shortcuts */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
               <button
                 onClick={() => handleCopyMessage(selectedJobForWhatsApp.whatsapp_message || generateJobWhatsAppMessage(selectedJobForWhatsApp))}
                 className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-600/30 flex items-center justify-center space-x-2 transition-colors"

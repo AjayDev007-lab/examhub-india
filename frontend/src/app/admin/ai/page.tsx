@@ -20,6 +20,11 @@ export default function AutonomousAIManagerPage() {
   const [testPhoneInput, setTestPhoneInput] = useState<string>("");
   const [sendingTestWhatsApp, setSendingTestWhatsApp] = useState<boolean>(false);
   const [whatsAppPreview, setWhatsAppPreview] = useState<string>("");
+  const [telegramChatId, setTelegramChatId] = useState<string>("");
+  const [resolvingTelegram, setResolvingTelegram] = useState<boolean>(false);
+  const [sendingTestTelegram, setSendingTestTelegram] = useState<boolean>(false);
+  const [telegramNotice, setTelegramNotice] = useState<string>("");
+  const [telegramPreview, setTelegramPreview] = useState<string>("");
   const [newMemoryKey, setNewMemoryKey] = useState<string>("");
   const [newMemoryVal, setNewMemoryVal] = useState<string>("");
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -41,6 +46,9 @@ export default function AutonomousAIManagerPage() {
         setData(json.data);
         if (json.data.config?.whatsapp?.adminPhoneNumber) {
           setTestPhoneInput(json.data.config.whatsapp.adminPhoneNumber);
+        }
+        if (json.data.config?.telegram?.adminChatId) {
+          setTelegramChatId(json.data.config.telegram.adminChatId);
         }
       }
     } catch (err) {
@@ -176,6 +184,50 @@ export default function AutonomousAIManagerPage() {
       console.error(err);
     } finally {
       setSendingTestWhatsApp(false);
+    }
+  }
+
+  async function handleResolveTelegramChatId() {
+    setResolvingTelegram(true);
+    setTelegramNotice("");
+    try {
+      const res = await fetch("/api/admin/telegram/resolve-chat-id", { method: "POST" });
+      const json = await res.json();
+      if (json.found && json.chatId) {
+        setTelegramChatId(json.chatId);
+        setTelegramNotice(`✅ Found numerical Chat ID for @AJ4Y2: ${json.chatId}!`);
+        await fetchState();
+      } else {
+        setTelegramNotice(json.message || json.error || "No messages found yet. Please open @ExamHub_AI_Guardian_Bot on Telegram, tap Start, and send Hello.");
+      }
+    } catch (err: any) {
+      setTelegramNotice("Failed to query Telegram API: " + err.message);
+    } finally {
+      setResolvingTelegram(false);
+    }
+  }
+
+  async function handleSendTestTelegram() {
+    setSendingTestTelegram(true);
+    setTelegramNotice("");
+    try {
+      const res = await fetch("/api/admin/telegram/test-dispatch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chatId: telegramChatId })
+      });
+      const json = await res.json();
+      if (json.success) {
+        setTelegramNotice(json.message || "Test alert delivered to @AJ4Y2 on Telegram!");
+        setTelegramPreview(json.digestContent || "");
+        await fetchState();
+      } else {
+        setTelegramNotice(json.error || "Failed to dispatch Telegram alert.");
+      }
+    } catch (err: any) {
+      setTelegramNotice("Error dispatching alert: " + err.message);
+    } finally {
+      setSendingTestTelegram(false);
     }
   }
 
@@ -1076,6 +1128,128 @@ export default function AutonomousAIManagerPage() {
                     `• IT Job Openings: 4 roles (TCS, Infosys, AWS, MSFT)\n` +
                     `• Gov Portals: 4 gateways (OPSC, KPSC, ISRO, DRDO)\n\n` +
                     `_Click button on left to dispatch test notification to admin WhatsApp._`
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ================================================================= */}
+        {/* SECTION 12B: PRIVATE ADMIN TELEGRAM AI GUARDIAN (@AJ4Y2)         */}
+        {/* ================================================================= */}
+        {(activeTab === "ALL" || activeTab === "WHATSAPP") && (
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-3 gap-2">
+              <div>
+                <h2 className="text-base font-bold text-white flex items-center gap-2">
+                  <Bot className="w-4 h-4 text-sky-400" />
+                  <span>Section 12B: Private Admin Telegram AI Guardian Integration</span>
+                </h2>
+                <p className="text-xs text-slate-400">
+                  Bot: <span className="text-sky-300 font-mono">@ExamHub_AI_Guardian_Bot</span> • Private Admin: <a href="https://t.me/AJ4Y2" target="_blank" rel="noopener noreferrer" className="text-sky-400 font-bold hover:underline">@AJ4Y2</a>
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${
+                  telegramChatId 
+                    ? "bg-sky-500/10 text-sky-400 border-sky-500/20" 
+                    : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                }`}>
+                  {telegramChatId ? `CHAT ID CONNECTED: ${telegramChatId}` : "PENDING NUMERICAL CHAT ID"}
+                </span>
+              </div>
+            </div>
+
+            {telegramNotice && (
+              <div className="p-3 bg-slate-950 border border-sky-800/60 text-sky-200 rounded-xl text-xs flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-sky-400 shrink-0" />
+                <span className="leading-relaxed">{telegramNotice}</span>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-white text-sm">Admin Chat ID Resolver & Dispatcher</h3>
+                  <span className="text-[10px] text-sky-400 bg-sky-950/60 px-2 py-0.5 rounded border border-sky-800/40 font-mono">
+                    TELEGRAM_ADMIN_CHAT_ID
+                  </span>
+                </div>
+
+                <div className="p-3 rounded-lg bg-sky-950/30 border border-sky-800/30 text-sky-300 text-[11px] space-y-1">
+                  <div className="font-bold">Instructions to Link Your Account:</div>
+                  <ol className="list-decimal list-inside space-y-0.5 text-slate-300">
+                    <li>Open <a href="https://t.me/ExamHub_AI_Guardian_Bot" target="_blank" rel="noopener noreferrer" className="text-sky-400 font-bold underline">@ExamHub_AI_Guardian_Bot</a> in Telegram.</li>
+                    <li>Press <span className="text-white font-bold">Start</span> and send message <span className="text-white font-bold">&quot;Hello&quot;</span>.</li>
+                    <li>Click <span className="text-white font-bold">Auto-Detect My Telegram Chat ID</span> below.</li>
+                  </ol>
+                </div>
+
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-slate-400 text-[11px] font-semibold">Admin Telegram Username:</label>
+                    <div className="w-full mt-1 bg-slate-900 border border-slate-800 rounded-lg p-2 text-white font-mono flex items-center justify-between">
+                      <span>@AJ4Y2</span>
+                      <a href="https://t.me/AJ4Y2" target="_blank" rel="noopener noreferrer" className="text-sky-400 hover:underline flex items-center gap-1 text-[11px]">
+                        <span>Open Profile</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-slate-400 text-[11px] font-semibold">Resolved Numerical Chat ID (Server-Side Env):</label>
+                    <input
+                      type="text"
+                      value={telegramChatId}
+                      onChange={(e) => setTelegramChatId(e.target.value)}
+                      placeholder="e.g. 1092847192 (Auto-detected)"
+                      className="w-full mt-1 bg-slate-900 border border-slate-800 rounded-lg p-2 text-white font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
+                  <button
+                    onClick={handleResolveTelegramChatId}
+                    disabled={resolvingTelegram}
+                    className="w-full py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white font-semibold flex items-center justify-center gap-1.5 transition-all shadow-md"
+                  >
+                    {resolvingTelegram ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                    <span>Auto-Detect Chat ID</span>
+                  </button>
+
+                  <button
+                    onClick={handleSendTestTelegram}
+                    disabled={sendingTestTelegram || !telegramChatId}
+                    className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-semibold flex items-center justify-center gap-1.5 transition-all shadow-md"
+                  >
+                    {sendingTestTelegram ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                    <span>Dispatch Test Alert</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                <h3 className="font-bold text-white text-sm">Telegram AI Guardian Preview</h3>
+                <div className="h-56 overflow-y-auto p-3 rounded-lg bg-sky-950/20 border border-sky-500/20 text-sky-200 font-mono text-[11px] whitespace-pre-wrap leading-relaxed">
+                  {telegramPreview || (
+                    `🛡️ *EXAMHUB INDIA — AI GUARDIAN MONITORING REPORT*\n` +
+                    `🤖 Bot: @ExamHub_AI_Guardian_Bot | 👤 Admin: @AJ4Y2\n` +
+                    `━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+                    `⚡ 1. PLATFORM VITALS & HEALTH:\n` +
+                    `• System Status: OPTIMAL / ONLINE\n` +
+                    `• Uptime: 99.98%\n` +
+                    `• Average Latency: 38ms\n` +
+                    `• Security Posture: 98/100\n\n` +
+                    `🔗 2. SMART LINK GUARDIAN:\n` +
+                    `• Internal Routes: 10/10 Monitored Online\n` +
+                    `• Broken Outbound Links: 0 Flagged\n\n` +
+                    `💼 3. APPROVALS AWAITING CLEARANCE:\n` +
+                    `• Discovered IT Jobs: 4 Roles (TCS, Infosys, AWS, MSFT)\n` +
+                    `• Gov Portals: 4 Gateways (OPSC, KPSC, ISRO, DRDO)\n\n` +
+                    `_All private digests delivered strictly to @AJ4Y2._`
                   )}
                 </div>
               </div>

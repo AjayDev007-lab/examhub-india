@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbStore } from "@/lib/data";
-import { generateJobWhatsAppMessage } from "@/lib/whatsappJobNotification";
+import { generateJobWhatsAppMessage, dispatchAutomaticWhatsAppChannelPost } from "@/lib/whatsappJobNotification";
 
 export async function GET(req: NextRequest) {
   try {
@@ -196,11 +196,15 @@ export async function POST(req: NextRequest) {
       last_verified_at: new Date().toISOString(),
     };
 
-    // Automated WhatsApp Notification Workflow
+    // Automated WhatsApp Notification Workflow & Channel Dispatch
     if (status === "PUBLISHED") {
       newJob.whatsapp_message = generateJobWhatsAppMessage(newJob);
       newJob.whatsapp_generated_at = new Date().toISOString();
-      newJob.whatsapp_status = "READY_TO_POST";
+      const channelResult = await dispatchAutomaticWhatsAppChannelPost(newJob);
+      newJob.whatsapp_status = channelResult.status === "POSTED_TO_CHANNEL" ? "POSTED_TO_CHANNEL" : "READY_TO_POST";
+      if (channelResult.status === "POSTED_TO_CHANNEL") {
+        newJob.whatsapp_posted_at = new Date().toISOString();
+      }
     } else {
       newJob.whatsapp_status = "PENDING";
       newJob.whatsapp_message = null;

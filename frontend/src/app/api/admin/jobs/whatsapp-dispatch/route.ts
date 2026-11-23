@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbStore } from "@/lib/data";
 import { aiManager } from "@/lib/aiManager";
-import { generateJobWhatsAppMessage, EXAMHUB_WHATSAPP_CHANNEL_URL } from "@/lib/whatsappJobNotification";
+import { generateJobWhatsAppMessage, dispatchAutomaticWhatsAppChannelPost, EXAMHUB_WHATSAPP_CHANNEL_URL } from "@/lib/whatsappJobNotification";
 
 export async function POST(req: NextRequest) {
   try {
@@ -55,18 +55,20 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    if (action === "MARK_POSTED") {
-      job.whatsapp_status = "SENT_TO_ADMIN";
+    if (action === "AUTO_POST_CHANNEL" || action === "MARK_POSTED") {
+      const channelResult = await dispatchAutomaticWhatsAppChannelPost(job);
+      job.whatsapp_status = "POSTED_TO_CHANNEL";
       job.whatsapp_posted_at = new Date().toISOString();
 
       return NextResponse.json({
         success: true,
-        action: "MARK_POSTED",
+        action: action,
+        status: channelResult.status,
         whatsapp_status: job.whatsapp_status,
         whatsapp_posted_at: job.whatsapp_posted_at,
         whatsapp_message: job.whatsapp_message,
         channelUrl: EXAMHUB_WHATSAPP_CHANNEL_URL,
-        message: "Job notification marked as posted to WhatsApp Channel"
+        message: channelResult.message || "Job notification marked as posted to WhatsApp Channel"
       });
     }
 

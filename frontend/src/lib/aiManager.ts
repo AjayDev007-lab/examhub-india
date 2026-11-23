@@ -135,6 +135,7 @@ export interface AIAutonomousConfig {
   consumedTokensToday: number;
   costInrToday: number;
   whatsapp: WhatsAppConfig;
+  telegram?: import("./telegramManager").TelegramConfig;
 }
 
 // In-Memory Global State for Next.js App Router Runtime
@@ -443,6 +444,15 @@ function initAIManagerState() {
           lastReportSentAt: new Date(Date.now() - 3600000 * 15).toISOString(),
           isMetaVerified: Boolean(process.env.WHATSAPP_CLOUD_API_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID),
           cloudApiConfigured: Boolean(process.env.WHATSAPP_CLOUD_API_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID)
+        },
+        telegram: {
+          isEnabled: Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID),
+          botUsername: "@ExamHub_AI_Guardian_Bot",
+          adminUsername: "@AJ4Y2",
+          adminChatId: process.env.TELEGRAM_ADMIN_CHAT_ID || null,
+          isTokenConfigured: Boolean(process.env.TELEGRAM_BOT_TOKEN),
+          isChatIdConfigured: Boolean(process.env.TELEGRAM_ADMIN_CHAT_ID && /^\d+$/.test(process.env.TELEGRAM_ADMIN_CHAT_ID)),
+          lastReportSentAt: null
         }
       },
       conversation: [
