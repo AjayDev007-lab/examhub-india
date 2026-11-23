@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
     // Run real-time full system health check
     const health = await runFullSystemHealthCheck();
     const reportText = formatDailyHealthReport(health);
-    const sendRes = await sendTelegramAdminAlert(reportText);
+    const sendRes = await sendTelegramAdminAlert(reportText, { parseMode: "HTML" });
 
     // Record audit log
     if (dbStore.auditLogs) {

@@ -483,8 +483,8 @@ export async function sendTelegramAdminAlert(
     let data = await res.json();
 
     // Fail-safe self-recovery: If formatting entity parsing fails, retry cleanly with plain text
-    if (!data.ok && data.description && data.description.toLowerCase().includes("can't parse entities")) {
-      const plainText = messageText.replace(/<\/?[^>]+(>|$)/g, "").replace(/[*_`\[\]()]/g, "");
+    if (!data.ok && data.description && (data.description.toLowerCase().includes("entities") || data.description.toLowerCase().includes("parse") || data.error_code === 400)) {
+      const plainText = messageText.replace(/<[^>]*>/g, "").replace(/[_*[\]()~>#+=|{}.!-]/g, "");
       res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
