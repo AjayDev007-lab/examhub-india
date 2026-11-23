@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import {
   Bot, ShieldCheck, ArrowLeft, RefreshCw, CheckCircle2, AlertTriangle,
-  XCircle, Send, Play, Undo2, Check, X, Phone, Globe, ExternalLink,
+  XCircle, Send, Play, Undo2, Check, X, Globe, ExternalLink,
   Search, Cpu, Sparkles, Activity, Link2, Briefcase, Landmark, Bell,
   FileCheck2, History, RotateCcw, MessageSquare, Users, ShieldAlert,
   HardDrive, Sliders, Brain, Clock, ChevronRight, Layers, ArrowUpRight
@@ -17,9 +17,6 @@ export default function AutonomousAIManagerPage() {
   const [chatInput, setChatInput] = useState<string>("");
   const [sendingChat, setSendingChat] = useState<boolean>(false);
   const [actionNotice, setActionNotice] = useState<string>("");
-  const [testPhoneInput, setTestPhoneInput] = useState<string>("");
-  const [sendingTestWhatsApp, setSendingTestWhatsApp] = useState<boolean>(false);
-  const [whatsAppPreview, setWhatsAppPreview] = useState<string>("");
   const [telegramChatId, setTelegramChatId] = useState<string>("");
   const [resolvingTelegram, setResolvingTelegram] = useState<boolean>(false);
   const [sendingTestTelegram, setSendingTestTelegram] = useState<boolean>(false);
@@ -44,9 +41,6 @@ export default function AutonomousAIManagerPage() {
       const json = await res.json();
       if (json.success && json.data) {
         setData(json.data);
-        if (json.data.config?.whatsapp?.adminPhoneNumber) {
-          setTestPhoneInput(json.data.config.whatsapp.adminPhoneNumber);
-        }
         if (json.data.config?.telegram?.adminChatId) {
           setTelegramChatId(json.data.config.telegram.adminChatId);
         }
@@ -161,29 +155,6 @@ export default function AutonomousAIManagerPage() {
       }
     } catch (err) {
       console.error(err);
-    }
-  }
-
-  async function handleSendTestWhatsApp() {
-    setSendingTestWhatsApp(true);
-    setWhatsAppPreview("");
-    try {
-      const res = await fetch("/api/admin/ai/whatsapp-test", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phoneNumber: testPhoneInput })
-      });
-      const json = await res.json();
-      if (json.success) {
-        setWhatsAppPreview(json.digestContent);
-        setActionNotice(json.message);
-        setTimeout(() => setActionNotice(""), 5000);
-        await fetchState();
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setSendingTestWhatsApp(false);
     }
   }
 
@@ -320,7 +291,7 @@ export default function AutonomousAIManagerPage() {
                   </span>
                 </div>
                 <p className="text-xs text-slate-400">
-                  Real-time website guardian, link inspector, government discovery agent, IT job harvester & WhatsApp administrator
+                  Real-time website guardian, link inspector, government discovery agent, IT job harvester & Telegram AI administrator
                 </p>
               </div>
             </div>
@@ -361,7 +332,7 @@ export default function AutonomousAIManagerPage() {
             { id: "LINKS", label: "4, 8. Smart Guardian & Audit", icon: Link2 },
             { id: "DISCOVERY", label: "5-7, 9. Discoveries & Approvals", icon: Landmark },
             { id: "HISTORY", label: "10-11. Tasks & Rollback", icon: History },
-            { id: "WHATSAPP", label: "12, 18. WhatsApp & Cron", icon: Phone },
+            { id: "TELEGRAM", label: "12, 18. Telegram & Cron", icon: Bot },
             { id: "SECURITY", label: "13-15. Security & Analytics", icon: ShieldCheck },
             { id: "CONFIG", label: "16-17. Settings & Memory", icon: Sliders }
           ].map(tab => {
@@ -408,7 +379,7 @@ export default function AutonomousAIManagerPage() {
                 "Scan broken links",
                 "Find 10 IT jobs",
                 "Discover gov websites",
-                "Send WhatsApp report",
+                "Send Telegram report",
                 "Approve all jobs",
                 "Rollback last action"
               ].map(chip => (
@@ -869,7 +840,7 @@ export default function AutonomousAIManagerPage() {
               <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
                 <div className="text-slate-400 font-semibold">Security & Privacy (DPDP)</div>
                 <div className="text-2xl font-black text-emerald-400">100 / 100</div>
-                <p className="text-slate-400 text-[11px]">Zero candidate PII exposed to WhatsApp or AI models. Argon2 password hashing verified.</p>
+                <p className="text-slate-400 text-[11px]">Zero candidate PII exposed. Argon2 password hashing verified.</p>
               </div>
             </div>
           </div>
@@ -1038,113 +1009,15 @@ export default function AutonomousAIManagerPage() {
         )}
 
         {/* ================================================================= */}
-        {/* SECTION 12: WHATSAPP REPORTS & WEBHOOK CONFIGURATION             */}
+        {/* SECTION 12: PRIVATE ADMIN TELEGRAM AI GUARDIAN (@AJ4Y2)          */}
         {/* ================================================================= */}
-        {(activeTab === "ALL" || activeTab === "WHATSAPP") && (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div>
-                <h2 className="text-base font-bold text-white flex items-center gap-2">
-                  <Phone className="w-4 h-4 text-emerald-400" />
-                  <span>Section 12: Private Admin WhatsApp Reports & Webhook Configuration</span>
-                </h2>
-                <p className="text-xs text-slate-400">Direct integration with Meta WhatsApp Business Platform for administrative control & monitoring digests</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${
-                  config.whatsapp?.isMetaVerified 
-                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" 
-                    : "bg-blue-500/10 text-blue-400 border-blue-500/20"
-                }`}>
-                  {config.whatsapp?.isMetaVerified ? "META CLOUD API VERIFIED" : "ADMIN RECIPIENT CONNECTED"}
-                </span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-bold text-white text-sm">Private Admin Recipient & Allowlist</h3>
-                  <span className="text-[10px] text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/40 font-mono">
-                    ADMIN_WHATSAPP_NUMBER
-                  </span>
-                </div>
-                
-                <p className="text-slate-400 text-[11px] leading-relaxed">
-                  This private number receives all AI Guardian health audits, security threat alerts, and 20-point daily digests. Public student WhatsApp Channel broadcasts are kept completely separate.
-                </p>
-
-                <div className="space-y-2">
-                  <div>
-                    <label className="text-slate-400 text-[11px] font-semibold">Configured Admin Phone Number (Server-Side Env):</label>
-                    <input
-                      type="text"
-                      value={testPhoneInput}
-                      onChange={(e) => setTestPhoneInput(e.target.value)}
-                      placeholder="+918220525033"
-                      className="w-full mt-1 bg-slate-900 border border-slate-800 rounded-lg p-2 text-white font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-slate-400 text-[11px]">Webhook Verification Token:</label>
-                    <input
-                      type="text"
-                      readOnly
-                      value={config.whatsapp?.webhookVerifyToken}
-                      className="w-full mt-1 bg-slate-900/60 border border-slate-800/80 rounded-lg p-2 text-slate-400 font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-slate-400 text-[11px]">Daily Digest Scheduled Time:</label>
-                    <div className="text-sm font-bold text-white mt-1">Every Morning at {config.whatsapp?.dailyDigestTime} IST</div>
-                  </div>
-                </div>
-
-                <div className="pt-2">
-                  <button
-                    onClick={handleSendTestWhatsApp}
-                    disabled={sendingTestWhatsApp}
-                    className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-semibold flex items-center justify-center gap-2 transition-all shadow-md"
-                  >
-                    {sendingTestWhatsApp ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                    <span>Prepare & Verify Admin WhatsApp Digest</span>
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
-                <h3 className="font-bold text-white text-sm">WhatsApp Digest Live Message Preview</h3>
-                <div className="h-48 overflow-y-auto p-3 rounded-lg bg-emerald-950/20 border border-emerald-500/20 text-emerald-200 font-mono text-[11px] whitespace-pre-wrap leading-relaxed">
-                  {whatsAppPreview || (
-                    `🇮🇳 *EXAMHUB INDIA — DAILY AI WEBSITE DIGEST*\n\n` +
-                    `⚡ 1. PLATFORM HEALTH COCKPIT:\n` +
-                    `• Uptime: 99.98%\n` +
-                    `• Avg Latency: 42ms\n` +
-                    `• Security Posture: 98/100\n\n` +
-                    `🔗 2. SMART LINK GUARDIAN:\n` +
-                    `• Internal Routes: 10/10 Online\n` +
-                    `• Broken Links Flagged: 0\n\n` +
-                    `💼 3. DISCOVERIES AWAITING APPROVAL:\n` +
-                    `• IT Job Openings: 4 roles (TCS, Infosys, AWS, MSFT)\n` +
-                    `• Gov Portals: 4 gateways (OPSC, KPSC, ISRO, DRDO)\n\n` +
-                    `_Click button on left to dispatch test notification to admin WhatsApp._`
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ================================================================= */}
-        {/* SECTION 12B: PRIVATE ADMIN TELEGRAM AI GUARDIAN (@AJ4Y2)         */}
-        {/* ================================================================= */}
-        {(activeTab === "ALL" || activeTab === "WHATSAPP") && (
+        {(activeTab === "ALL" || activeTab === "TELEGRAM") && (
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-3 gap-2">
               <div>
                 <h2 className="text-base font-bold text-white flex items-center gap-2">
                   <Bot className="w-4 h-4 text-sky-400" />
-                  <span>Section 12B: Private Admin Telegram AI Guardian Integration</span>
+                  <span>Section 12: Private Admin Telegram AI Guardian Integration</span>
                 </h2>
                 <p className="text-xs text-slate-400">
                   Bot: <span className="text-sky-300 font-mono">@ExamHub_AI_Guardian_Bot</span> • Private Admin: <a href="https://t.me/AJ4Y2" target="_blank" rel="noopener noreferrer" className="text-sky-400 font-bold hover:underline">@AJ4Y2</a>
@@ -1462,7 +1335,7 @@ export default function AutonomousAIManagerPage() {
         {/* ================================================================= */}
         {/* SECTION 18: SCHEDULED TASKS & CRON SETTINGS                      */}
         {/* ================================================================= */}
-        {(activeTab === "ALL" || activeTab === "WHATSAPP") && (
+        {(activeTab === "ALL" || activeTab === "TELEGRAM") && (
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
             <h2 className="text-base font-bold text-white flex items-center gap-2 border-b border-slate-800 pb-3">
               <Clock className="w-4 h-4 text-cyan-400" />
@@ -1489,7 +1362,7 @@ export default function AutonomousAIManagerPage() {
               </div>
 
               <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
-                <span className="text-slate-400 font-semibold">WhatsApp Daily Digest</span>
+                <span className="text-slate-400 font-semibold">Telegram Daily Digest</span>
                 <div className="text-base font-bold text-white">Every Morning 08:30 IST</div>
                 <span className="text-emerald-400 text-[10px]">Scheduled Notification</span>
               </div>

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbStore } from "@/lib/data";
-import { generateJobWhatsAppMessage, dispatchAutomaticWhatsAppChannelPost } from "@/lib/whatsappJobNotification";
 
 export async function GET(
   req: NextRequest,
@@ -75,24 +74,8 @@ export async function PUT(
     if (body.official_notification_pdf !== undefined) current.official_notification_pdf = body.official_notification_pdf;
     if (body.official_notification_pdf_url !== undefined) current.official_notification_pdf_url = body.official_notification_pdf_url;
     
-    // Manage Automated WhatsApp Notification Lifecycle & Channel Broadcast
-    if (body.status === "PUBLISHED" && (prevStatus !== "PUBLISHED" || !current.whatsapp_message)) {
-      if (current.whatsapp_status !== "SENT_TO_ADMIN" && current.whatsapp_status !== "POSTED_TO_CHANNEL") {
-        current.whatsapp_message = generateJobWhatsAppMessage(current);
-        current.whatsapp_generated_at = new Date().toISOString();
-        const channelResult = await dispatchAutomaticWhatsAppChannelPost(current);
-        current.whatsapp_status = channelResult.status === "POSTED_TO_CHANNEL" ? "POSTED_TO_CHANNEL" : "READY_TO_POST";
-        if (channelResult.status === "POSTED_TO_CHANNEL") {
-          current.whatsapp_posted_at = new Date().toISOString();
-        }
-      }
+    if (body.status === "PUBLISHED" && prevStatus !== "PUBLISHED") {
       current.published_at = current.published_at || new Date().toISOString();
-    } else if (body.status === "DRAFT" && current.whatsapp_status !== "SENT_TO_ADMIN") {
-      current.whatsapp_status = "PENDING";
-    }
-
-    if (body.whatsapp_status) {
-      current.whatsapp_status = body.whatsapp_status;
     }
 
     current.last_verified_at = new Date().toISOString();

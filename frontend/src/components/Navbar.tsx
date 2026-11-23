@@ -157,18 +157,6 @@ export default function Navbar() {
           {/* Right Action Controls: Language, Theme & Auth */}
           <div className="hidden md:flex items-center space-x-2.5">
             
-            {/* WhatsApp Official Channel Link */}
-            <a
-              href="https://whatsapp.com/channel/0029VbA1ZLpJENy3wwL6VC0s"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hidden lg:inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 text-xs font-bold transition-all shadow-sm group"
-              title="Join ExamHub India Official WhatsApp Channel"
-            >
-              <MessageCircle className="w-3.5 h-3.5 text-emerald-500 fill-emerald-500/20 group-hover:scale-110 transition-transform" />
-              <span>WhatsApp Channel</span>
-            </a>
-            
             {/* Language Dropdown */}
             <div className="relative" ref={langRef}>
               <button
@@ -313,18 +301,6 @@ export default function Navbar() {
               );
             })}
           </nav>
-
-          {/* Mobile WhatsApp Channel Link */}
-          <a
-            href="https://whatsapp.com/channel/0029VbA1ZLpJENy3wwL6VC0s"
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => setMobileMenuOpen(false)}
-            className="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 transition-all"
-          >
-            <MessageCircle className="w-4 h-4 text-emerald-500" />
-            <span>Join Official WhatsApp Channel</span>
-          </a>
 
           {/* Mobile Language Selector */}
           <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">

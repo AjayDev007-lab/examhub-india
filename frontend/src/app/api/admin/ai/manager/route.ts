@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { aiManager, processAIManagerCommand, generateWhatsAppDailyDigest } from "@/lib/aiManager";
+import { aiManager, processAIManagerCommand } from "@/lib/aiManager";
 
 // GET /api/admin/ai/manager - Retrieve complete state for 18-section control dashboard
 export async function GET() {
@@ -182,11 +182,7 @@ export async function POST(req: NextRequest) {
       if (body.config) {
         aiManager.config = {
           ...aiManager.config,
-          ...body.config,
-          whatsapp: {
-            ...aiManager.config.whatsapp,
-            ...(body.config.whatsapp || {})
-          }
+          ...body.config
         };
       }
       return NextResponse.json({ success: true, message: "AI Configuration saved successfully", config: aiManager.config });

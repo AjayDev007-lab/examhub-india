@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
     if (dispatchResult.success) {
       aiManager.taskHistory.unshift({
         id: `TASK-TG-${Date.now()}`,
-        taskType: "WHATSAPP_DIGEST", // telemetry log category
+        taskType: "TELEGRAM_DIGEST", // telemetry log category
         status: "COMPLETED",
         summary: `AI Guardian digest delivered to Admin Telegram (${TELEGRAM_ADMIN_USERNAME}) [Chat ID: ${targetChatId}].`,
         durationMs: 310,

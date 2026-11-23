@@ -1,7 +1,7 @@
 // ============================================================================
 // EXAMHUB INDIA — AUTONOMOUS AI WEBSITE MANAGER ENGINE
 // Production-grade Digital Administrator for Website Monitoring, Smart Link
-// Guardian, Government Portal & IT Job Discovery, WhatsApp AI & Safe Rollbacks.
+// Guardian, Government Portal & IT Job Discovery, Telegram AI & Safe Rollbacks.
 // ============================================================================
 
 export interface AIHealthMetric {
@@ -75,11 +75,11 @@ export interface DiscoveredNotice {
 
 export interface AITaskRecord {
   id: string;
-  taskType: "HEALTH_AUDIT" | "LINK_GUARDIAN_SCAN" | "GOV_DISCOVERY" | "JOB_DISCOVERY" | "WHATSAPP_DIGEST" | "AUTO_FIX";
+  taskType: "HEALTH_AUDIT" | "LINK_GUARDIAN_SCAN" | "GOV_DISCOVERY" | "JOB_DISCOVERY" | "TELEGRAM_DIGEST" | "AUTO_FIX";
   status: "COMPLETED" | "RUNNING" | "FAILED";
   summary: string;
   durationMs: number;
-  initiatedBy: "SCHEDULED_CRON" | "ADMIN_WEB" | "WHATSAPP_COMMAND";
+  initiatedBy: "SCHEDULED_CRON" | "ADMIN_WEB" | "TELEGRAM_COMMAND";
   timestamp: string;
 }
 
@@ -105,23 +105,12 @@ export interface AIMemoryItem {
 
 export interface SecurityThreatLog {
   id: string;
-  threatType: "FAILED_ADMIN_LOGIN" | "SQL_INJECTION_PROBE" | "XSS_ATTEMPT" | "RATE_LIMIT_EXCEEDED" | "UNAUTHORIZED_WHATSAPP";
+  threatType: "FAILED_ADMIN_LOGIN" | "SQL_INJECTION_PROBE" | "XSS_ATTEMPT" | "RATE_LIMIT_EXCEEDED" | "UNAUTHORIZED_ACCESS";
   ipAddress: string;
   endpoint: string;
   severity: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
   details: string;
   timestamp: string;
-}
-
-export interface WhatsAppConfig {
-  isEnabled: boolean;
-  adminPhoneNumber: string;
-  webhookVerifyToken: string;
-  dailyDigestTime: string; // e.g. "08:30"
-  emergencyAlerts: boolean;
-  lastReportSentAt: string | null;
-  isMetaVerified: boolean;
-  cloudApiConfigured: boolean;
 }
 
 export interface AIAutonomousConfig {
@@ -134,7 +123,6 @@ export interface AIAutonomousConfig {
   maxTokensPerDay: number;
   consumedTokensToday: number;
   costInrToday: number;
-  whatsapp: WhatsAppConfig;
   telegram?: import("./telegramManager").TelegramConfig;
 }
 
@@ -368,9 +356,9 @@ function initAIManagerState() {
         },
         {
           id: "TASK-804",
-          taskType: "WHATSAPP_DIGEST",
+          taskType: "TELEGRAM_DIGEST",
           status: "COMPLETED",
-          summary: "Automated 20-point morning website status digest dispatched to Admin WhatsApp.",
+          summary: "Automated 20-point morning website status digest dispatched to Admin Telegram (@AJ4Y2).",
           durationMs: 310,
           initiatedBy: "SCHEDULED_CRON",
           timestamp: new Date(Date.now() - 3600000 * 15).toISOString()
@@ -407,9 +395,9 @@ function initAIManagerState() {
         },
         {
           id: "MEM-03",
-          key: "WHATSAPP_SCHEDULE",
+          key: "TELEGRAM_SCHEDULE",
           category: "PREFERENCE",
-          value: "Send Daily Morning Digest at 08:30 IST. Send immediate high-priority alerts for server downtime or critical link failures.",
+          value: "Send Daily Morning Digest at 08:30 IST to Admin @AJ4Y2. Send immediate high-priority alerts for server downtime or critical link failures.",
           confidence: 95,
           lastUpdated: new Date().toISOString()
         }
@@ -435,16 +423,6 @@ function initAIManagerState() {
         maxTokensPerDay: 500000,
         consumedTokensToday: 68420,
         costInrToday: 13.68,
-        whatsapp: {
-          isEnabled: true,
-          adminPhoneNumber: process.env.ADMIN_WHATSAPP_NUMBER || "+918220525033",
-          webhookVerifyToken: process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || "examhub_ai_manager_whatsapp_secure_token_2026",
-          dailyDigestTime: "08:30",
-          emergencyAlerts: true,
-          lastReportSentAt: new Date(Date.now() - 3600000 * 15).toISOString(),
-          isMetaVerified: Boolean(process.env.WHATSAPP_CLOUD_API_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID),
-          cloudApiConfigured: Boolean(process.env.WHATSAPP_CLOUD_API_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID)
-        },
         telegram: {
           isEnabled: Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID),
           botUsername: "@ExamHub_AI_Guardian_Bot",
@@ -474,7 +452,7 @@ export const aiManager = initAIManagerState();
 // NATURAL LANGUAGE COMMAND INTERPRETER & TOOL CALLING DISPATCHER
 // ============================================================================
 
-export async function processAIManagerCommand(prompt: string, channel: "WEB" | "WHATSAPP" = "WEB"): Promise<{
+export async function processAIManagerCommand(prompt: string, channel: "WEB" | "TELEGRAM" = "WEB"): Promise<{
   reply: string;
   actionTaken?: string;
   affectedItem?: any;
@@ -491,7 +469,7 @@ export async function processAIManagerCommand(prompt: string, channel: "WEB" | "
       status: "COMPLETED",
       summary: `Audited all ${state.monitoredRoutes.length} core platform routes. Status: OPTIMAL, Uptime: ${state.healthMetrics.uptimePercentage}%.`,
       durationMs: 380,
-      initiatedBy: channel === "WHATSAPP" ? "WHATSAPP_COMMAND" : "ADMIN_WEB",
+      initiatedBy: channel === "TELEGRAM" ? "TELEGRAM_COMMAND" : "ADMIN_WEB",
       timestamp: new Date().toISOString()
     });
 
@@ -517,7 +495,7 @@ export async function processAIManagerCommand(prompt: string, channel: "WEB" | "
       status: "COMPLETED",
       summary: `Smart Link Guardian checked internal routes & external authorities. Found ${openIssues.length} pending redirection optimization.`,
       durationMs: 510,
-      initiatedBy: channel === "WHATSAPP" ? "WHATSAPP_COMMAND" : "ADMIN_WEB",
+      initiatedBy: channel === "TELEGRAM" ? "TELEGRAM_COMMAND" : "ADMIN_WEB",
       timestamp: new Date().toISOString()
     });
 
@@ -541,7 +519,7 @@ export async function processAIManagerCommand(prompt: string, channel: "WEB" | "
       status: "COMPLETED",
       summary: `Crawled top authorized tech career boards. ${pendingJobs.length} fresh opportunities currently in pending queue.`,
       durationMs: 640,
-      initiatedBy: channel === "WHATSAPP" ? "WHATSAPP_COMMAND" : "ADMIN_WEB",
+      initiatedBy: channel === "TELEGRAM" ? "TELEGRAM_COMMAND" : "ADMIN_WEB",
       timestamp: new Date().toISOString()
     });
 
@@ -562,7 +540,7 @@ export async function processAIManagerCommand(prompt: string, channel: "WEB" | "
       status: "COMPLETED",
       summary: `Scanned public service and recruitment boards. ${pendingPortals.length} official government portals queued.`,
       durationMs: 590,
-      initiatedBy: channel === "WHATSAPP" ? "WHATSAPP_COMMAND" : "ADMIN_WEB",
+      initiatedBy: channel === "TELEGRAM" ? "TELEGRAM_COMMAND" : "ADMIN_WEB",
       timestamp: new Date().toISOString()
     });
 
@@ -575,23 +553,25 @@ export async function processAIManagerCommand(prompt: string, channel: "WEB" | "
     };
   }
 
-  // 5. Daily WhatsApp Digest
-  if (q.includes("whatsapp") || q.includes("digest") || q.includes("daily report") || q.includes("send report")) {
-    state.config.whatsapp.lastReportSentAt = new Date().toISOString();
+  // 5. Daily Telegram Digest
+  if (q.includes("telegram") || q.includes("digest") || q.includes("daily report") || q.includes("send report")) {
+    if (state.config.telegram) {
+      state.config.telegram.lastReportSentAt = new Date().toISOString();
+    }
     state.taskHistory.unshift({
       id: `TASK-${Date.now()}`,
-      taskType: "WHATSAPP_DIGEST",
+      taskType: "TELEGRAM_DIGEST",
       status: "COMPLETED",
-      summary: `Compiled and formatted 20-Point Daily Platform Digest for WhatsApp Admin dispatch.`,
+      summary: `Compiled and formatted 20-Point Daily Platform Digest for Telegram Admin dispatch (@AJ4Y2).`,
       durationMs: 290,
-      initiatedBy: channel === "WHATSAPP" ? "WHATSAPP_COMMAND" : "ADMIN_WEB",
+      initiatedBy: channel === "TELEGRAM" ? "TELEGRAM_COMMAND" : "ADMIN_WEB",
       timestamp: new Date().toISOString()
     });
 
-    const digestText = generateWhatsAppDailyDigest();
+    const digestText = generateTelegramDailyDigest();
     return {
-      actionTaken: "SEND_WHATSAPP_DIGEST",
-      reply: `📱 **Daily WhatsApp Admin Digest Generated & Dispatched:**\n\n${digestText}`
+      actionTaken: "SEND_TELEGRAM_DIGEST",
+      reply: `🛡️ **Daily Telegram Admin Digest Generated:**\n\n${digestText}`
     };
   }
 
@@ -660,12 +640,12 @@ export async function processAIManagerCommand(prompt: string, channel: "WEB" | "
       `• **"Scan broken links"** — run the Smart Link Guardian across all directories\n` +
       `• **"Find IT jobs"** — crawl verified fresher & developer recruitment feeds\n` +
       `• **"Discover gov websites"** — find official State PSC and Central portals\n` +
-      `• **"Send WhatsApp report"** — compile and send the 20-Point Daily Digest\n` +
+      `• **"Send Telegram report"** — compile and send the 20-Point Daily Digest\n` +
       `• **"Rollback last action"** — safely revert the most recent automated change`
   };
 }
 
-export function generateWhatsAppDailyDigest(): string {
+export function generateTelegramDailyDigest(): string {
   const state = initAIManagerState();
   const dateStr = new Date().toLocaleDateString("en-IN", {
     weekday: "long",
@@ -674,7 +654,10 @@ export function generateWhatsAppDailyDigest(): string {
     year: "numeric"
   });
 
-  return `🇮🇳 *EXAMHUB INDIA — DAILY AI WEBSITE DIGEST*\n📅 *${dateStr}*\n\n` +
+  return `🛡️ *EXAMHUB INDIA — DAILY AI WEBSITE DIGEST*\n` +
+    `📅 *${dateStr}* | 👤 Admin: @AJ4Y2\n` +
+    `🤖 Bot: @ExamHub_AI_Guardian_Bot\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━\n\n` +
     `⚡ *1. PLATFORM HEALTH COCKPIT:*\n` +
     `• Uptime: ${state.healthMetrics.uptimePercentage}%\n` +
     `• Avg Latency: ${state.healthMetrics.averageLatencyMs}ms\n` +
@@ -693,82 +676,5 @@ export function generateWhatsAppDailyDigest(): string {
     `🔒 *5. SECURITY MONITORING:*\n` +
     `• Critical Incidents: 0\n` +
     `• Threat Level: NORMAL\n\n` +
-    `_Reply 'Approve all' to publish pending items or 'Help' for quick actions._`;
-}
-
-/**
- * Checks whether the Meta WhatsApp Cloud API credentials are configured in the environment.
- */
-export function isMetaWhatsAppCloudApiConfigured(): boolean {
-  return Boolean(process.env.WHATSAPP_CLOUD_API_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID);
-}
-
-/**
- * Safely dispatches a private admin WhatsApp notification via Meta WhatsApp Cloud API.
- * 
- * SAFETY RULE: If Meta Cloud API credentials (access token and phone number ID)
- * are not yet verified and configured, this function does NOT make external API
- * calls. It records the status as "PENDING_META_VERIFICATION" and returns a clean,
- * safe diagnostic report without throwing errors.
- */
-export async function sendMetaWhatsAppCloudApiMessage(
-  recipientPhone: string,
-  messageText: string
-): Promise<{
-  success: boolean;
-  status: "SENT" | "PENDING_META_VERIFICATION" | "CREDENTIALS_MISSING" | "FAILED";
-  message: string;
-  details?: any;
-}> {
-  const token = process.env.WHATSAPP_CLOUD_API_ACCESS_TOKEN;
-  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-  const cleanRecipient = recipientPhone.replace(/[^\d]/g, "");
-
-  if (!token || !phoneNumberId) {
-    return {
-      success: false,
-      status: "PENDING_META_VERIFICATION",
-      message: "Meta WhatsApp Cloud API credentials (WHATSAPP_CLOUD_API_ACCESS_TOKEN / WHATSAPP_PHONE_NUMBER_ID) are not configured. Outbound message safely held to avoid unverified API calls."
-    };
-  }
-
-  try {
-    const res = await fetch(`https://graph.facebook.com/v19.0/${phoneNumberId}/messages`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        recipient_type: "individual",
-        to: cleanRecipient,
-        type: "text",
-        text: { preview_url: true, body: messageText }
-      })
-    });
-
-    const data = await res.json();
-    if (!res.ok) {
-      return {
-        success: false,
-        status: "FAILED",
-        message: data.error?.message || "Meta Cloud API returned an error response",
-        details: data
-      };
-    }
-
-    return {
-      success: true,
-      status: "SENT",
-      message: `WhatsApp message successfully sent to +${cleanRecipient} via Meta Cloud API`,
-      details: data
-    };
-  } catch (err: any) {
-    return {
-      success: false,
-      status: "FAILED",
-      message: `Network error reaching Meta Cloud API: ${err.message}`
-    };
-  }
+    `_All private digests delivered strictly to @AJ4Y2._`;
 }

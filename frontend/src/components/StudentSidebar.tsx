@@ -143,29 +143,6 @@ export default function StudentSidebar() {
               </Link>
             );
           })}
-          {/* Official WhatsApp Channel Link */}
-          <div className="pt-3">
-            <a
-              href="https://whatsapp.com/channel/0029VbA1ZLpJENy3wwL6VC0s"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-emerald-950/80 to-[#0A1A35] border border-emerald-500/40 text-emerald-300 hover:text-white transition-all group shadow-sm"
-            >
-              <div className="flex items-center space-x-2.5">
-                <div className="w-7 h-7 rounded-lg bg-[#25D366] flex items-center justify-center text-white shadow-sm shrink-0">
-                  <MessageCircle className="w-4 h-4 fill-white text-[#25D366]" />
-                </div>
-                <div>
-                  <div className="text-[11px] font-bold text-white flex items-center space-x-1.5">
-                    <span>WhatsApp</span>
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                  </div>
-                  <div className="text-[9px] text-emerald-300/80">Exam Alerts Channel</div>
-                </div>
-              </div>
-              <ExternalLink className="w-3.5 h-3.5 text-emerald-400/80 group-hover:translate-x-0.5 transition-transform" />
-            </a>
-          </div>
         </div>
 
         {/* Bottom Theme Toggle and Logout */}

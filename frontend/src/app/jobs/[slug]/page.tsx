@@ -479,7 +479,7 @@ export default function JobDetailPage() {
                 Student Safety Advisory
               </span>
               <p className="text-[11px] leading-relaxed text-amber-300/80">
-                Government recruitment boards never ask for OTPs or login passwords via WhatsApp or third-party links. Always verify the domain ends in <strong>.gov.in</strong> or <strong>.nic.in</strong> before paying application fees.
+                Government recruitment boards never ask for OTPs or login passwords via messaging apps or third-party links. Always verify the domain ends in <strong>.gov.in</strong> or <strong>.nic.in</strong> before paying application fees.
               </p>
             </div>
           </div>
