@@ -220,64 +220,94 @@ export default function HomePage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {govtJobs.map(job => (
-            <div
-              key={job.id}
-              className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800/90 hover:border-blue-400 dark:hover:border-blue-600 transition-all shadow-sm hover:shadow-md flex flex-col justify-between space-y-4"
-            >
-              <div className="space-y-2.5">
-                <div className="flex items-start justify-between gap-2">
-                  <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
-                    {job.organization_name}
-                  </span>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                    {job.vacancies_count ? `${job.vacancies_count.toLocaleString()} Posts` : "Recruitment"}
-                  </span>
+          {govtJobs.map((job) => {
+            const isExpired = job.is_expired || (job.application_end_date && new Date(job.application_end_date).getTime() < Date.now());
+
+            return (
+              <div
+                key={job.id}
+                className={`p-5 rounded-2xl bg-white dark:bg-slate-900 border transition-all shadow-sm hover:shadow-md flex flex-col justify-between space-y-4 ${
+                  isExpired
+                    ? "border-slate-200 dark:border-slate-800 opacity-80"
+                    : "border-slate-200/90 dark:border-slate-800/90 hover:border-blue-400 dark:hover:border-blue-600"
+                }`}
+              >
+                <div className="space-y-2.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
+                      {job.organization_name}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {isExpired ? (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                          Applications Closed
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                          Active Recruitment
+                        </span>
+                      )}
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                        {job.vacancies_count ? `${job.vacancies_count.toLocaleString()} Posts` : "Recruitment"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white line-clamp-1">
+                    {job.title}
+                  </h3>
+
+                  <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2">
+                    {job.job_description}
+                  </p>
+
+                  <div className="flex flex-wrap items-center gap-3 text-xs pt-1">
+                    <span className="flex items-center gap-1 text-slate-500">
+                      <MapPin className="w-3.5 h-3.5 text-slate-400" /> {job.location}
+                    </span>
+                    <span className={`flex items-center gap-1 font-semibold ${
+                      isExpired ? "text-amber-600 dark:text-amber-400" : "text-slate-500"
+                    }`}>
+                      <Calendar className="w-3.5 h-3.5" /> 
+                      {isExpired
+                        ? `Ended: ${job.application_end_date ? new Date(job.application_end_date).toLocaleDateString("en-IN") : "Archived"}`
+                        : `Deadline: ${job.application_end_date ? new Date(job.application_end_date).toLocaleDateString("en-IN") : "Active"}`}
+                    </span>
+                  </div>
                 </div>
 
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white line-clamp-1">
-                  {job.title}
-                </h3>
-
-                <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2">
-                  {job.job_description}
-                </p>
-
-                <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 pt-1">
-                  <span className="flex items-center gap-1">
-                    <MapPin className="w-3.5 h-3.5 text-slate-400" /> {job.location}
+                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
+                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold text-[11px] flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Official Source Verified
                   </span>
-                  <span className="flex items-center gap-1">
-                    <Calendar className="w-3.5 h-3.5 text-slate-400" /> Deadline: {job.application_end_date ? new Date(job.application_end_date).toLocaleDateString("en-IN") : "Active"}
-                  </span>
+
+                  <div className="flex items-center gap-2">
+                    <Link
+                      href={`/jobs/${job.slug || job.id}`}
+                      className="px-3.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs transition-all"
+                    >
+                      {isExpired ? "Archived Notice" : "Details"}
+                    </Link>
+                    {isExpired ? (
+                      <span className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-400 font-semibold text-xs cursor-default">
+                        Closed
+                      </span>
+                    ) : (
+                      <a
+                        href={job.official_application_url || "https://upsc.gov.in"}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1 shadow-sm"
+                      >
+                        <span>Apply</span>
+                        <ArrowUpRight className="w-3 h-3" />
+                      </a>
+                    )}
+                  </div>
                 </div>
               </div>
-
-              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
-                <span className="text-emerald-600 dark:text-emerald-400 font-semibold text-[11px] flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5" /> Official Source Verified
-                </span>
-
-                <div className="flex items-center gap-2">
-                  <Link
-                    href={`/jobs/${job.slug || job.id}`}
-                    className="px-3.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs transition-all"
-                  >
-                    Details
-                  </Link>
-                  <a
-                    href={job.official_application_url || "https://upsc.gov.in"}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1 shadow-sm"
-                  >
-                    <span>Apply</span>
-                    <ArrowUpRight className="w-3 h-3" />
-                  </a>
-                </div>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 

@@ -93,8 +93,13 @@ export async function GET(req: NextRequest) {
     } else if (sortBy === "vacancies") {
       jobs.sort((a: any, b: any) => (b.vacancies_count || 0) - (a.vacancies_count || 0));
     } else {
-      // Default: featured first, then published_at
+      // Default: active jobs first, then featured, then published_at
       jobs.sort((a: any, b: any) => {
+        const aExpired = a.application_end_date && new Date(a.application_end_date).getTime() < now.getTime();
+        const bExpired = b.application_end_date && new Date(b.application_end_date).getTime() < now.getTime();
+        if (!aExpired && bExpired) return -1;
+        if (aExpired && !bExpired) return 1;
+
         if (a.is_featured && !b.is_featured) return -1;
         if (!a.is_featured && b.is_featured) return 1;
         return new Date(b.published_at || b.created_at).getTime() - new Date(a.published_at || a.created_at).getTime();
