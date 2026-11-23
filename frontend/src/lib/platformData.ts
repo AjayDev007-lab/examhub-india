@@ -840,6 +840,216 @@ export const initialSchoolChapters: SchoolChapterResource[] = [
         explanation: "Rocket propulsion is based on the law of conservation of linear momentum and Newton's Third Law of motion."
       }
     ]
+  },
+  {
+    id: "cbse-10-math-ch01",
+    board_code: "CBSE",
+    board_name: "Central Board of Secondary Education",
+    class_level: "10",
+    subject: "Mathematics",
+    subject_code: "041",
+    chapter_number: 1,
+    chapter_title: "Real Numbers",
+    summary_notes: `
+# Chapter 1: Real Numbers (Class 10 Mathematics)
+
+### 1. Fundamental Theorem of Arithmetic
+- Every composite number can be expressed (factorised) as a product of primes uniquely, apart from the order in which the prime factors occur.
+- For any two positive integers $a$ and $b$:
+  $$\\text{HCF}(a, b) \\times \\text{LCM}(a, b) = a \\times b$$
+- Note: This formula holds true only for two numbers, not for three or more.
+
+### 2. Revisiting Irrational Numbers
+- A number $s$ is irrational if it cannot be written in the form $\\frac{p}{q}$, where $p$ and $q$ are integers and $q \\neq 0$.
+- **Theorem:** Let $p$ be a prime number. If $p$ divides $a^2$, then $p$ divides $a$, where $a$ is a positive integer.
+- Proof of irrationality of $\\sqrt{2}, \\sqrt{3}, \\sqrt{5}$ using the method of contradiction is a guaranteed board question.
+
+### 3. Properties of Operations on Real Numbers
+- The sum or difference of a rational and an irrational number is always **irrational**.
+- The product and quotient of a non-zero rational and an irrational number is always **irrational**.
+`,
+    pdf_notes_url: "https://ncert.nic.in/textbook/pdf/jemh101.pdf",
+    video_lessons: [
+      {
+        id: "vid-cbse-10-real-1",
+        title: "Real Numbers Class 10 Full Chapter in One Shot | CBSE 2026",
+        youtube_id: "YdK1Qz6e5wY",
+        channel_name: "ExamHub Mathematics",
+        duration: "52:10",
+        thumbnail_url: "https://img.youtube.com/vi/YdK1Qz6e5wY/hqdefault.jpg",
+        topic: "Prime Factorisation, HCF-LCM & Irrationality Proofs"
+      }
+    ],
+    previous_exam_questions: [
+      {
+        year: 2024,
+        question: "Prove that √5 is an irrational number.",
+        marks: 3,
+        answer: "Assume √5 is rational, i.e., √5 = a/b where a, b are co-prime integers. 5b² = a², so 5 divides a². Thus 5 divides a. Let a = 5c. 5b² = 25c² => b² = 5c², so 5 divides b. Hence 5 is a common factor of a and b, contradicting that a, b are co-prime. Therefore √5 is irrational."
+      },
+      {
+        year: 2023,
+        question: "Given that HCF(306, 657) = 9, find LCM(306, 657).",
+        marks: 2,
+        answer: "We know HCF × LCM = Product of numbers. 9 × LCM = 306 × 657. LCM = (306 × 657) / 9 = 34 × 657 = 22,338."
+      }
+    ],
+    important_questions: [
+      {
+        id: "imp-10-math-1",
+        marks: 3,
+        question: "Explain why 7 × 11 × 13 + 13 and 7 × 6 × 5 × 4 × 3 × 2 × 1 + 5 are composite numbers.",
+        key_points: ["7×11×13 + 13 = 13(77 + 1) = 13 × 78", "Has factors other than 1 and itself, therefore composite"]
+      }
+    ],
+    practice_quiz: [
+      {
+        id: 1,
+        question: "The product of a non-zero rational and an irrational number is always:",
+        options: ["Rational", "Irrational", "Always an integer", "Zero"],
+        correct_option: 1,
+        explanation: "Multiplying any non-zero rational number with an irrational number always yields an irrational number."
+      },
+      {
+        id: 2,
+        question: "If HCF(a, b) = 12 and a × b = 1800, then LCM(a, b) is:",
+        options: ["120", "150", "180", "1500"],
+        correct_option: 1,
+        explanation: "LCM = (a × b) / HCF = 1800 / 12 = 150."
+      }
+    ]
+  },
+  {
+    id: "icse-10-chem-ch01",
+    board_code: "ICSE",
+    board_name: "Indian Certificate of Secondary Education",
+    class_level: "10",
+    subject: "Chemistry",
+    subject_code: "52",
+    chapter_number: 1,
+    chapter_title: "Periodic Properties and Variations",
+    summary_notes: `
+# Chapter 1: Periodic Properties (ICSE Class 10 Chemistry)
+
+### 1. Modern Periodic Law
+- Physical and chemical properties of elements are periodic functions of their **atomic numbers**.
+- Modern Periodic Table consists of 7 horizontal rows (**Periods**) and 18 vertical columns (**Groups**).
+
+### 2. Trends in Periodic Properties
+| Property | Across a Period (Left to Right) | Down a Group (Top to Bottom) |
+|---|---|---|
+| **Atomic Radius** | Decreases (Nuclear charge increases) | Increases (Number of shells increases) |
+| **Ionisation Potential** | Increases | Decreases |
+| **Electron Affinity** | Increases | Decreases |
+| **Electronegativity** | Increases (Fluorine is highest: 4.0) | Decreases |
+| **Metallic Character** | Decreases | Increases |
+| **Non-metallic Character** | Increases | Decreases |
+
+### 3. Key Definitions
+- **Ionisation Potential (IP):** Energy required to remove an electron from the outermost shell of an isolated gaseous atom.
+- **Electronegativity:** The tendency of an atom in a molecule to attract the shared pair of electrons towards itself.
+`,
+    pdf_notes_url: "https://cisce.org/wp-content/uploads/2023/11/ICSE-Chemistry-Class-10.pdf",
+    video_lessons: [
+      {
+        id: "vid-icse-10-chem-1",
+        title: "Periodic Table ICSE Class 10 Chemistry Full Chapter Revision",
+        youtube_id: "k8Z_54o90rM",
+        channel_name: "ICSE Simplified",
+        duration: "40:15",
+        thumbnail_url: "https://img.youtube.com/vi/k8Z_54o90rM/hqdefault.jpg",
+        topic: "Ionisation Energy, Atomic Size & Electronegativity Trends"
+      }
+    ],
+    previous_exam_questions: [
+      {
+        year: 2024,
+        question: "Define Electron Affinity. How does it vary across a period from left to right?",
+        marks: 3,
+        answer: "Electron Affinity is the amount of energy released when an electron is added to an isolated neutral gaseous atom to form a uninegative ion. Across a period, nuclear charge increases and atomic size decreases, so electron affinity increases from left to right."
+      }
+    ],
+    important_questions: [
+      {
+        id: "imp-icse-10-1",
+        marks: 2,
+        question: "Name the element having the highest electronegativity and the element having the highest electron affinity.",
+        key_points: ["Highest electronegativity: Fluorine (F)", "Highest electron affinity: Chlorine (Cl)"]
+      }
+    ],
+    practice_quiz: [
+      {
+        id: 1,
+        question: "Which of the following elements has the highest electronegativity?",
+        options: ["Chlorine", "Fluorine", "Oxygen", "Nitrogen"],
+        correct_option: 1,
+        explanation: "Fluorine has the highest electronegativity value (4.0 on Pauling scale) in the periodic table."
+      }
+    ]
+  },
+  {
+    id: "karnataka-10-math-ch03",
+    board_code: "KSEEB",
+    board_name: "Karnataka School Examination and Assessment Board",
+    class_level: "10",
+    subject: "Mathematics",
+    subject_code: "81E",
+    chapter_number: 1,
+    chapter_title: "Arithmetic Progressions",
+    summary_notes: `
+# Chapter 1: Arithmetic Progressions (Karnataka SSLC Maths)
+
+### 1. General Form of an AP
+- An Arithmetic Progression (AP) is a list of numbers in which each term is obtained by adding a fixed number $d$ (common difference) to the preceding term:
+  $$a, a + d, a + 2d, a + 3d, \\dots$$
+- Common difference $d = a_{k+1} - a_k$ (can be positive, negative, or zero).
+
+### 2. $n$-th Term of an AP
+$$a_n = a + (n - 1)d$$
+Where $a$ is the first term, $d$ is common difference, and $n$ is number of terms.
+
+### 3. Sum of First $n$ Terms of an AP
+$$S_n = \\frac{n}{2} [2a + (n - 1)d] = \\frac{n}{2} [a + l]$$
+Where $l = a_n$ is the last term.
+- Sum of first $n$ positive integers: $S_n = \\frac{n(n + 1)}{2}$.
+`,
+    pdf_notes_url: "https://kseab.karnataka.gov.in/textbooks/sslc-maths.pdf",
+    video_lessons: [
+      {
+        id: "vid-kar-10-ap-1",
+        title: "SSLC Maths Arithmetic Progressions Full Chapter | Karnataka Board",
+        youtube_id: "3V1G91jY7pQ",
+        channel_name: "Karnataka SSLC Toppers",
+        duration: "45:00",
+        thumbnail_url: "https://img.youtube.com/vi/3V1G91jY7pQ/hqdefault.jpg",
+        topic: "nth term formula and Sum of AP derivations"
+      }
+    ],
+    previous_exam_questions: [
+      {
+        year: 2024,
+        question: "Find the 20th term of the AP: 2, 7, 12, ...",
+        marks: 2,
+        answer: "Here a = 2, d = 7 - 2 = 5, n = 20. a20 = a + (n-1)d = 2 + (20-1)5 = 2 + 19(5) = 2 + 95 = 97."
+      }
+    ],
+    important_questions: [
+      {
+        id: "imp-kar-10-1",
+        marks: 3,
+        question: "The sum of the 4th and 8th terms of an AP is 24 and the sum of the 6th and 10th terms is 44. Find the first three terms of the AP.",
+        key_points: ["a4 + a8 = 2a + 10d = 24 => a + 5d = 12", "a6 + a10 = 2a + 14d = 44 => a + 7d = 22", "d = 5, a = -13. First three terms: -13, -8, -3"]
+      }
+    ],
+    practice_quiz: [
+      {
+        id: 1,
+        question: "The common difference of the AP: -5, -1, 3, 7, ... is:",
+        options: ["-4", "4", "-6", "2"],
+        correct_option: 1,
+        explanation: "d = a2 - a1 = -1 - (-5) = -1 + 5 = 4."
+      }
+    ]
   }
 ];
 

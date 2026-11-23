@@ -278,13 +278,33 @@ export default function JobDetailPage() {
                 </a>
               )}
 
-              <button
-                onClick={handleApplyClick}
-                className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center space-x-2 shadow-lg shadow-blue-600/30 transition-all"
-              >
-                <span>Apply on Official Portal</span>
-                <ExternalLink className="w-4 h-4" />
-              </button>
+              {isExpired ? (
+                <div className="flex items-center gap-2">
+                  <span className="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-400 font-bold text-xs flex items-center gap-1.5 border border-slate-700 cursor-not-allowed">
+                    <Clock className="w-4 h-4 text-amber-400" />
+                    <span>Applications Closed</span>
+                  </span>
+                  {job.official_application_url && (
+                    <a
+                      href={job.official_application_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1.5 border border-slate-700 transition-colors"
+                    >
+                      <span>View Portal Archive</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  )}
+                </div>
+              ) : (
+                <button
+                  onClick={handleApplyClick}
+                  className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center space-x-2 shadow-lg shadow-blue-600/30 transition-all"
+                >
+                  <span>Apply on Official Portal</span>
+                  <ExternalLink className="w-4 h-4" />
+                </button>
+              )}
             </div>
           </div>
         </div>

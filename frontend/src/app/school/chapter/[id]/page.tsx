@@ -32,12 +32,30 @@ export default function SchoolChapterLearningPage() {
 
   useEffect(() => {
     // Look up chapter from initial data or API
-    const found = initialSchoolChapters.find(c => c.id === chapterId) || initialSchoolChapters[0];
-    setChapter(found);
-    if (found?.video_lessons?.[0]?.youtube_id) {
-      setActiveVideoId(found.video_lessons[0].youtube_id);
+    const found = initialSchoolChapters.find(c => c.id === chapterId);
+    if (found) {
+      setChapter(found);
+      if (found?.video_lessons?.[0]?.youtube_id) {
+        setActiveVideoId(found.video_lessons[0].youtube_id);
+      }
+      setLoading(false);
+    } else {
+      fetch("/api/school/chapters")
+        .then(r => r.json())
+        .then(d => {
+          const apiFound = d.chapters?.find((c: any) => c.id === chapterId) || initialSchoolChapters[0];
+          setChapter(apiFound);
+          if (apiFound?.video_lessons?.[0]?.youtube_id) {
+            setActiveVideoId(apiFound.video_lessons[0].youtube_id);
+          }
+        })
+        .catch(() => {
+          setChapter(initialSchoolChapters[0]);
+        })
+        .finally(() => {
+          setLoading(false);
+        });
     }
-    setLoading(false);
 
     // Load saved states from localStorage
     const saved = localStorage.getItem(`examhub_saved_chapter_${chapterId}`);

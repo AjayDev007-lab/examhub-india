@@ -5,14 +5,18 @@ import Link from "next/link";
 import { 
   GraduationCap, BookOpen, Award, FileText, Calendar, Search, 
   ChevronRight, ExternalLink, ShieldCheck, CheckCircle2, Clock, 
-  Sparkles, Download, Layers, ArrowRight, Eye, Bookmark, Filter
+  Sparkles, Download, Layers, ArrowRight, Eye, Bookmark, Filter,
+  Play, Video, HelpCircle
 } from "lucide-react";
 import { fetchApi } from "@/lib/api";
+import { initialSchoolChapters, SchoolChapterResource } from "@/lib/platformData";
 
 export default function SchoolEducationHomePage() {
   const [boards, setBoards] = useState<any[]>([]);
   const [results, setResults] = useState<any[]>([]);
   const [textbooks, setTextbooks] = useState<any[]>([]);
+  const [chapters, setChapters] = useState<SchoolChapterResource[]>(initialSchoolChapters);
+  const [selectedBoardFilter, setSelectedBoardFilter] = useState<string>("ALL");
   const [loading, setLoading] = useState(true);
   const [selectedClass, setSelectedClass] = useState<"ALL" | "10" | "11" | "12">("ALL");
 
@@ -23,20 +27,30 @@ export default function SchoolEducationHomePage() {
   async function loadData() {
     setLoading(true);
     try {
-      const [resBoards, resResults, resBooks] = await Promise.all([
-        fetchApi("/api/school/boards"),
-        fetchApi("/api/school/results"),
-        fetchApi("/api/school/books")
+      const [resBoards, resResults, resBooks, resChapters] = await Promise.all([
+        fetchApi("/api/school/boards").catch(() => ({ boards: [] })),
+        fetchApi("/api/school/results").catch(() => ({ results: [] })),
+        fetchApi("/api/school/books").catch(() => ({ books: [] })),
+        fetchApi("/api/school/chapters").catch(() => ({ chapters: initialSchoolChapters }))
       ]);
       setBoards(resBoards.boards || []);
       setResults(resResults.results || []);
       setTextbooks(resBooks.books || []);
+      if (resChapters?.chapters && resChapters.chapters.length > 0) {
+        setChapters(resChapters.chapters);
+      }
     } catch (err) {
       console.error("Failed to load school data:", err);
     } finally {
       setLoading(false);
     }
   }
+
+  const filteredChapters = chapters.filter(c => {
+    if (selectedClass !== "ALL" && c.class_level !== selectedClass) return false;
+    if (selectedBoardFilter !== "ALL" && c.board_code !== selectedBoardFilter) return false;
+    return true;
+  });
 
   const filteredResults = selectedClass === "ALL" 
     ? results 
@@ -120,6 +134,115 @@ export default function SchoolEducationHomePage() {
       </div>
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-10 space-y-12">
+        {/* 2.5 INTERACTIVE CHAPTER-WISE STUDY CENTER & VIDEO CLASSES */}
+        <section className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
+            <div>
+              <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 text-[11px] font-bold mb-1">
+                <Sparkles className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                <span>Curriculum Learning Suite</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black text-[#102D59] dark:text-white flex items-center space-x-2">
+                <BookOpen className="w-6 h-6 text-blue-600" />
+                <span>Interactive Chapter-Wise Study Center & Video Classes</span>
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Full chapter video lessons, NCERT notes summaries, formulas, past board exam questions, and practice quizzes.
+              </p>
+            </div>
+
+            {/* Board Filter Tabs */}
+            <div className="flex flex-wrap items-center gap-1.5 self-start sm:self-auto">
+              {[
+                { id: "ALL", label: "All Boards" },
+                { id: "CBSE", label: "CBSE" },
+                { id: "ICSE", label: "ICSE" },
+                { id: "TNSB", label: "Tamil Nadu" },
+                { id: "KSEEB", label: "Karnataka" }
+              ].map(b => (
+                <button
+                  key={b.id}
+                  onClick={() => setSelectedBoardFilter(b.id)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+                    selectedBoardFilter === b.id
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
+                  }`}
+                >
+                  {b.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {filteredChapters.map(ch => (
+              <div
+                key={ch.id}
+                className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm hover:shadow-lg transition-all flex flex-col justify-between space-y-4 group"
+              >
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="px-2.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 text-xs font-bold border border-blue-200/60 dark:border-blue-800">
+                      {ch.board_code} • Class {ch.class_level}
+                    </span>
+                    <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                      {ch.subject}
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider block">
+                      Chapter {ch.chapter_number}
+                    </span>
+                    <h3 className="text-base font-bold text-[#102D59] dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors line-clamp-1">
+                      {ch.chapter_title}
+                    </h3>
+                  </div>
+
+                  {/* Feature Badges */}
+                  <div className="flex flex-wrap gap-1.5 pt-1 text-[10px] font-semibold text-slate-600 dark:text-slate-300">
+                    <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 flex items-center gap-1">
+                      <Video className="w-3 h-3 text-red-500" />
+                      <span>{ch.video_lessons?.length || 1} Video Lessons</span>
+                    </span>
+                    <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 flex items-center gap-1">
+                      <FileText className="w-3 h-3 text-blue-500" />
+                      <span>Notes & Formulas</span>
+                    </span>
+                    <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 flex items-center gap-1">
+                      <HelpCircle className="w-3 h-3 text-emerald-500" />
+                      <span>{ch.practice_quiz?.length || 3} Qs Quiz</span>
+                    </span>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
+                  <Link
+                    href={`/school/chapter/${ch.id}`}
+                    className="flex-1 py-2 px-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold text-center flex items-center justify-center space-x-1.5 shadow-sm transition-all"
+                  >
+                    <span>Start Learning</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+
+                  {ch.pdf_notes_url && (
+                    <a
+                      href={ch.pdf_notes_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl transition-colors shrink-0"
+                      title="Download Official NCERT/State PDF"
+                    >
+                      <Download className="w-4 h-4" />
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
         {/* 3. LATEST RESULT ANNOUNCEMENTS */}
         <section className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">

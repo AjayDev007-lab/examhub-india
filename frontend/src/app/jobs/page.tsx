@@ -516,22 +516,28 @@ export default function JobsPage() {
                           href={`/jobs/${job.slug}`}
                           className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center space-x-1.5 transition-colors"
                         >
-                          <span>Full Details</span>
+                          <span>{isExpired ? "Notice Details" : "Full Details"}</span>
                           <ChevronRight className="w-3.5 h-3.5" />
                         </Link>
 
-                        <a
-                          href={job.official_application_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={() => {
-                            fetchApi(`/api/jobs/${job.slug}/apply`, { method: "POST" }).catch(() => {});
-                          }}
-                          className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center space-x-1.5 shadow-md shadow-blue-600/20 transition-all"
-                        >
-                          <span>Apply Online</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
+                        {isExpired ? (
+                          <span className="px-3.5 py-2 rounded-xl bg-slate-800 text-slate-400 text-xs font-semibold flex items-center space-x-1 cursor-default">
+                            <span>Applications Closed</span>
+                          </span>
+                        ) : (
+                          <a
+                            href={job.official_application_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={() => {
+                              fetchApi(`/api/jobs/${job.slug}/apply`, { method: "POST" }).catch(() => {});
+                            }}
+                            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center space-x-1.5 shadow-md shadow-blue-600/20 transition-all"
+                          >
+                            <span>Apply Online</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        )}
                       </div>
                     </div>
                   </div>

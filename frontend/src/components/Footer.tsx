@@ -61,10 +61,13 @@ export default function Footer() {
           <div>
             <h4 className="text-white font-bold text-xs uppercase tracking-wider mb-3">Core Portals</h4>
             <ul className="space-y-2">
-              <li><Link href="/results" className="hover:text-white transition-colors">Results</Link></li>
+              <li><Link href="/jobs" className="hover:text-white transition-colors">Govt Jobs</Link></li>
+              <li><Link href="/jobs/it" className="hover:text-white transition-colors">IT & Tech Jobs</Link></li>
+              <li><Link href="/university" className="hover:text-white transition-colors">University Papers</Link></li>
+              <li><Link href="/school" className="hover:text-white transition-colors">School Learning</Link></li>
+              <li><Link href="/ai-tools" className="hover:text-white transition-colors">AI Career Tools</Link></li>
+              <li><Link href="/results" className="hover:text-white transition-colors">Exam Results</Link></li>
               <li><Link href="/hall-tickets" className="hover:text-white transition-colors">Admit Cards</Link></li>
-              <li><Link href="/jobs" className="hover:text-white transition-colors">Jobs</Link></li>
-              <li><Link href="/dashboard?tab=vault" className="hover:text-white transition-colors">Documents</Link></li>
             </ul>
           </div>
 
@@ -74,8 +77,9 @@ export default function Footer() {
             <ul className="space-y-2">
               <li><Link href="/about" className="hover:text-white transition-colors">About Us</Link></li>
               <li><Link href="/contact" className="hover:text-white transition-colors">Contact</Link></li>
+              <li><Link href="/official-websites" className="hover:text-white transition-colors">Gov Registry</Link></li>
               <li><Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
-              <li><Link href="/terms" className="hover:text-white transition-colors">Terms and Conditions</Link></li>
+              <li><Link href="/terms" className="hover:text-white transition-colors">Terms of Service</Link></li>
             </ul>
           </div>
 
