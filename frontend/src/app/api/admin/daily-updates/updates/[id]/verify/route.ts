@@ -1,6 +1,6 @@
 import { NextResponse, NextRequest } from "next/server";
 import { INITIAL_DETECTED_UPDATES } from "@/lib/dailyUpdatesData";
-import { sendTelegramChannelPost, formatJobTelegramPost } from "@/lib/telegramManager";
+import { processAndAutoPublishJob } from "@/lib/aiJobVerification";
 
 export async function POST(
   req: NextRequest,
@@ -22,7 +22,7 @@ export async function POST(
   let broadcastResult = null;
   const newStatus = body.action === "APPROVE" ? "APPROVED" : body.action === "PUBLISH" ? "PUBLISHED" : "REJECTED";
 
-  // If approved or published, broadcast to public channel @india102210
+  // If approved or published, trigger autonomous publishing pipeline
   if (newStatus === "PUBLISHED" || newStatus === "APPROVED") {
     const item = INITIAL_DETECTED_UPDATES.find(u => String(u.id) === String(id)) || {
       id: parseInt(id),
@@ -30,13 +30,12 @@ export async function POST(
       organization: body.organization || "Official Board",
       category: "GOV_JOB",
       state: "ALL_INDIA",
-      detected_at: new Date().toISOString()
+      detected_at: new Date().toISOString(),
+      official_application_url: "https://upsconline.nic.in",
+      application_end_date: "2026-03-05"
     };
 
-    const postHtml = formatJobTelegramPost(item);
-    broadcastResult = await sendTelegramChannelPost(postHtml, {
-      customChannel: "@india102210"
-    });
+    broadcastResult = await processAndAutoPublishJob(item, { forcePublishTest: true });
   }
 
   return NextResponse.json({

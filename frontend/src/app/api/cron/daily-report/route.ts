@@ -30,6 +30,25 @@ export async function GET(req: NextRequest) {
       runGuardianScan("FULL").catch(() => null)
     ]);
 
+    // Automated Job Expiry Check: Recheck published jobs and mark expired listings
+    const now = Date.now();
+    let expiredJobsDetected = 0;
+    const jobs = (dbStore as any).jobs || [];
+    for (const j of jobs) {
+      if (j.application_end_date) {
+        const endMs = new Date(j.application_end_date).getTime();
+        if (!isNaN(endMs) && endMs < now) {
+          if (j.status !== "EXPIRED") {
+            j.status = "EXPIRED";
+            j.is_expired = true;
+            j.application_action_disabled = true;
+            j.expiry_verified_at = new Date().toISOString();
+            expiredJobsDetected++;
+          }
+        }
+      }
+    }
+
     const reportText = formatDailyHealthReport(health);
     const sendRes = await sendTelegramAdminAlert(reportText, { parseMode: "HTML" });
 

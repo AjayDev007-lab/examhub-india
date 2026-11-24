@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbStore } from "@/lib/data";
 import { sendTelegramChannelPost, formatJobTelegramPost } from "@/lib/telegramManager";
+import { processAndAutoPublishJob } from "@/lib/aiJobVerification";
 
 export async function GET(req: NextRequest) {
   try {
@@ -201,30 +202,15 @@ export async function POST(req: NextRequest) {
       last_verified_at: new Date().toISOString(),
     };
 
-    // Automated Telegram Channel Publishing (@india102210)
-    const isExpired = endDate ? new Date(endDate).getTime() < Date.now() : false;
-
-    if (status === "PUBLISHED" && !isExpired && body.broadcast_to_telegram !== false) {
-      try {
-        newJob.telegram_message = formatJobTelegramPost(newJob);
-        newJob.telegram_generated_at = new Date().toISOString();
-        const channelResult = await sendTelegramChannelPost(newJob.telegram_message);
-        if (channelResult.success) {
-          newJob.telegram_channel_status = "POSTED_TO_CHANNEL";
-          newJob.telegram_message_id = channelResult.details?.messageId;
-          newJob.telegram_posted_at = new Date().toISOString();
-          newJob.telegram_error = null;
-        } else {
-          newJob.telegram_channel_status = "FAILED";
-          newJob.telegram_error = channelResult.message || "Failed to post to Telegram channel";
-        }
-      } catch (err: any) {
-        newJob.telegram_channel_status = "FAILED";
-        newJob.telegram_error = err.message || "Network error dispatching Telegram broadcast";
-      }
-    } else if (isExpired) {
-      newJob.telegram_channel_status = "EXPIRED";
-      newJob.telegram_error = "Job application deadline has already passed; not broadcast to channel.";
+    // Autonomous AI Verification & Instant Telegram Channel Broadcast (@india102210)
+    let autoPublishResult = null;
+    if (body.broadcast_to_telegram !== false) {
+      autoPublishResult = await processAndAutoPublishJob(newJob, {
+        forcePublishTest: Boolean(body.force_publish)
+      });
+      newJob.auto_publish_result = autoPublishResult;
+      newJob.ai_verification_status = autoPublishResult.status;
+      newJob.telegram_channel_status = autoPublishResult.published ? "POSTED_TO_CHANNEL" : autoPublishResult.status;
     } else {
       newJob.telegram_channel_status = "DRAFT_PENDING";
     }
@@ -243,7 +229,7 @@ export async function POST(req: NextRequest) {
       created_at: new Date().toISOString()
     });
 
-    return NextResponse.json({ success: true, job: newJob }, { status: 201 });
+    return NextResponse.json({ success: true, job: newJob, auto_publish: autoPublishResult }, { status: 201 });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

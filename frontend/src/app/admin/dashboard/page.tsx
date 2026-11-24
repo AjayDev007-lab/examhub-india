@@ -8,7 +8,7 @@ import {
   AlertCircle, RefreshCw, LogOut, Search, ExternalLink, Save,
   Check, X, Lock, Key, Wifi, WifiOff, Clock, Trash2, Edit3, Eye,
   History, Globe, Server, CheckCircle, AlertTriangle, ChevronRight, Zap,
-  Train, GraduationCap, Award, Bot, CreditCard, ShieldAlert, Sliders, DollarSign, Download, Briefcase, BarChart3, Database, Radio, Power, Laptop
+  Train, GraduationCap, Award, Bot, CreditCard, ShieldAlert, Sliders, DollarSign, Download, Briefcase, BarChart3, Database, Radio, Power, Laptop, Send
 } from "lucide-react";
 import { fetchApi } from "@/lib/api";
 
@@ -632,6 +632,8 @@ export default function AdminDashboardPage() {
     { id: "countdowns", label: "Countdown Clocks", icon: Clock, href: "/admin/countdowns" },
     { id: "backups", label: "Backups & Recovery", icon: Database, href: "/admin/backups" },
     { id: "school", label: "School Education Suite", icon: GraduationCap, href: "/admin/school" },
+    { id: "auto_publishing", label: "Auto Job Publishing", icon: Send, href: "/admin/auto-publishing" },
+    { id: "guardian", label: "AI Website Guardian", icon: ShieldAlert, href: "/admin/guardian" },
     { id: "it_jobs", label: "IT & Tech Careers CMS", icon: Laptop, href: "/admin/it-jobs" },
     { id: "university_cms", label: "University & Question Papers", icon: BookOpen, href: "/admin/university" },
     { id: "analytics", label: "Advanced Analytics", icon: BarChart3, href: "/admin/analytics" },
