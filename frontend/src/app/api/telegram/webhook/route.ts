@@ -23,6 +23,15 @@ import {
   getAllApprovals,
   getApprovalById
 } from "@/lib/approvalManager";
+import {
+  approveGuardianRepair,
+  rejectGuardianRepair,
+  rollbackGuardianRepair,
+  runGuardianScan,
+  getGuardianConfig,
+  getGuardianIssues,
+  getGuardianRepairs
+} from "@/lib/websiteGuardian";
 import { dbStore } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
@@ -94,6 +103,30 @@ export async function POST(req: NextRequest) {
         });
 
         return NextResponse.json({ ok: true, action: "REJECTED", result: res });
+      }
+
+      // Handle Guardian Auto-Repair Approvals (🟢 APPROVE REPAIR)
+      if (data.startsWith("gappr_")) {
+        const repairId = data.replace(/^gappr_/, "");
+        const res = await approveGuardianRepair(repairId, adminLabel);
+        await answerTelegramCallbackQuery({
+          callbackQueryId: cb.id,
+          text: res.success ? "✅ Guardian repair approved & applied!" : `⚠️ ${res.message}`,
+          showAlert: !res.success
+        });
+        return NextResponse.json({ ok: true, action: "GUARDIAN_REPAIR_APPROVED", result: res });
+      }
+
+      // Handle Guardian Auto-Repair Rejections (🔴 REJECT REPAIR)
+      if (data.startsWith("grejc_")) {
+        const repairId = data.replace(/^grejc_/, "");
+        const res = await rejectGuardianRepair(repairId, adminLabel);
+        await answerTelegramCallbackQuery({
+          callbackQueryId: cb.id,
+          text: res.success ? "🔴 Guardian repair rejected." : `⚠️ ${res.message}`,
+          showAlert: !res.success
+        });
+        return NextResponse.json({ ok: true, action: "GUARDIAN_REPAIR_REJECTED", result: res });
       }
 
       return NextResponse.json({ ok: true, reason: "unknown_callback_data" });
@@ -292,6 +325,76 @@ export async function POST(req: NextRequest) {
           `_Security threat engine scanning continuously._`;
         await sendTelegramAdminAlert(secMsg, { customChatId: chatId });
         return NextResponse.json({ ok: true, command: "security" });
+      }
+
+      // COMMAND: /guardian or /scan
+      if (lowerText === "/guardian" || lowerText === "/scan") {
+        await sendTelegramAdminAlert(
+          `🔍 <b>Initiating AI Website Guardian Scan...</b>\nChecking core pages, endpoints, job expiries, and links.`,
+          { customChatId: chatId, parseMode: "HTML" }
+        );
+
+        const scan = await runGuardianScan("FULL");
+        const scanReport = `🛡️ <b>EXAMHUB AI WEBSITE GUARDIAN — SCAN REPORT</b>\n` +
+          `━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+          `• <b>Overall Health Score:</b> <b>${scan.healthScore}/100</b>\n` +
+          `• <b>Endpoints Audited:</b> ${scan.endpointsScanned}\n` +
+          `• <b>Job Deadlines Audited:</b> ${scan.jobsChecked}\n` +
+          `• <b>University Papers Checked:</b> ${scan.papersChecked}\n` +
+          `• <b>School Chapters Checked:</b> ${scan.schoolChaptersChecked}\n` +
+          `• <b>Issues Detected:</b> ${scan.issuesFound}\n` +
+          `• <b>Safe Auto-Repairs:</b> ${scan.repairsTriggered}\n` +
+          `• <b>Duration:</b> ${scan.durationMs}ms\n\n` +
+          `━━━━━━━━━━━━━━━━━━━━━━\n` +
+          `🌐 <b>Guardian Cockpit:</b> https://examhub-india.vercel.app/admin/guardian`;
+
+        await sendTelegramAdminAlert(scanReport, { customChatId: chatId, parseMode: "HTML" });
+        return NextResponse.json({ ok: true, command: "guardian", result: scan });
+      }
+
+      // COMMAND: /repairs
+      if (lowerText === "/repairs") {
+        const repairs = getGuardianRepairs().slice(0, 5);
+        if (repairs.length === 0) {
+          await sendTelegramAdminAlert(
+            `✅ <b>NO PENDING GUARDIAN REPAIRS</b>\nAll platform resources are currently in optimal verified state.`,
+            { customChatId: chatId, parseMode: "HTML" }
+          );
+        } else {
+          let repMsg = `🔧 <b>RECENT AI GUARDIAN REPAIRS (${repairs.length})</b>\n━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+          repairs.forEach((r, idx) => {
+            repMsg += `<b>${idx + 1}. ${r.actionType}</b>\n`;
+            repMsg += `• ID: <code>${r.id}</code>\n`;
+            repMsg += `• Status: <b>${r.status}</b>\n`;
+            repMsg += `• Resource: ${r.targetResource} #${r.targetIdentifier}\n`;
+            if (r.status === "EXECUTED") {
+              repMsg += `• To Rollback: <code>/rollback ${r.id}</code>\n`;
+            }
+            repMsg += `\n`;
+          });
+          await sendTelegramAdminAlert(repMsg, { customChatId: chatId, parseMode: "HTML" });
+        }
+        return NextResponse.json({ ok: true, command: "repairs" });
+      }
+
+      // COMMAND: /rollback <id>
+      if (lowerText.startsWith("/rollback")) {
+        const parts = text.split(/\s+/);
+        const repairId = parts[1];
+        if (!repairId) {
+          await sendTelegramAdminAlert(
+            `⚠️ Please specify a Repair ID to rollback. Example:\n<code>/rollback rep-1234</code>`,
+            { customChatId: chatId, parseMode: "HTML" }
+          );
+          return NextResponse.json({ ok: true, command: "rollback_missing_id" });
+        }
+
+        const res = await rollbackGuardianRepair(repairId, `@${sender.username || "AJ4Y2"} (${chatId})`);
+        await sendTelegramAdminAlert(
+          res.success ? `✅ <b>ROLLBACK SUCCESSFUL:</b>\n${res.message}` : `⚠️ <b>ROLLBACK FAILED:</b>\n${res.message}`,
+          { customChatId: chatId, parseMode: "HTML" }
+        );
+        return NextResponse.json({ ok: true, command: "rollback", result: res });
       }
 
       // COMMAND: /approve <id>

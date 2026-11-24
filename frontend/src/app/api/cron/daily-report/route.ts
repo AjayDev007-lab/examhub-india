@@ -11,6 +11,7 @@ import {
   TELEGRAM_DEFAULT_ADMIN_CHAT_ID
 } from "@/lib/telegramManager";
 import { runFullSystemHealthCheck, formatDailyHealthReport } from "@/lib/guardianMonitoring";
+import { runGuardianScan } from "@/lib/websiteGuardian";
 import { dbStore } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
@@ -23,8 +24,12 @@ export async function GET(req: NextRequest) {
       // Internal or development bypass
     }
 
-    // Run real-time full system health check
-    const health = await runFullSystemHealthCheck();
+    // Run real-time full system health check & AI Guardian scan
+    const [health, guardianScan] = await Promise.all([
+      runFullSystemHealthCheck(),
+      runGuardianScan("FULL").catch(() => null)
+    ]);
+
     const reportText = formatDailyHealthReport(health);
     const sendRes = await sendTelegramAdminAlert(reportText, { parseMode: "HTML" });
 

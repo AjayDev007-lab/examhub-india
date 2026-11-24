@@ -434,7 +434,12 @@ export function resolveAdminChatIdFromUpdates(
  */
 export async function sendTelegramAdminAlert(
   messageText: string,
-  options?: { customToken?: string; customChatId?: string; parseMode?: "Markdown" | "HTML" | "NONE" }
+  options?: {
+    customToken?: string;
+    customChatId?: string;
+    parseMode?: "Markdown" | "HTML" | "NONE";
+    replyMarkup?: any;
+  }
 ): Promise<{
   success: boolean;
   status: "SENT" | "PENDING_CONFIG" | "UNAUTHORIZED_RECIPIENT" | "FAILED";
@@ -473,6 +478,9 @@ export async function sendTelegramAdminAlert(
     if (preferredParseMode !== "NONE") {
       payload.parse_mode = preferredParseMode;
     }
+    if (options?.replyMarkup) {
+      payload.reply_markup = options.replyMarkup;
+    }
 
     let res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: "POST",
@@ -485,14 +493,18 @@ export async function sendTelegramAdminAlert(
     // Fail-safe self-recovery: If formatting entity parsing fails, retry cleanly with plain text
     if (!data.ok && data.description && (data.description.toLowerCase().includes("entities") || data.description.toLowerCase().includes("parse") || data.error_code === 400)) {
       const plainText = messageText.replace(/<[^>]*>/g, "").replace(/[_*[\]()~>#+=|{}.!-]/g, "");
+      const fallbackPayload: any = {
+        chat_id: configuredAdminChatId,
+        text: plainText,
+        disable_web_page_preview: false
+      };
+      if (options?.replyMarkup) {
+        fallbackPayload.reply_markup = options.replyMarkup;
+      }
       res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: configuredAdminChatId,
-          text: plainText,
-          disable_web_page_preview: false
-        })
+        body: JSON.stringify(fallbackPayload)
       });
       data = await res.json();
     }

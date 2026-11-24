@@ -623,6 +623,7 @@ export default function AdminDashboardPage() {
 
   const tabs = [
     { id: "overview", label: "Dashboard Overview", icon: LayoutDashboard },
+    { id: "guardian", label: "24/7 AI Website Guardian", icon: ShieldAlert, href: "/admin/guardian" },
     { id: "website_control", label: "Website Availability (Online/Offline)", icon: Power, href: "/admin/website-control" },
     { id: "daily_updates", label: "Daily Updates Engine", icon: Radio, href: "/admin/daily-updates" },
     { id: "maintenance", label: "Maintenance Cockpit", icon: Server, href: "/admin/maintenance" },
