@@ -10,6 +10,11 @@ import {
   getVerificationLogs,
   processAndAutoPublishJob
 } from "@/lib/aiJobVerification";
+import {
+  getQueueTelemetry,
+  getQueueItems,
+  retryPendingNow
+} from "@/lib/jobQueue";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +22,8 @@ export async function GET(req: NextRequest) {
   try {
     const config = getAutoPublishConfig();
     const logs = getVerificationLogs(100);
+    const queueTelemetry = getQueueTelemetry();
+    const queueItems = getQueueItems(50);
 
     return NextResponse.json({
       success: true,
@@ -34,8 +41,19 @@ export async function GET(req: NextRequest) {
         deliveryFailures: config.totalDeliveryFailures,
         lastPublishedAt: config.lastPublishedAt || null,
         isPaused: config.pausePublishing,
-        channel: config.targetChannel
+        channel: config.targetChannel,
+        // Queue Telemetry
+        queueCount: queueTelemetry.queueCount,
+        rateLimited: queueTelemetry.rateLimitedCount,
+        retrying: queueTelemetry.retryingCount,
+        failed: queueTelemetry.failedCount,
+        nextRetryAt: queueTelemetry.nextRetryAt,
+        lastSuccessfulDeliveryAt: queueTelemetry.lastSuccessfulDeliveryAt,
+        lastSuccessfulMessageId: queueTelemetry.lastSuccessfulMessageId,
+        permanentErrors: queueTelemetry.permanentErrors,
+        expiredInQueue: queueTelemetry.expiredInQueueCount
       },
+      queue: queueItems,
       logs
     });
   } catch (err: any) {
@@ -50,6 +68,15 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const action = body.action?.toUpperCase();
+
+    if (action === "RETRY_QUEUE") {
+      const res = await retryPendingNow();
+      return NextResponse.json({
+        success: true,
+        message: res.message,
+        processedCount: res.processedCount
+      });
+    }
 
     if (action === "PAUSE") {
       const updated = updateAutoPublishConfig({ pausePublishing: true });

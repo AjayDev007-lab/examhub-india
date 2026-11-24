@@ -13,6 +13,7 @@ import {
   TELEGRAM_DEFAULT_ADMIN_CHAT_ID
 } from "./telegramManager";
 import { dbStore, initialJobs } from "./data";
+import { enqueueVerifiedJob } from "./jobQueue";
 
 export type JobVerificationStatus =
   | "VERIFIED"
@@ -222,11 +223,14 @@ export interface DeadlineParseResult {
   valid: boolean;
   timestampMs?: number;
   istString?: string;
+  utcString?: string;
   isExpired: boolean;
   error?: string;
   year?: number;
   month?: number;
   day?: number;
+  hours?: number;
+  minutes?: number;
 }
 
 export function parseIndianDeadline(dateInput: any): DeadlineParseResult {
@@ -240,55 +244,84 @@ export function parseIndianDeadline(dateInput: any): DeadlineParseResult {
   }
 
   const nowMs = Date.now();
-  let year: number, month: number, day: number;
+  let year: number = 0;
+  let month: number = 0;
+  let day: number = 0;
+  let hours: number = 23;
+  let minutes: number = 59;
+  let seconds: number = 59;
+  let ms: number = 999;
 
-  // 1. ISO string with time (e.g. 2026-03-28T23:59:59Z or 2026-03-28T18:29:59.000Z)
-  if (str.includes("T")) {
-    const parsedDate = new Date(str);
-    if (!isNaN(parsedDate.getTime())) {
-      const ms = parsedDate.getTime();
-      return {
-        valid: true,
-        timestampMs: ms,
-        isExpired: ms < nowMs,
-        istString: parsedDate.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
-        year: parsedDate.getFullYear(),
-        month: parsedDate.getMonth() + 1,
-        day: parsedDate.getDate()
-      };
+  // 1. Check for explicit timezone offset preceded by time (e.g. +05:30, +0530, or Z)
+  const tzMatch = str.match(/(?:T|\s)\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?([+-]\d{2}:?\d{2}|Z)$/i);
+  if (tzMatch) {
+    const tzStr = tzMatch[1];
+    // If it is explicitly +05:30, or if it is UTC 18:29:59Z (which is 23:59:59 IST), parse directly
+    if (tzStr === "+05:30" || tzStr === "+0530" || (tzStr.toUpperCase() === "Z" && str.includes("18:29:59"))) {
+      const parsed = new Date(str);
+      if (!isNaN(parsed.getTime())) {
+        const parsedMs = parsed.getTime();
+        return {
+          valid: true,
+          timestampMs: parsedMs,
+          isExpired: parsedMs < nowMs,
+          istString: parsed.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
+          utcString: parsed.toISOString(),
+          year: parsed.getFullYear(),
+          month: parsed.getMonth() + 1,
+          day: parsed.getDate()
+        };
+      }
     }
   }
 
-  // 2. DD/MM/YYYY or DD-MM-YYYY (Standard Indian official portal format)
-  const dmyMatch = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-  if (dmyMatch) {
-    day = parseInt(dmyMatch[1], 10);
-    month = parseInt(dmyMatch[2], 10);
-    year = parseInt(dmyMatch[3], 10);
+  // 2. ISO format (YYYY-MM-DD or YYYY/MM/DD)
+  const ymdMatch = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})(?:[T\s](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
+  if (ymdMatch) {
+    year = parseInt(ymdMatch[1], 10);
+    month = parseInt(ymdMatch[2], 10);
+    day = parseInt(ymdMatch[3], 10);
+    if (ymdMatch[4] !== undefined) {
+      hours = parseInt(ymdMatch[4], 10);
+      minutes = parseInt(ymdMatch[5], 10);
+      seconds = ymdMatch[6] ? parseInt(ymdMatch[6], 10) : 0;
+      ms = (hours === 23 && minutes === 59) ? 999 : 0;
+    }
   } else {
-    // 3. YYYY-MM-DD or YYYY/MM/DD (ISO date format)
-    const ymdMatch = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
-    if (ymdMatch) {
-      year = parseInt(ymdMatch[1], 10);
-      month = parseInt(ymdMatch[2], 10);
-      day = parseInt(ymdMatch[3], 10);
-    } else {
-      // 4. Text format: "28 March 2026", "March 28, 2026", "28-Mar-2026", "28th March 2026"
-      const cleaned = str.replace(/(\d+)(st|nd|rd|th)/i, "$1");
-      const textParsed = new Date(cleaned);
-      if (!isNaN(textParsed.getTime())) {
-        const ms = textParsed.getTime();
-        return {
-          valid: true,
-          timestampMs: ms,
-          isExpired: ms < nowMs,
-          istString: textParsed.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
-          year: textParsed.getFullYear(),
-          month: textParsed.getMonth() + 1,
-          day: textParsed.getDate()
-        };
+    // 3. DD/MM/YYYY or DD-MM-YYYY
+    const dmyMatch = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:[T\s](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
+    if (dmyMatch) {
+      day = parseInt(dmyMatch[1], 10);
+      month = parseInt(dmyMatch[2], 10);
+      year = parseInt(dmyMatch[3], 10);
+      if (dmyMatch[4] !== undefined) {
+        hours = parseInt(dmyMatch[4], 10);
+        minutes = parseInt(dmyMatch[5], 10);
+        seconds = dmyMatch[6] ? parseInt(dmyMatch[6], 10) : 0;
+        ms = (hours === 23 && minutes === 59) ? 999 : 0;
       }
-      return { valid: false, isExpired: false, error: `Unrecognized or ambiguous deadline format: "${str}".` };
+    } else {
+      // 4. Text format ('28 March 2026', '28-Mar-2026', 'March 28, 2026', '28th March 2026')
+      const monthNames: Record<string, number> = {
+        jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+        jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12
+      };
+      const cleaned = str.replace(/(\d+)(st|nd|rd|th)/gi, (m, d) => d);
+      const textMatch1 = cleaned.match(/^(\d{1,2})[\s\-\/]+([a-zA-Z]+)[\s\-\/]+(\d{4})/);
+      const textMatch2 = cleaned.match(/^([a-zA-Z]+)[\s\-\/]+(\d{1,2}),?[\s\-\/]+(\d{4})/);
+      if (textMatch1) {
+        day = parseInt(textMatch1[1], 10);
+        const mKey = textMatch1[2].toLowerCase().slice(0, 3);
+        month = monthNames[mKey] || 0;
+        year = parseInt(textMatch1[3], 10);
+      } else if (textMatch2) {
+        const mKey = textMatch2[1].toLowerCase().slice(0, 3);
+        month = monthNames[mKey] || 0;
+        day = parseInt(textMatch2[2], 10);
+        year = parseInt(textMatch2[3], 10);
+      } else {
+        return { valid: false, isExpired: false, error: `Unrecognized or ambiguous deadline format: "${str}".` };
+      }
     }
   }
 
@@ -303,9 +336,30 @@ export function parseIndianDeadline(dateInput: any): DeadlineParseResult {
     return { valid: false, isExpired: false, error: `Invalid date: Day ${day} exceeds maximum days (${daysInMonth}) for month ${month}.` };
   }
 
-  // For dates without explicit time, official Indian deadline is 23:59:59.999 IST
-  // In UTC (IST is UTC+05:30): 23:59:59 IST = 18:29:59 UTC
-  const deadlineUtcMs = Date.UTC(year, month - 1, day, 18, 29, 59, 999);
+  // Convert IST (Asia/Kolkata, UTC+05:30) to UTC:
+  // Offset is -330 minutes (-5h 30m)
+  const totalIstMinutes = hours * 60 + minutes;
+  const totalUtcMinutes = totalIstMinutes - 330;
+  let utcHours = Math.floor(totalUtcMinutes / 60);
+  let utcMinutes = (totalUtcMinutes % 60 + 60) % 60;
+  let utcDay = day;
+  let utcMonth = month;
+  let utcYear = year;
+
+  if (utcHours < 0) {
+    utcHours += 24;
+    utcDay -= 1;
+    if (utcDay < 1) {
+      utcMonth -= 1;
+      if (utcMonth < 1) {
+        utcMonth = 12;
+        utcYear -= 1;
+      }
+      utcDay = new Date(Date.UTC(utcYear, utcMonth, 0)).getUTCDate();
+    }
+  }
+
+  const deadlineUtcMs = Date.UTC(utcYear, utcMonth - 1, utcDay, utcHours, utcMinutes, seconds, ms);
   const istObj = new Date(deadlineUtcMs);
 
   return {
@@ -313,9 +367,12 @@ export function parseIndianDeadline(dateInput: any): DeadlineParseResult {
     timestampMs: deadlineUtcMs,
     isExpired: deadlineUtcMs < nowMs,
     istString: istObj.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
+    utcString: istObj.toISOString(),
     year,
     month,
-    day
+    day,
+    hours,
+    minutes
   };
 }
 
@@ -829,15 +886,29 @@ export async function processAndAutoPublishJob(
   // 2. Format Specification-Compliant Post
   const postHtml = formatVerifiedJobTelegramAlert(job, verification.evidence);
 
-  // 3. Dispatch directly to Telegram Channel (@india102210)
+  // 3. Dispatch through Reliable Idempotent Telegram Delivery Queue
   try {
-    const sendRes = await sendTelegramChannelPost(postHtml, {
+    const enqueueRes = await enqueueVerifiedJob(job, {
       customChannel: targetChannel,
-      parseMode: "HTML"
+      forceImmediate: true,
+      locationCategory: verification.evidence.locationCategory
     });
 
-    if (sendRes.success) {
-      const messageId = sendRes.details?.messageId;
+    if (enqueueRes.duplicateBlocked) {
+      config.totalDuplicatesBlocked++;
+      return {
+        published: false,
+        jobId: job.id,
+        status: "DUPLICATE",
+        reasons: ["Duplicate job notification blocked: already queued or broadcast to channel."],
+        messageId: enqueueRes.item.telegramMessageId || undefined,
+        channel: targetChannel
+      };
+    }
+
+    const imm = enqueueRes.immediateResult;
+    if (imm && imm.status === "SENT") {
+      const messageId = imm.messageId || enqueueRes.item.telegramMessageId;
       const fp = verification.evidence.fingerprint;
       publishedFingerprints.add(fp);
 
@@ -894,8 +965,8 @@ export async function processAndAutoPublishJob(
         channel: targetChannel
       };
     } else {
-      config.totalDeliveryFailures++;
-      // Log delivery failure
+      // Job is securely preserved in persistent delivery queue with RETRYING or RATE_LIMITED state
+      const reasonMsg = imm?.message || enqueueRes.item.lastError || "Enqueued in persistent delivery queue.";
       verificationLogs.unshift({
         id: `vlog-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         jobId: job.id || "temp",
@@ -904,9 +975,9 @@ export async function processAndAutoPublishJob(
         sourceUrl: job.source_website_url || job.official_application_url || "",
         applyUrl: job.official_application_url || job.official_apply_url || "",
         locationCategory: verification.evidence.locationCategory,
-        status: "UNVERIFIABLE",
+        status: "VERIFIED",
         score: verification.score,
-        reasons: [`Telegram channel delivery rejected: ${sendRes.message}`],
+        reasons: [`Preserved in delivery queue: ${reasonMsg}`],
         evidence: verification.evidence,
         publishedToTelegram: false,
         timestamp: new Date().toISOString()
@@ -916,9 +987,9 @@ export async function processAndAutoPublishJob(
       return {
         published: false,
         jobId: job.id,
-        status: "UNVERIFIABLE",
-        reasons: [`Telegram channel delivery rejected: ${sendRes.message}`],
-        error: sendRes.message
+        status: "VERIFIED",
+        reasons: [`Preserved in delivery queue: ${reasonMsg}`],
+        channel: targetChannel
       };
     }
   } catch (err: any) {
@@ -927,7 +998,7 @@ export async function processAndAutoPublishJob(
       published: false,
       jobId: job.id,
       status: "UNVERIFIABLE",
-      reasons: [`Unexpected network failure connecting to Telegram: ${err.message}`],
+      reasons: [`Unexpected queue dispatch error: ${err.message}`],
       error: err.message
     };
   }

@@ -21,6 +21,34 @@ interface AutoPublishMetrics {
   lastPublishedAt: string | null;
   isPaused: boolean;
   channel: string;
+  queueCount?: number;
+  rateLimited?: number;
+  retrying?: number;
+  failed?: number;
+  nextRetryAt?: string | null;
+  lastSuccessfulDeliveryAt?: string | null;
+  lastSuccessfulMessageId?: number | null;
+  permanentErrors?: number;
+  expiredInQueue?: number;
+}
+
+interface JobQueueItem {
+  id: string;
+  jobId: number | string;
+  title: string;
+  organization: string;
+  locationCategory: string;
+  applyUrl: string;
+  status: "PENDING" | "RETRYING" | "RATE_LIMITED" | "SENT" | "FAILED" | "EXPIRED_IN_QUEUE";
+  attempts: number;
+  maxAttempts: number;
+  nextRetryAt: string | null;
+  lastError: string | null;
+  idempotencyKey: string;
+  telegramMessageId: number | null;
+  channel: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface VerificationLogItem {
@@ -46,6 +74,7 @@ export default function AdminAutoPublishingPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [metrics, setMetrics] = useState<AutoPublishMetrics | null>(null);
   const [logs, setLogs] = useState<VerificationLogItem[]>([]);
+  const [queue, setQueue] = useState<JobQueueItem[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [feedback, setFeedback] = useState<{ text: string; error?: boolean } | null>(null);
@@ -63,11 +92,35 @@ export default function AdminAutoPublishingPage() {
       if (data.success) {
         setMetrics(data.metrics);
         setLogs(data.logs || []);
+        setQueue(data.queue || []);
       }
     } catch (err: any) {
       setFeedback({ text: `Failed to load auto-publishing data: ${err.message}`, error: true });
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleRetryQueue() {
+    setActionLoading(true);
+    setFeedback(null);
+    try {
+      const res = await fetch("/api/admin/auto-publishing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "RETRY_QUEUE" })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setFeedback({ text: data.message });
+        fetchDashboardData();
+      } else {
+        setFeedback({ text: data.error || "Queue retry failed", error: true });
+      }
+    } catch (err: any) {
+      setFeedback({ text: `Queue retry error: ${err.message}`, error: true });
+    } finally {
+      setActionLoading(false);
     }
   }
 
@@ -168,6 +221,16 @@ export default function AdminAutoPublishingPage() {
             title="Refresh feed"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-cyan-400" : ""}`} />
+          </button>
+
+          <button
+            onClick={handleRetryQueue}
+            disabled={actionLoading}
+            className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/30 transition flex items-center space-x-2"
+            title="Immediately retry all pending and rate-limited items in publishing queue"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${actionLoading ? "animate-spin" : ""}`} />
+            <span>Retry Queue Now</span>
           </button>
 
           <button
@@ -304,6 +367,138 @@ export default function AdminAutoPublishingPage() {
               {metrics?.lastPublishedAt ? new Date(metrics.lastPublishedAt).toLocaleDateString("en-IN") : "Awaiting first"}
             </div>
           </div>
+
+          {/* Queue Awaiting Delivery */}
+          <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl shadow-sm">
+            <div className="flex items-center justify-between text-slate-400 text-xs">
+              <span>Queue Awaiting</span>
+              <Layers className="w-4 h-4 text-cyan-400" />
+            </div>
+            <div className="text-2xl font-black text-cyan-400 mt-2">{metrics?.queueCount ?? 0}</div>
+            <div className="text-[11px] text-slate-500 mt-0.5">Awaiting channel dispatch</div>
+          </div>
+
+          {/* Rate-Limited Deliveries */}
+          <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl shadow-sm">
+            <div className="flex items-center justify-between text-slate-400 text-xs">
+              <span>Rate-Limited</span>
+              <Clock className="w-4 h-4 text-amber-400" />
+            </div>
+            <div className="text-2xl font-black text-amber-400 mt-2">{metrics?.rateLimited ?? 0}</div>
+            <div className="text-[11px] text-slate-500 mt-0.5">HTTP 429 backoff active</div>
+          </div>
+
+          {/* Next Scheduled Retry */}
+          <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl shadow-sm">
+            <div className="flex items-center justify-between text-slate-400 text-xs">
+              <span>Next Retry</span>
+              <RefreshCw className="w-4 h-4 text-indigo-400" />
+            </div>
+            <div className="text-sm font-bold text-indigo-300 mt-2 truncate">
+              {metrics?.nextRetryAt ? new Date(metrics.nextRetryAt).toLocaleTimeString("en-IN") : "Idle"}
+            </div>
+            <div className="text-[11px] text-slate-500 mt-0.5 truncate">
+              {metrics?.nextRetryAt ? new Date(metrics.nextRetryAt).toLocaleDateString("en-IN") : "No pending retries"}
+            </div>
+          </div>
+
+          {/* Permanent Errors */}
+          <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl shadow-sm">
+            <div className="flex items-center justify-between text-slate-400 text-xs">
+              <span>Permanent Errors</span>
+              <AlertTriangle className="w-4 h-4 text-rose-400" />
+            </div>
+            <div className="text-2xl font-black text-rose-400 mt-2">{metrics?.permanentErrors ?? 0}</div>
+            <div className="text-[11px] text-slate-500 mt-0.5">HTTP 403 or max retries</div>
+          </div>
+        </div>
+
+        {/* Delivery Queue Section */}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+          <div className="px-5 py-3.5 border-b border-slate-800 flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Send className="w-4 h-4 text-cyan-400" />
+              <span className="text-xs font-bold text-white uppercase tracking-wider">
+                Telegram Publishing Queue ({queue.length})
+              </span>
+            </div>
+            <div className="flex items-center space-x-3 text-xs">
+              <span className="text-slate-400">
+                Last Delivery: <strong className="text-emerald-400">{metrics?.lastSuccessfulDeliveryAt ? new Date(metrics.lastSuccessfulDeliveryAt).toLocaleTimeString("en-IN") : "None"}</strong>
+                {metrics?.lastSuccessfulMessageId && ` (Msg #${metrics.lastSuccessfulMessageId})`}
+              </span>
+            </div>
+          </div>
+
+          {queue.length === 0 ? (
+            <div className="p-6 text-center text-slate-500 text-xs">
+              Publishing queue is empty. All verified jobs have been processed.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-slate-300">
+                <thead className="bg-slate-950/60 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
+                  <tr>
+                    <th className="px-4 py-2.5 font-bold">Job Role & Organization</th>
+                    <th className="px-4 py-2.5 font-bold">Delivery Status</th>
+                    <th className="px-4 py-2.5 font-bold">Attempts</th>
+                    <th className="px-4 py-2.5 font-bold">Next Retry / Result</th>
+                    <th className="px-4 py-2.5 font-bold">Error / Telemetry Details</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60">
+                  {queue.map((item) => {
+                    const isSent = item.status === "SENT";
+                    const isRateLimited = item.status === "RATE_LIMITED";
+                    const isRetrying = item.status === "RETRYING";
+                    const isFailed = item.status === "FAILED";
+                    const isExpired = item.status === "EXPIRED_IN_QUEUE";
+
+                    const badge = isSent
+                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                      : isRateLimited
+                      ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                      : isRetrying
+                      ? "bg-indigo-500/20 text-indigo-400 border border-indigo-500/30"
+                      : isExpired
+                      ? "bg-purple-500/20 text-purple-400 border border-purple-500/30"
+                      : isFailed
+                      ? "bg-red-500/20 text-red-400 border border-red-500/30"
+                      : "bg-cyan-500/20 text-cyan-400 border border-cyan-500/30";
+
+                    return (
+                      <tr key={item.id} className="hover:bg-slate-800/40 transition">
+                        <td className="px-4 py-3">
+                          <div className="font-bold text-white truncate max-w-xs">{item.title}</div>
+                          <div className="text-[11px] text-slate-400">{item.organization} • {item.locationCategory}</div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${badge}`}>
+                            {item.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="font-mono text-slate-300">{item.attempts}/{item.maxAttempts}</span>
+                        </td>
+                        <td className="px-4 py-3 text-[11px]">
+                          {isSent ? (
+                            <span className="text-emerald-400 font-mono">Msg #{item.telegramMessageId}</span>
+                          ) : item.nextRetryAt ? (
+                            <span className="text-indigo-400 font-mono">{new Date(item.nextRetryAt).toLocaleTimeString("en-IN")}</span>
+                          ) : (
+                            <span className="text-slate-500">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-[11px] text-slate-400 max-w-sm truncate">
+                          {item.lastError || "Awaiting dispatch window"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         {/* Filter and Search Bar */}

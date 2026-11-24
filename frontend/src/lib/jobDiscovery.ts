@@ -13,6 +13,7 @@ import {
   JobLocationCategory,
   JobVerificationResult
 } from "./aiJobVerification";
+import { enqueueVerifiedJob } from "./jobQueue";
 
 export interface DiscoverySource {
   id: string;
@@ -425,14 +426,17 @@ export async function runAutomatedJobDiscovery(options?: {
           });
         }
       } else {
-        // Quota control reached: record as verified in db without spamming channel
+        // Quota control reached: preserve job in persistent delivery queue with rate limit backoff
+        await enqueueVerifiedJob(newJob, {
+          locationCategory: verification.evidence.locationCategory
+        });
         results.push({
           title: newJob.title,
           organization: newJob.organization_name,
           locationCategory: verification.evidence.locationCategory,
           status: "VERIFIED",
           published: false,
-          reasons: ["Verified and saved to database; channel broadcast rate-limited to avoid student notification spam."]
+          reasons: ["Verified and preserved in persistent delivery queue (channel broadcast rate-limited)."]
         });
       }
     } else {
