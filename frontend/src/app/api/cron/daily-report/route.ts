@@ -12,6 +12,7 @@ import {
 } from "@/lib/telegramManager";
 import { runFullSystemHealthCheck, formatDailyHealthReport } from "@/lib/guardianMonitoring";
 import { runGuardianScan } from "@/lib/websiteGuardian";
+import { runAutomatedJobDiscovery } from "@/lib/jobDiscovery";
 import { dbStore } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
@@ -48,6 +49,9 @@ export async function GET(req: NextRequest) {
         }
       }
     }
+
+    // Automated Job Discovery & Verification Sweep (Runs cleanly within daily cron window)
+    const discoverySweep = await runAutomatedJobDiscovery({ maxJobsToPublish: 1 }).catch(() => null);
 
     const reportText = formatDailyHealthReport(health);
     const sendRes = await sendTelegramAdminAlert(reportText, { parseMode: "HTML" });
