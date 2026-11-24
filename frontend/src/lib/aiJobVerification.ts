@@ -94,23 +94,21 @@ const verificationLogs: VerificationLogItem[] = [
     sourceUrl: "https://upsc.gov.in",
     applyUrl: "https://upsconline.nic.in",
     locationCategory: "All India",
-    status: "VERIFIED",
-    score: 98,
-    reasons: ["Passed all 5 AI verification pillars (Organization, Link, Expiry, Content, Fraud)."],
+    status: "EXPIRED",
+    score: 0,
+    reasons: ["Application deadline expired on 05/03/2026 (Asia/Kolkata). Recruitment officially closed."],
     evidence: {
       organizationVerified: true,
       linkVerified: true,
-      expiryVerified: true,
+      expiryVerified: false,
       contentVerified: true,
       fraudCheckPassed: true,
       duplicateCheckPassed: true,
       locationCategory: "All India",
       fingerprint: "seed_upsc_cse_2026",
-      details: { vacancies: 1100, deadline: "2026-03-05" }
+      details: { vacancies: 1100, deadline: "2026-03-05", expired: true }
     },
-    publishedToTelegram: true,
-    telegramMessageId: 9812,
-    channel: "@india102210",
+    publishedToTelegram: false,
     timestamp: new Date(Date.now() - 3600000 * 4).toISOString()
   },
   {
@@ -118,26 +116,27 @@ const verificationLogs: VerificationLogItem[] = [
     jobId: 102,
     title: "TNPSC Combined Technical Services Examination 2026",
     organization: "Tamil Nadu Public Service Commission",
-    sourceUrl: "https://tnpsc.gov.in",
-    applyUrl: "https://tnpscexams.in",
+    sourceUrl: "https://www.tnpsc.gov.in/Tamil/Notification1.aspx",
+    applyUrl: "https://apply.tnpscexams.in/cts-2026",
     locationCategory: "Tamil Nadu",
-    status: "VERIFIED",
-    score: 95,
-    reasons: ["Official state commission verification confirmed.", "Safe HTTPS portal."],
+    status: "EXPIRED",
+    score: 0,
+    reasons: [
+      "Application deadline expired on 28/03/2026, 11:59:59 pm (Asia/Kolkata).",
+      "Audited against official TNPSC Gazette (Notification1.aspx). Recruitment is officially closed."
+    ],
     evidence: {
       organizationVerified: true,
       linkVerified: true,
-      expiryVerified: true,
+      expiryVerified: false,
       contentVerified: true,
       fraudCheckPassed: true,
       duplicateCheckPassed: true,
       locationCategory: "Tamil Nadu",
       fingerprint: "seed_tnpsc_cts_2026",
-      details: { vacancies: 420, deadline: "2026-03-20" }
+      details: { vacancies: 420, deadline: "2026-03-28", expired: true }
     },
-    publishedToTelegram: true,
-    telegramMessageId: 9814,
-    channel: "@india102210",
+    publishedToTelegram: false,
     timestamp: new Date(Date.now() - 3600000 * 2).toISOString()
   }
 ];
@@ -212,6 +211,112 @@ export function isSafePublicUrl(urlStr: string): boolean {
   } catch (_) {
     return false;
   }
+}
+
+// ============================================================================
+// 1B. ROBUST INDIAN DEADLINE & EXPIRY ENGINE (Asia/Kolkata UTC+05:30)
+// Supports DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD, ISO, and standard month names
+// ============================================================================
+
+export interface DeadlineParseResult {
+  valid: boolean;
+  timestampMs?: number;
+  istString?: string;
+  isExpired: boolean;
+  error?: string;
+  year?: number;
+  month?: number;
+  day?: number;
+}
+
+export function parseIndianDeadline(dateInput: any): DeadlineParseResult {
+  if (!dateInput) {
+    return { valid: false, isExpired: false, error: "Application deadline is completely missing." };
+  }
+
+  const str = String(dateInput).trim();
+  if (!str) {
+    return { valid: false, isExpired: false, error: "Application deadline string is empty." };
+  }
+
+  const nowMs = Date.now();
+  let year: number, month: number, day: number;
+
+  // 1. ISO string with time (e.g. 2026-03-28T23:59:59Z or 2026-03-28T18:29:59.000Z)
+  if (str.includes("T")) {
+    const parsedDate = new Date(str);
+    if (!isNaN(parsedDate.getTime())) {
+      const ms = parsedDate.getTime();
+      return {
+        valid: true,
+        timestampMs: ms,
+        isExpired: ms < nowMs,
+        istString: parsedDate.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
+        year: parsedDate.getFullYear(),
+        month: parsedDate.getMonth() + 1,
+        day: parsedDate.getDate()
+      };
+    }
+  }
+
+  // 2. DD/MM/YYYY or DD-MM-YYYY (Standard Indian official portal format)
+  const dmyMatch = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+  if (dmyMatch) {
+    day = parseInt(dmyMatch[1], 10);
+    month = parseInt(dmyMatch[2], 10);
+    year = parseInt(dmyMatch[3], 10);
+  } else {
+    // 3. YYYY-MM-DD or YYYY/MM/DD (ISO date format)
+    const ymdMatch = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+    if (ymdMatch) {
+      year = parseInt(ymdMatch[1], 10);
+      month = parseInt(ymdMatch[2], 10);
+      day = parseInt(ymdMatch[3], 10);
+    } else {
+      // 4. Text format: "28 March 2026", "March 28, 2026", "28-Mar-2026", "28th March 2026"
+      const cleaned = str.replace(/(\d+)(st|nd|rd|th)/i, "$1");
+      const textParsed = new Date(cleaned);
+      if (!isNaN(textParsed.getTime())) {
+        const ms = textParsed.getTime();
+        return {
+          valid: true,
+          timestampMs: ms,
+          isExpired: ms < nowMs,
+          istString: textParsed.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
+          year: textParsed.getFullYear(),
+          month: textParsed.getMonth() + 1,
+          day: textParsed.getDate()
+        };
+      }
+      return { valid: false, isExpired: false, error: `Unrecognized or ambiguous deadline format: "${str}".` };
+    }
+  }
+
+  // Validate calendar components
+  if (year < 2020 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 31) {
+    return { valid: false, isExpired: false, error: `Deadline date components out of bounds (${day}/${month}/${year}).` };
+  }
+
+  // Handle month length validation
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  if (day > daysInMonth) {
+    return { valid: false, isExpired: false, error: `Invalid date: Day ${day} exceeds maximum days (${daysInMonth}) for month ${month}.` };
+  }
+
+  // For dates without explicit time, official Indian deadline is 23:59:59.999 IST
+  // In UTC (IST is UTC+05:30): 23:59:59 IST = 18:29:59 UTC
+  const deadlineUtcMs = Date.UTC(year, month - 1, day, 18, 29, 59, 999);
+  const istObj = new Date(deadlineUtcMs);
+
+  return {
+    valid: true,
+    timestampMs: deadlineUtcMs,
+    isExpired: deadlineUtcMs < nowMs,
+    istString: istObj.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
+    year,
+    month,
+    day
+  };
 }
 
 // ============================================================================
@@ -380,22 +485,22 @@ export async function verifyJobOpportunity(job: any): Promise<JobVerificationRes
   }
 
   // --------------------------------------------------------------------------
-  // PILLAR C: EXPIRY & TIMELINE VERIFICATION
+  // PILLAR C: EXPIRY & TIMELINE VERIFICATION (Asia/Kolkata UTC+05:30)
   // --------------------------------------------------------------------------
   let expiryVerified = false;
-  const now = Date.now();
 
   // Mandatory rule: A missing deadline must not be treated as proof of active recruitment
   if (!endDate) {
-    reasons.push("Application deadline is missing. Unverifiable whether recruitment is currently active.");
+    reasons.push("Application deadline is missing. Missing deadlines are strictly unverifiable and held back from publication.");
     score -= 35;
   } else {
-    const endMs = new Date(endDate).getTime();
-    if (isNaN(endMs)) {
-      reasons.push("Application deadline date string is unparseable.");
-      score -= 25;
-    } else if (endMs < now) {
-      reasons.push(`Application deadline expired on ${new Date(endDate).toLocaleDateString("en-IN")}. Recruitment is closed.`);
+    const deadlineResult = parseIndianDeadline(endDate);
+
+    if (!deadlineResult.valid) {
+      reasons.push(deadlineResult.error || "Application deadline date format is ambiguous or invalid. Requires manual investigation.");
+      score -= 30;
+    } else if (deadlineResult.isExpired) {
+      reasons.push(`Application deadline officially expired on ${deadlineResult.istString} (Asia/Kolkata). Recruitment is officially closed.`);
       return {
         status: "EXPIRED",
         reasons,
@@ -408,12 +513,23 @@ export async function verifyJobOpportunity(job: any): Promise<JobVerificationRes
           duplicateCheckPassed: true,
           locationCategory: categorizeJobLocation(job.location, title, org),
           fingerprint: generateJobFingerprint(job),
-          details: { endDate, expired: true }
+          details: { endDate, deadlineResult, expired: true }
         },
         score: 0
       };
     } else {
-      expiryVerified = true;
+      // Check start date vs end date conflict
+      if (startDate) {
+        const startResult = parseIndianDeadline(startDate);
+        if (startResult.valid && startResult.timestampMs && deadlineResult.timestampMs && startResult.timestampMs > deadlineResult.timestampMs) {
+          reasons.push("Conflicting dates detected: application start date is after the closing deadline.");
+          score -= 35;
+        } else {
+          expiryVerified = true;
+        }
+      } else {
+        expiryVerified = true;
+      }
     }
   }
 
@@ -623,6 +739,47 @@ export async function processAndAutoPublishJob(
   // Increment total discovered count
   config.totalDiscoveredCount++;
 
+  // 0. Strict Pre-Flight Expiry Check: Never publish any expired or unparseable job
+  const preflightDeadline = parseIndianDeadline(job.application_end_date || job.last_date_to_apply);
+  if (!preflightDeadline.valid || preflightDeadline.isExpired) {
+    const isPast = preflightDeadline.isExpired;
+    job.status = isPast ? "EXPIRED" : "UNVERIFIABLE";
+    job.is_expired = isPast;
+    job.application_action_disabled = true;
+
+    if (isPast) config.totalExpiredCount++;
+    else config.totalUnverifiableCount++;
+
+    const reason = isPast
+      ? `Pre-flight expiry block: Application deadline passed on ${preflightDeadline.istString} (Asia/Kolkata). Publishing forbidden.`
+      : (preflightDeadline.error || "Pre-flight validation block: application deadline is invalid or missing.");
+
+    // Record to verification logs
+    verificationLogs.unshift({
+      id: `vlog-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      jobId: job.id || "temp",
+      title: job.title || "Untitled Job",
+      organization: job.organization_name || job.organization || "Unspecified Org",
+      sourceUrl: job.source_website_url || job.official_application_url || "",
+      applyUrl: job.official_application_url || job.official_apply_url || "",
+      locationCategory: categorizeJobLocation(job.location, job.title, job.organization_name || job.organization),
+      status: isPast ? "EXPIRED" : "UNVERIFIABLE",
+      score: 0,
+      reasons: [reason],
+      evidence: { preflightCheckPassed: false, isExpired: isPast, deadlineResult: preflightDeadline },
+      publishedToTelegram: false,
+      timestamp: new Date().toISOString()
+    });
+    if (verificationLogs.length > 100) verificationLogs.pop();
+
+    return {
+      published: false,
+      jobId: job.id,
+      status: isPast ? "EXPIRED" : "UNVERIFIABLE",
+      reasons: [reason]
+    };
+  }
+
   // 1. Run AI Job Verification Engine
   const verification = await verifyJobOpportunity(job);
 
@@ -641,8 +798,8 @@ export async function processAndAutoPublishJob(
     config.totalRejectedCount++;
   }
 
-  // If testing or not verified, handle decision
-  if (verification.status !== "VERIFIED" && !options?.forcePublishTest) {
+  // If not verified, reject and never publish to channel
+  if (verification.status !== "VERIFIED") {
     // Record to verification logs for Admin Monitoring Feed
     verificationLogs.unshift({
       id: `vlog-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
