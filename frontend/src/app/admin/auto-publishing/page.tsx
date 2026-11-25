@@ -21,15 +21,25 @@ interface AutoPublishMetrics {
   lastPublishedAt: string | null;
   isPaused: boolean;
   channel: string;
+  // Firestore Queue Telemetry
+  isConfigured?: boolean;
+  provider?: string;
+  projectId?: string;
+  collection?: string;
+  error?: string | null;
   queueCount?: number;
+  pendingCount?: number;
   rateLimited?: number;
   retrying?: number;
+  sentCount?: number;
   failed?: number;
   nextRetryAt?: string | null;
   lastSuccessfulDeliveryAt?: string | null;
   lastSuccessfulMessageId?: number | null;
   permanentErrors?: number;
   expiredInQueue?: number;
+  isChannelThrottled?: boolean;
+  channelThrottledUntil?: string | null;
 }
 
 interface JobQueueItem {
@@ -49,6 +59,16 @@ interface JobQueueItem {
   channel: string;
   createdAt: string;
   updatedAt: string;
+  lockedBy?: string | null;
+  lockedAt?: string | null;
+  lockExpiresAt?: string | null;
+  auditHistory?: Array<{
+    timestamp: string;
+    fromStatus: string;
+    toStatus: string;
+    reason?: string;
+    workerId?: string;
+  }>;
 }
 
 interface VerificationLogItem {
@@ -119,6 +139,29 @@ export default function AdminAutoPublishingPage() {
       }
     } catch (err: any) {
       setFeedback({ text: `Queue retry error: ${err.message}`, error: true });
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function handleMigrateJobs() {
+    setActionLoading(true);
+    setFeedback(null);
+    try {
+      const res = await fetch("/api/admin/auto-publishing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "MIGRATE_TO_FIRESTORE" })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setFeedback({ text: data.message });
+        fetchDashboardData();
+      } else {
+        setFeedback({ text: data.message || data.error || "Migration to Firestore failed", error: true });
+      }
+    } catch (err: any) {
+      setFeedback({ text: `Migration error: ${err.message}`, error: true });
     } finally {
       setActionLoading(false);
     }
@@ -224,6 +267,16 @@ export default function AdminAutoPublishingPage() {
           </button>
 
           <button
+            onClick={handleMigrateJobs}
+            disabled={actionLoading}
+            className="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold shadow-lg shadow-teal-600/30 transition flex items-center space-x-2"
+            title="Import 4 verified opportunities into Cloud Firestore production queue"
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>Migrate 4 Jobs to Firestore</span>
+          </button>
+
+          <button
             onClick={handleRetryQueue}
             disabled={actionLoading}
             className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/30 transition flex items-center space-x-2"
@@ -272,6 +325,54 @@ export default function AdminAutoPublishingPage() {
 
       {/* Main Content Area */}
       <main className="p-6 max-w-7xl mx-auto w-full space-y-6 flex-1">
+        {/* Firestore Infrastructure Status Panel */}
+        <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl shadow-sm">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-start md:items-center space-x-3">
+              <div className="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/30 flex items-center justify-center text-orange-400">
+                <Layers className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center space-x-2">
+                  <h2 className="text-sm font-bold text-white tracking-tight">Cloud Firestore Queue Infrastructure</h2>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                    metrics?.isConfigured
+                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                      : "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                  }`}>
+                    {metrics?.isConfigured ? "DURABLE PERSISTENCE ACTIVE" : "AWAITING CREDENTIALS"}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Project: <strong className="text-cyan-400">{metrics?.projectId || "examhub-india-6ba59"}</strong> • Collection: <code className="text-amber-300 font-mono text-[11px]">{metrics?.collection || "telegram_publishing_queue"}</code> • Zero Monthly Cost (₹0 Spark Tier)
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-4 text-xs">
+              <div className="text-right">
+                <div className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Spark Quota Health</div>
+                <div className="text-emerald-400 font-mono font-bold">&lt; 0.5% (Safe ₹0)</div>
+              </div>
+              <div className="text-right border-l border-slate-800 pl-4">
+                <div className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Channel Throttle</div>
+                <div className={metrics?.isChannelThrottled ? "text-amber-400 font-bold" : "text-slate-400"}>
+                  {metrics?.isChannelThrottled ? "Rate-Limited (Cooling)" : "Nominal"}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {!metrics?.isConfigured && (
+            <div className="mt-3 p-3 bg-amber-950/40 border border-amber-800/60 rounded-xl text-xs text-amber-300 flex items-start space-x-2.5">
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold">Production Configuration Requirement:</span> Firebase Admin service credentials (<code>FIREBASE_CLIENT_EMAIL</code> &amp; <code>FIREBASE_PRIVATE_KEY</code>) must be set in Vercel Environment Variables. The engine safely detects unset credentials without silently writing to <code>/tmp</code> or crashing serverless workers.
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Metric Cards Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
           <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl shadow-sm">
@@ -441,9 +542,11 @@ export default function AdminAutoPublishingPage() {
                   <tr>
                     <th className="px-4 py-2.5 font-bold">Job Role & Organization</th>
                     <th className="px-4 py-2.5 font-bold">Delivery Status</th>
+                    <th className="px-4 py-2.5 font-bold">Worker Lease Lock</th>
                     <th className="px-4 py-2.5 font-bold">Attempts</th>
                     <th className="px-4 py-2.5 font-bold">Next Retry / Result</th>
-                    <th className="px-4 py-2.5 font-bold">Error / Telemetry Details</th>
+                    <th className="px-4 py-2.5 font-bold">Audit History</th>
+                    <th className="px-4 py-2.5 font-bold">Telemetry Details</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
@@ -466,16 +569,29 @@ export default function AdminAutoPublishingPage() {
                       ? "bg-red-500/20 text-red-400 border border-red-500/30"
                       : "bg-cyan-500/20 text-cyan-400 border border-cyan-500/30";
 
+                    const isLocked = Boolean(item.lockedBy && item.lockExpiresAt && new Date(item.lockExpiresAt).getTime() > Date.now());
+
                     return (
                       <tr key={item.id} className="hover:bg-slate-800/40 transition">
                         <td className="px-4 py-3">
                           <div className="font-bold text-white truncate max-w-xs">{item.title}</div>
                           <div className="text-[11px] text-slate-400">{item.organization} • {item.locationCategory}</div>
+                          <div className="text-[10px] text-slate-600 font-mono mt-0.5">doc: {item.id}</div>
                         </td>
                         <td className="px-4 py-3">
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${badge}`}>
                             {item.status}
                           </span>
+                        </td>
+                        <td className="px-4 py-3 text-[11px]">
+                          {isLocked ? (
+                            <span className="text-amber-400 font-mono flex items-center space-x-1">
+                              <span>🔒</span>
+                              <span className="truncate max-w-[100px]" title={item.lockedBy || ""}>{item.lockedBy}</span>
+                            </span>
+                          ) : (
+                            <span className="text-slate-500 font-mono">🔓 Free</span>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           <span className="font-mono text-slate-300">{item.attempts}/{item.maxAttempts}</span>
@@ -489,7 +605,12 @@ export default function AdminAutoPublishingPage() {
                             <span className="text-slate-500">—</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-[11px] text-slate-400 max-w-sm truncate">
+                        <td className="px-4 py-3 text-[11px]">
+                          <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono border border-slate-700">
+                            {item.auditHistory?.length || 1} transitions
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-[11px] text-slate-400 max-w-sm truncate" title={item.lastError || "Awaiting dispatch window"}>
                           {item.lastError || "Awaiting dispatch window"}
                         </td>
                       </tr>

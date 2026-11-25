@@ -1,14 +1,17 @@
 // ============================================================================
-// EXAMHUB INDIA — DURABLE TELEGRAM JOB PUBLISHING QUEUE & RELIABILITY ENGINE
-// Ensures 100% reliable, rate-limit resilient, idempotent job publishing
-// Backed by atomic file-based durable persistence surviving cold starts
+// EXAMHUB INDIA — DURABLE FIRESTORE PUBLISHING QUEUE & RELIABILITY ENGINE
+// Cloud Firestore Production Queue (Project: examhub-india-6ba59)
+// Uses Firebase Admin SDK exclusively with atomic Firestore transactions
+// Shared locks across all Vercel function instances with ₹0 free-tier adherence
 // ============================================================================
 
-import fs from "fs";
-import path from "path";
-import os from "os";
 import crypto from "crypto";
 import { parseIndianDeadline } from "./aiJobVerification";
+import {
+  getFirestoreAdminDb,
+  getFirebaseAdminConfigStatus,
+  isFirebaseAdminConfigured
+} from "./firebaseAdmin";
 import {
   getSanitizedTelegramBotToken,
   TELEGRAM_PUBLIC_CHANNEL_ID
@@ -23,8 +26,16 @@ export type DeliveryStatus =
   | "FAILED"
   | "EXPIRED_IN_QUEUE";
 
+export interface QueueAuditEntry {
+  timestamp: string;
+  fromStatus: DeliveryStatus;
+  toStatus: DeliveryStatus;
+  reason: string;
+  workerId: string;
+}
+
 export interface JobQueueItem {
-  id: string;
+  id: string; // Firestore document ID: sha256 or q-<id>
   jobId: number | string;
   title: string;
   organization: string;
@@ -45,123 +56,12 @@ export interface JobQueueItem {
   lockedBy?: string | null;
   lockedAt?: string | null;
   lockExpiresAt?: string | null;
+  auditHistory?: QueueAuditEntry[];
 }
 
-export interface DurableQueueState {
-  version: number;
-  updatedAt: string;
-  channelRateLimitUntilMs: number;
-  lastSuccessfulDeliveryTime: string | null;
-  lastSuccessfulMsgId: number | null;
-  sentIdempotencyKeys: string[];
-  items: JobQueueItem[];
-}
-
-/**
- * Returns the durable filesystem path for the queue storage.
- * In serverless environments (Vercel/Lambda), falls back to OS temp dir.
- */
-export function getStorageFilePath(): string {
-  if (process.env.QUEUE_STORAGE_PATH) {
-    return process.env.QUEUE_STORAGE_PATH;
-  }
-  const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
-  if (isServerless) {
-    return path.join(os.tmpdir(), "examhub_publishing_queue.json");
-  }
-  // Local project directory
-  const localDataDir = path.join(process.cwd(), "data");
-  if (!fs.existsSync(localDataDir)) {
-    try {
-      fs.mkdirSync(localDataDir, { recursive: true });
-    } catch (_) {}
-  }
-  return path.join(localDataDir, "publishing_queue.json");
-}
-
-// In-memory working cache (synced to durable disk on every mutation)
-let activeState: DurableQueueState = {
-  version: 1,
-  updatedAt: new Date().toISOString(),
-  channelRateLimitUntilMs: 0,
-  lastSuccessfulDeliveryTime: null,
-  lastSuccessfulMsgId: null,
-  sentIdempotencyKeys: [],
-  items: []
-};
-
-// Initial load on module initialization
-loadDurableState();
-
-/**
- * Atomically writes the queue state to durable disk using temp-file rename.
- */
-export function saveDurableState(): void {
-  activeState.updatedAt = new Date().toISOString();
-  const filePath = getStorageFilePath();
-  const tmpPath = `${filePath}.tmp.${Date.now()}.${Math.random().toString(36).slice(2, 6)}`;
-
-  try {
-    const json = JSON.stringify(activeState, null, 2);
-    const parentDir = path.dirname(filePath);
-    if (!fs.existsSync(parentDir)) {
-      fs.mkdirSync(parentDir, { recursive: true });
-    }
-    fs.writeFileSync(tmpPath, json, "utf8");
-    fs.renameSync(tmpPath, filePath);
-  } catch (err: any) {
-    // If atomic rename fails (e.g. cross-device link), fallback to direct write
-    try {
-      fs.writeFileSync(filePath, JSON.stringify(activeState, null, 2), "utf8");
-    } catch (_) {}
-  }
-}
-
-/**
- * Loads the queue state from durable storage and releases expired locks.
- */
-export function loadDurableState(): DurableQueueState {
-  const filePath = getStorageFilePath();
-  const nowMs = Date.now();
-
-  try {
-    if (fs.existsSync(filePath)) {
-      const content = fs.readFileSync(filePath, "utf8");
-      const parsed = JSON.parse(content);
-      if (parsed && Array.isArray(parsed.items)) {
-        activeState = {
-          version: parsed.version || 1,
-          updatedAt: parsed.updatedAt || new Date().toISOString(),
-          channelRateLimitUntilMs: Number(parsed.channelRateLimitUntilMs) || 0,
-          lastSuccessfulDeliveryTime: parsed.lastSuccessfulDeliveryTime || null,
-          lastSuccessfulMsgId: parsed.lastSuccessfulMsgId || null,
-          sentIdempotencyKeys: Array.isArray(parsed.sentIdempotencyKeys) ? parsed.sentIdempotencyKeys : [],
-          items: parsed.items
-        };
-
-        // Automatic lock recovery: Unlock any orphaned items held by dead workers
-        for (const item of activeState.items) {
-          if (item.lockedBy) {
-            const exp = item.lockExpiresAt ? new Date(item.lockExpiresAt).getTime() : 0;
-            if (exp <= nowMs) {
-              item.lockedBy = null;
-              item.lockedAt = null;
-              item.lockExpiresAt = null;
-              if (item.status === "PENDING" || item.status === "RETRYING") {
-                item.status = "RETRYING";
-              }
-            }
-          }
-        }
-      }
-    }
-  } catch (err) {
-    // On corrupt file, keep active in-memory state and re-save
-    saveDurableState();
-  }
-
-  return activeState;
-}
+export const QUEUE_COLLECTION = "telegram_publishing_queue";
+export const IDEMPOTENCY_COLLECTION = "publishing_idempotency_keys";
+export const CONFIG_COLLECTION = "telegram_queue_config";
 
 /**
  * Derives a SHA-256 idempotency key preventing duplicate queueing and double-broadcasts.
@@ -175,70 +75,145 @@ export function calculateIdempotencyKey(job: any): string {
 
 /**
  * Returns queue telemetry metrics for Admin Cockpit.
+ * Reads directly from Firestore when configured.
  */
-export function getQueueTelemetry() {
-  loadDurableState();
-  const nowMs = Date.now();
-  let pendingCount = 0;
-  let retryingCount = 0;
-  let rateLimitedCount = 0;
-  let sentCount = 0;
-  let failedCount = 0;
-  let expiredInQueueCount = 0;
-  let earliestNextRetry: number | null = null;
+export async function getQueueTelemetry() {
+  const configStatus = getFirebaseAdminConfigStatus();
 
-  for (const item of activeState.items) {
-    if (item.status === "PENDING") pendingCount++;
-    else if (item.status === "RETRYING") {
-      retryingCount++;
-      if (item.nextRetryAt) {
-        const ms = new Date(item.nextRetryAt).getTime();
-        if (earliestNextRetry === null || ms < earliestNextRetry) earliestNextRetry = ms;
-      }
-    } else if (item.status === "RATE_LIMITED") {
-      rateLimitedCount++;
-      if (item.nextRetryAt) {
-        const ms = new Date(item.nextRetryAt).getTime();
-        if (earliestNextRetry === null || ms < earliestNextRetry) earliestNextRetry = ms;
-      }
-    } else if (item.status === "SENT") sentCount++;
-    else if (item.status === "FAILED") failedCount++;
-    else if (item.status === "EXPIRED_IN_QUEUE") expiredInQueueCount++;
+  if (!configStatus.isConfigured) {
+    return {
+      isConfigured: false,
+      error: configStatus.error,
+      projectId: configStatus.projectId,
+      queueCount: 0,
+      pendingCount: 0,
+      retryingCount: 0,
+      rateLimitedCount: 0,
+      sentCount: 0,
+      failedCount: 0,
+      expiredInQueueCount: 0,
+      permanentErrors: 0,
+      nextRetryAt: null,
+      lastSuccessfulDeliveryAt: null,
+      lastSuccessfulMessageId: null,
+      totalQueuedLifetime: 0,
+      isChannelThrottled: false,
+      channelThrottledUntil: null,
+      provider: "FIRESTORE_DISCONNECTED"
+    };
   }
 
-  return {
-    queueCount: pendingCount + retryingCount + rateLimitedCount,
-    pendingCount,
-    retryingCount,
-    rateLimitedCount,
-    sentCount,
-    failedCount,
-    expiredInQueueCount,
-    permanentErrors: failedCount,
-    nextRetryAt: earliestNextRetry ? new Date(earliestNextRetry).toISOString() : null,
-    lastSuccessfulDeliveryAt: activeState.lastSuccessfulDeliveryTime,
-    lastSuccessfulMessageId: activeState.lastSuccessfulMsgId,
-    totalQueuedLifetime: activeState.items.length,
-    isChannelThrottled: nowMs < activeState.channelRateLimitUntilMs,
-    channelThrottledUntil: nowMs < activeState.channelRateLimitUntilMs ? new Date(activeState.channelRateLimitUntilMs).toISOString() : null
-  };
+  const db = getFirestoreAdminDb();
+  if (!db) {
+    return {
+      isConfigured: false,
+      error: "Failed to connect to Cloud Firestore with configured credentials.",
+      provider: "FIRESTORE_ERROR"
+    };
+  }
+
+  try {
+    const queueSnapshot = await db.collection(QUEUE_COLLECTION).get();
+    const configDoc = await db.collection(CONFIG_COLLECTION).doc("global").get();
+    const configData = configDoc.exists ? configDoc.data() : {};
+
+    const nowMs = Date.now();
+    let pendingCount = 0;
+    let retryingCount = 0;
+    let rateLimitedCount = 0;
+    let sentCount = 0;
+    let failedCount = 0;
+    let expiredInQueueCount = 0;
+    let earliestNextRetry: number | null = null;
+
+    queueSnapshot.forEach((doc: any) => {
+      const item = doc.data() as JobQueueItem;
+      if (item.status === "PENDING") pendingCount++;
+      else if (item.status === "RETRYING") {
+        retryingCount++;
+        if (item.nextRetryAt) {
+          const ms = new Date(item.nextRetryAt).getTime();
+          if (earliestNextRetry === null || ms < earliestNextRetry) earliestNextRetry = ms;
+        }
+      } else if (item.status === "RATE_LIMITED") {
+        rateLimitedCount++;
+        if (item.nextRetryAt) {
+          const ms = new Date(item.nextRetryAt).getTime();
+          if (earliestNextRetry === null || ms < earliestNextRetry) earliestNextRetry = ms;
+        }
+      } else if (item.status === "SENT") sentCount++;
+      else if (item.status === "FAILED") failedCount++;
+      else if (item.status === "EXPIRED_IN_QUEUE") expiredInQueueCount++;
+    });
+
+    const throttledUntilMs = Number(configData?.channelRateLimitUntilMs) || 0;
+
+    return {
+      isConfigured: true,
+      provider: "FIREBASE_FIRESTORE_DURABLE",
+      projectId: configStatus.projectId,
+      collection: QUEUE_COLLECTION,
+      queueCount: pendingCount + retryingCount + rateLimitedCount,
+      pendingCount,
+      retryingCount,
+      rateLimitedCount,
+      sentCount,
+      failedCount,
+      expiredInQueueCount,
+      permanentErrors: failedCount,
+      nextRetryAt: earliestNextRetry ? new Date(earliestNextRetry).toISOString() : null,
+      lastSuccessfulDeliveryAt: configData?.lastSuccessfulDeliveryTime || null,
+      lastSuccessfulMessageId: configData?.lastSuccessfulMsgId || null,
+      totalQueuedLifetime: queueSnapshot.size,
+      isChannelThrottled: nowMs < throttledUntilMs,
+      channelThrottledUntil: nowMs < throttledUntilMs ? new Date(throttledUntilMs).toISOString() : null
+    };
+  } catch (err: any) {
+    return {
+      isConfigured: true,
+      error: `Firestore query error: ${err.message}`,
+      provider: "FIRESTORE_ERROR"
+    };
+  }
 }
 
 /**
- * Returns items in the delivery queue with optional filtering and pagination.
+ * Returns items in the delivery queue directly from Firestore.
  */
-export function getQueueItems(limit: number = 50, filterStatus?: string): JobQueueItem[] {
-  loadDurableState();
-  let list = activeState.items;
-  if (filterStatus && filterStatus !== "ALL") {
-    list = list.filter(i => i.status === filterStatus);
+export async function getQueueItems(limit: number = 50, filterStatus?: string): Promise<JobQueueItem[]> {
+  const db = getFirestoreAdminDb();
+  if (!db) return [];
+
+  try {
+    let query: any = db.collection(QUEUE_COLLECTION);
+    if (filterStatus && filterStatus !== "ALL") {
+      query = query.where("status", "==", filterStatus);
+    }
+    const snapshot = await query.orderBy("createdAt", "desc").limit(limit).get();
+    const items: JobQueueItem[] = [];
+    snapshot.forEach((doc: any) => items.push(doc.data() as JobQueueItem));
+    return items;
+  } catch (err: any) {
+    // If composite index is pending, fallback to un-ordered query
+    try {
+      const snapshot = await db.collection(QUEUE_COLLECTION).limit(limit).get();
+      const items: JobQueueItem[] = [];
+      snapshot.forEach((doc: any) => {
+        const item = doc.data() as JobQueueItem;
+        if (!filterStatus || filterStatus === "ALL" || item.status === filterStatus) {
+          items.push(item);
+        }
+      });
+      return items;
+    } catch (_) {
+      return [];
+    }
   }
-  return list.slice(0, limit);
 }
 
 /**
- * Adds a verified job into the persistent durable delivery queue.
- * Performs duplicate checking using SHA-256 idempotency key.
+ * Enqueues a verified job into Firestore.
+ * Performs duplicate checking using SHA-256 idempotency key collection.
  */
 export async function enqueueVerifiedJob(
   job: any,
@@ -252,56 +227,104 @@ export async function enqueueVerifiedJob(
   duplicateBlocked: boolean;
   item: JobQueueItem;
   immediateResult?: any;
+  error?: string;
 }> {
-  loadDurableState();
+  const configStatus = getFirebaseAdminConfigStatus();
+  if (!configStatus.isConfigured) {
+    return {
+      queued: false,
+      duplicateBlocked: false,
+      item: {
+        id: `unconfigured-${Date.now()}`,
+        jobId: job.id,
+        title: job.title,
+        organization: job.organization_name || "",
+        locationCategory: options?.locationCategory || "All India",
+        applyUrl: job.official_application_url || "",
+        status: "FAILED",
+        attempts: 0,
+        maxAttempts: 4,
+        nextRetryAt: null,
+        lastError: configStatus.error || "Firebase Admin credentials missing",
+        idempotencyKey: "",
+        telegramMessageId: null,
+        channel: options?.customChannel || TELEGRAM_PUBLIC_CHANNEL_ID,
+        jobData: job,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        completedAt: null
+      },
+      error: configStatus.error
+    };
+  }
+
+  const db = getFirestoreAdminDb();
+  if (!db) {
+    return {
+      queued: false,
+      duplicateBlocked: false,
+      item: {} as any,
+      error: "Firestore database connection could not be established."
+    };
+  }
+
   const idempotencyKey = calculateIdempotencyKey(job);
   const targetChannel = options?.customChannel || TELEGRAM_PUBLIC_CHANNEL_ID;
+  const nowIso = new Date().toISOString();
 
-  // 1. Idempotency Check: Reject if already SENT in durable store
-  if (activeState.sentIdempotencyKeys.includes(idempotencyKey)) {
-    const existing = activeState.items.find(i => i.idempotencyKey === idempotencyKey);
+  // 1. Idempotency Check in Firestore
+  const idempotencyRef = db.collection(IDEMPOTENCY_COLLECTION).doc(idempotencyKey);
+  const existingKeyDoc = await idempotencyRef.get();
+  if (existingKeyDoc.exists) {
+    const keyData = existingKeyDoc.data();
     return {
       queued: false,
       duplicateBlocked: true,
-      item: existing || {
-        id: `dup-${Date.now()}`,
-        jobId: job.id || "unknown",
+      item: {
+        id: `dup-${idempotencyKey}`,
+        jobId: job.id || "duplicate",
         title: job.title,
-        organization: job.organization_name || job.organization || "",
+        organization: job.organization_name || "",
         locationCategory: options?.locationCategory || "All India",
         applyUrl: job.official_application_url || "",
         status: "SENT",
         attempts: 1,
         maxAttempts: 4,
         nextRetryAt: null,
-        lastError: "Duplicate blocked: Job already sent to channel.",
+        lastError: "Duplicate blocked: Job notification already published to channel.",
         idempotencyKey,
-        telegramMessageId: null,
+        telegramMessageId: keyData?.telegramMessageId || null,
         channel: targetChannel,
         jobData: job,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        completedAt: new Date().toISOString()
+        createdAt: keyData?.deliveredAt || nowIso,
+        updatedAt: nowIso,
+        completedAt: keyData?.deliveredAt || nowIso
       }
     };
   }
 
-  // 2. Reject if already in active queue
-  const existingActive = activeState.items.find(
-    i => i.idempotencyKey === idempotencyKey &&
-         (i.status === "PENDING" || i.status === "RETRYING" || i.status === "RATE_LIMITED")
-  );
-  if (existingActive) {
-    return {
-      queued: false,
-      duplicateBlocked: true,
-      item: existingActive
-    };
+  // 2. Check if already active in queue collection
+  const existingItemQuery = await db
+    .collection(QUEUE_COLLECTION)
+    .where("idempotencyKey", "==", idempotencyKey)
+    .limit(1)
+    .get();
+
+  if (!existingItemQuery.empty) {
+    const activeItem = existingItemQuery.docs[0].data() as JobQueueItem;
+    if (activeItem.status === "PENDING" || activeItem.status === "RETRYING" || activeItem.status === "RATE_LIMITED") {
+      return {
+        queued: false,
+        duplicateBlocked: true,
+        item: activeItem
+      };
+    }
   }
 
-  // 3. Create fresh Queue Item
+  // 3. Create fresh Queue Item in Firestore
+  const docId = `q-${idempotencyKey.slice(0, 16)}`;
   const newItem: JobQueueItem = {
-    id: `q-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    id: docId,
     jobId: job.id || `gen-${Date.now()}`,
     title: job.title || "Job Notification",
     organization: job.organization_name || job.organization || "Official Authority",
@@ -316,18 +339,26 @@ export async function enqueueVerifiedJob(
     telegramMessageId: null,
     channel: targetChannel,
     jobData: job,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    createdAt: nowIso,
+    updatedAt: nowIso,
     completedAt: null,
     lockedBy: null,
     lockedAt: null,
-    lockExpiresAt: null
+    lockExpiresAt: null,
+    auditHistory: [
+      {
+        timestamp: nowIso,
+        fromStatus: "PENDING",
+        toStatus: "PENDING",
+        reason: "Job enqueued into Firestore durable queue",
+        workerId: "SYSTEM_INGEST"
+      }
+    ]
   };
 
-  activeState.items.unshift(newItem);
-  saveDurableState();
+  await db.collection(QUEUE_COLLECTION).doc(docId).set(newItem);
 
-  // If immediate dispatch is requested, attempt processing now
+  // If immediate dispatch is requested, process via transaction
   if (options?.forceImmediate) {
     const proc = await processQueueItem(newItem);
     return {
@@ -346,53 +377,166 @@ export async function enqueueVerifiedJob(
 }
 
 /**
- * Claims a job for exclusive atomic processing by a specific worker instance.
- * Returns null if the job is locked by another concurrent worker.
+ * Claims a job for exclusive atomic processing using a Firestore transaction.
+ * Shared across all Vercel function instances.
  */
-export function claimJobAtomically(item: JobQueueItem, workerId: string, lockDurationMs: number = 30000): boolean {
-  loadDurableState();
-  const current = activeState.items.find(i => i.id === item.id);
-  if (!current) return false;
+export async function claimJobInFirestoreTransaction(
+  db: any,
+  itemId: string,
+  workerId: string,
+  lockDurationMs: number = 30000
+): Promise<{ claimed: boolean; item?: JobQueueItem; error?: string }> {
+  const itemRef = db.collection(QUEUE_COLLECTION).doc(itemId);
 
-  const nowMs = Date.now();
-  if (current.lockedBy && current.lockExpiresAt) {
-    const expiresMs = new Date(current.lockExpiresAt).getTime();
-    if (expiresMs > nowMs && current.lockedBy !== workerId) {
-      return false; // Locked by another worker
+  return db.runTransaction(async (transaction: any) => {
+    const doc = await transaction.get(itemRef);
+    if (!doc.exists) {
+      return { claimed: false, error: "Queue item not found" };
     }
-  }
 
-  // Acquire lock
-  current.lockedBy = workerId;
-  current.lockedAt = new Date().toISOString();
-  current.lockExpiresAt = new Date(nowMs + lockDurationMs).toISOString();
-  saveDurableState();
+    const data = doc.data() as JobQueueItem;
+    const nowMs = Date.now();
 
-  item.lockedBy = current.lockedBy;
-  item.lockedAt = current.lockedAt;
-  item.lockExpiresAt = current.lockExpiresAt;
-  return true;
+    // Check if locked by another active worker
+    if (data.lockedBy && data.lockExpiresAt) {
+      const expiresMs = new Date(data.lockExpiresAt).getTime();
+      if (expiresMs > nowMs && data.lockedBy !== workerId) {
+        return { claimed: false, error: `Locked by worker ${data.lockedBy} until ${data.lockExpiresAt}` };
+      }
+    }
+
+    // Check terminal states
+    if (data.status === "SENT" || data.status === "FAILED" || data.status === "EXPIRED_IN_QUEUE") {
+      return { claimed: false, error: `Item already in terminal state: ${data.status}` };
+    }
+
+    const nowIso = new Date(nowMs).toISOString();
+    const lockExpiresAt = new Date(nowMs + lockDurationMs).toISOString();
+    const audit = [
+      ...(data.auditHistory || []),
+      {
+        timestamp: nowIso,
+        fromStatus: data.status,
+        toStatus: data.status,
+        reason: `Exclusively claimed by worker ${workerId}`,
+        workerId
+      }
+    ];
+
+    transaction.update(itemRef, {
+      lockedBy: workerId,
+      lockedAt: nowIso,
+      lockExpiresAt,
+      updatedAt: nowIso,
+      auditHistory: audit
+    });
+
+    return {
+      claimed: true,
+      item: {
+        ...data,
+        lockedBy: workerId,
+        lockedAt: nowIso,
+        lockExpiresAt
+      }
+    };
+  });
 }
 
 /**
- * Releases the atomic lock on a job after processing completes or fails.
+ * Finalizes state transitions in Firestore using a transaction.
  */
-export function releaseJobLock(item: JobQueueItem): void {
-  loadDurableState();
-  const current = activeState.items.find(i => i.id === item.id);
-  if (current) {
-    current.lockedBy = null;
-    current.lockedAt = null;
-    current.lockExpiresAt = null;
-    saveDurableState();
+export async function finalizeJobInFirestoreTransaction(
+  db: any,
+  itemId: string,
+  toStatus: DeliveryStatus,
+  workerId: string,
+  options: {
+    telegramMessageId?: number;
+    retryAfterSec?: number;
+    error?: string;
+    channelRateLimitUntilMs?: number;
+    incrementAttempts?: boolean;
   }
-  item.lockedBy = null;
-  item.lockedAt = null;
-  item.lockExpiresAt = null;
+): Promise<void> {
+  const itemRef = db.collection(QUEUE_COLLECTION).doc(itemId);
+  const configRef = db.collection(CONFIG_COLLECTION).doc("global");
+  const idempotencyRef = db.collection(IDEMPOTENCY_COLLECTION);
+
+  await db.runTransaction(async (transaction: any) => {
+    const doc = await transaction.get(itemRef);
+    if (!doc.exists) return;
+    const data = doc.data() as JobQueueItem;
+    const nowIso = new Date().toISOString();
+    const nowMs = Date.now();
+
+    const patch: any = {
+      status: toStatus,
+      lockedBy: null,
+      lockedAt: null,
+      lockExpiresAt: null,
+      updatedAt: nowIso
+    };
+
+    if (options.incrementAttempts) {
+      patch.attempts = (data.attempts || 0) + 1;
+    }
+
+    if (toStatus === "SENT") {
+      patch.completedAt = nowIso;
+      patch.telegramMessageId = options.telegramMessageId || null;
+      patch.lastError = null;
+      patch.nextRetryAt = null;
+
+      // Register idempotency key
+      transaction.set(idempotencyRef.doc(data.idempotencyKey), {
+        idempotencyKey: data.idempotencyKey,
+        jobId: data.jobId,
+        title: data.title,
+        telegramMessageId: options.telegramMessageId || null,
+        deliveredAt: nowIso
+      });
+
+      // Update global config stats
+      transaction.set(configRef, {
+        lastSuccessfulDeliveryTime: nowIso,
+        lastSuccessfulMsgId: options.telegramMessageId || null
+      }, { merge: true });
+    } else if (toStatus === "RATE_LIMITED") {
+      const retrySec = options.retryAfterSec || 30;
+      patch.nextRetryAt = new Date(nowMs + retrySec * 1000).toISOString();
+      patch.lastError = `Telegram HTTP 429: retry_after ${retrySec}s`;
+      if (options.channelRateLimitUntilMs) {
+        transaction.set(configRef, { channelRateLimitUntilMs: options.channelRateLimitUntilMs }, { merge: true });
+      }
+    } else if (toStatus === "RETRYING") {
+      const currentAttempts = (patch.attempts || data.attempts || 1);
+      const delayMs = Math.min(300000, 5000 * Math.pow(2, currentAttempts - 1));
+      patch.nextRetryAt = new Date(nowMs + delayMs).toISOString();
+      patch.lastError = options.error || "Temporary dispatch failure";
+    } else if (toStatus === "FAILED" || toStatus === "EXPIRED_IN_QUEUE") {
+      patch.completedAt = nowIso;
+      patch.lastError = options.error || `Terminal state: ${toStatus}`;
+      patch.nextRetryAt = null;
+    }
+
+    patch.auditHistory = [
+      ...(data.auditHistory || []),
+      {
+        timestamp: nowIso,
+        fromStatus: data.status,
+        toStatus,
+        reason: patch.lastError || `Status transitioned to ${toStatus}`,
+        workerId
+      }
+    ];
+
+    transaction.update(itemRef, patch);
+  });
 }
 
 /**
- * Processes a single queue item with strict pre-flight expiry check and error classification.
+ * Processes a single queue item via atomic Firestore transaction and Telegram dispatch.
  */
 export async function processQueueItem(
   item: JobQueueItem,
@@ -404,31 +548,41 @@ export async function processQueueItem(
   message: string;
   messageId?: number;
 }> {
-  // 1. Atomic Lock Claim: Prevents concurrent workers from double-processing
-  const acquired = claimJobAtomically(item, workerId);
-  if (!acquired) {
+  const db = getFirestoreAdminDb();
+  if (!db) {
     return {
       success: false,
-      status: item.status,
-      message: `Job is currently locked by another concurrent worker instance. Skipping duplicate dispatch.`
+      status: "FAILED",
+      message: "Firebase Admin Firestore is not configured in Vercel environment variables. Dispatch aborted."
     };
   }
 
+  // 1. ATOMIC TRANSACTION: Claim job lock in Firestore
+  const claimResult = await claimJobInFirestoreTransaction(db, item.id, workerId);
+  if (!claimResult.claimed) {
+    return {
+      success: false,
+      status: item.status,
+      message: `Atomic claim skipped: ${claimResult.error}`
+    };
+  }
+
+  const claimedItem = claimResult.item || item;
   const nowMs = Date.now();
-  item.updatedAt = new Date().toISOString();
 
   try {
-    // 2. CRITICAL PRE-FLIGHT EXPIRY RE-CHECK:
+    // 2. PRE-FLIGHT EXPIRY RE-CHECK:
     // If the job has expired while sitting in the queue, abort delivery immediately!
-    const expiryCheck = parseIndianDeadline(item.jobData.application_end_date);
+    const expiryCheck = parseIndianDeadline(claimedItem.jobData?.application_end_date);
     if (expiryCheck.valid && expiryCheck.isExpired) {
-      item.status = "EXPIRED_IN_QUEUE";
-      item.completedAt = new Date().toISOString();
-      item.lastError = `Pre-flight expiry block: Job application deadline passed on ${expiryCheck.istString} (Asia/Kolkata). Delivery aborted.`;
+      const errorMsg = `Pre-flight expiry block: Application deadline passed on ${expiryCheck.istString} (Asia/Kolkata). Delivery aborted.`;
+      await finalizeJobInFirestoreTransaction(db, claimedItem.id, "EXPIRED_IN_QUEUE", workerId, {
+        error: errorMsg
+      });
 
-      // Also update storage if job exists
+      // Update in-memory dbStore if job exists
       if ((dbStore as any).jobs) {
-        const dbJob = (dbStore as any).jobs.find((j: any) => j.id === item.jobId || j.title === item.title);
+        const dbJob = (dbStore as any).jobs.find((j: any) => j.id === claimedItem.jobId || j.title === claimedItem.title);
         if (dbJob) {
           dbJob.is_expired = true;
           dbJob.status = "EXPIRED";
@@ -436,63 +590,51 @@ export async function processQueueItem(
         }
       }
 
-      saveDurableState();
-      return {
-        success: false,
-        status: "EXPIRED_IN_QUEUE",
-        message: item.lastError
-      };
+      return { success: false, status: "EXPIRED_IN_QUEUE", message: errorMsg };
     }
 
     // 3. Channel Rate-Limit Check
-    if (nowMs < activeState.channelRateLimitUntilMs) {
-      const waitSec = Math.ceil((activeState.channelRateLimitUntilMs - nowMs) / 1000);
-      item.status = "RATE_LIMITED";
-      item.nextRetryAt = new Date(activeState.channelRateLimitUntilMs).toISOString();
-      item.lastError = `Telegram channel rate-limited. Global cool-down active for ${waitSec}s.`;
-      saveDurableState();
-      return {
-        success: false,
-        status: "RATE_LIMITED",
-        message: item.lastError
-      };
-    }
+    const configDoc = await db.collection(CONFIG_COLLECTION).doc("global").get();
+    const configData = configDoc.exists ? configDoc.data() : {};
+    const channelThrottledUntil = Number(configData?.channelRateLimitUntilMs) || 0;
 
-    item.attempts++;
+    if (nowMs < channelThrottledUntil) {
+      const waitSec = Math.ceil((channelThrottledUntil - nowMs) / 1000);
+      const errorMsg = `Telegram channel rate-limited. Global cool-down active for ${waitSec}s.`;
+      await finalizeJobInFirestoreTransaction(db, claimedItem.id, "RATE_LIMITED", workerId, {
+        retryAfterSec: waitSec,
+        error: errorMsg
+      });
+      return { success: false, status: "RATE_LIMITED", message: errorMsg };
+    }
 
     // 4. Dispatch to Telegram (Real API or injected test harness dispatcher)
     let result: { ok: boolean; status?: number; data?: any; error?: string };
     if (mockDispatcher) {
-      result = await mockDispatcher(item);
+      result = await mockDispatcher(claimedItem);
     } else {
-      result = await dispatchJobToTelegramChannel(item);
+      result = await dispatchJobToTelegramChannel(claimedItem);
     }
 
     // A. SUCCESSFUL DISPATCH
     if (result.ok) {
       const msgId = result.data?.result?.message_id || Date.now();
-      item.status = "SENT";
-      item.telegramMessageId = msgId;
-      item.completedAt = new Date().toISOString();
-      item.lastError = null;
-      item.nextRetryAt = null;
-
-      if (!activeState.sentIdempotencyKeys.includes(item.idempotencyKey)) {
-        activeState.sentIdempotencyKeys.push(item.idempotencyKey);
-      }
-      activeState.lastSuccessfulDeliveryTime = item.completedAt;
-      activeState.lastSuccessfulMsgId = msgId;
+      await finalizeJobInFirestoreTransaction(db, claimedItem.id, "SENT", workerId, {
+        telegramMessageId: msgId,
+        incrementAttempts: true
+      });
 
       // Update parent job model
-      item.jobData.telegram_posted = true;
-      item.jobData.telegram_posted_at = item.completedAt;
-      item.jobData.telegram_message_id = msgId;
+      if (claimedItem.jobData) {
+        claimedItem.jobData.telegram_posted = true;
+        claimedItem.jobData.telegram_posted_at = new Date().toISOString();
+        claimedItem.jobData.telegram_message_id = msgId;
+      }
 
-      saveDurableState();
       return {
         success: true,
         status: "SENT",
-        message: `Successfully published to ${item.channel} (Message ID: ${msgId}).`,
+        message: `Successfully published to ${claimedItem.channel} (Message ID: ${msgId}).`,
         messageId: msgId
       };
     }
@@ -502,87 +644,63 @@ export async function processQueueItem(
     if (errCode === 429) {
       const retryAfter = result.data?.parameters?.retry_after || 30;
       const retryMs = retryAfter * 1000;
-      activeState.channelRateLimitUntilMs = nowMs + retryMs;
+      await finalizeJobInFirestoreTransaction(db, claimedItem.id, "RATE_LIMITED", workerId, {
+        retryAfterSec: retryAfter,
+        channelRateLimitUntilMs: nowMs + retryMs,
+        incrementAttempts: true
+      });
 
-      item.status = "RATE_LIMITED";
-      item.nextRetryAt = new Date(nowMs + retryMs).toISOString();
-      item.lastError = `Telegram API rate limit (HTTP 429). Retry after ${retryAfter}s.`;
-
-      saveDurableState();
       return {
         success: false,
         status: "RATE_LIMITED",
-        message: item.lastError
+        message: `Telegram API rate limit (HTTP 429). Retry after ${retryAfter}s.`
       };
     }
 
     // C. PERMANENT PERMISSION ERROR (HTTP 403)
     if (errCode === 403) {
-      item.status = "FAILED";
-      item.completedAt = new Date().toISOString();
-      item.nextRetryAt = null;
-      item.lastError = "Permanent configuration error (HTTP 403): Bot lacks rights to post in channel.";
+      await finalizeJobInFirestoreTransaction(db, claimedItem.id, "FAILED", workerId, {
+        error: "Permanent configuration error (HTTP 403): Bot lacks rights to post in channel.",
+        incrementAttempts: true
+      });
 
-      saveDurableState();
       return {
         success: false,
         status: "FAILED",
-        message: item.lastError
+        message: "Permanent configuration error (HTTP 403): Bot lacks rights to post in channel."
       };
     }
 
-    // D. TEMPORARY SERVER ERROR (HTTP 500 / 502 / 503) OR NETWORK ERROR
-    const isServerError = errCode >= 500 && errCode < 600;
-    const isExceeded = item.attempts >= item.maxAttempts;
-
-    if (isExceeded) {
-      item.status = "FAILED";
-      item.completedAt = new Date().toISOString();
-      item.nextRetryAt = null;
-      item.lastError = `Exceeded maximum retry attempts (${item.attempts}/${item.maxAttempts}). Last error: ${result.error || result.data?.description || "Unknown error"}`;
-
-      saveDurableState();
+    // D. TEMPORARY ERROR (HTTP 500 OR NETWORK)
+    const currentAttempts = (claimedItem.attempts || 0) + 1;
+    if (currentAttempts >= claimedItem.maxAttempts) {
+      await finalizeJobInFirestoreTransaction(db, claimedItem.id, "FAILED", workerId, {
+        error: `Exceeded maximum retry attempts (${currentAttempts}/${claimedItem.maxAttempts}).`,
+        incrementAttempts: true
+      });
       return {
         success: false,
         status: "FAILED",
-        message: item.lastError
+        message: `Exceeded maximum retry attempts (${currentAttempts}/${claimedItem.maxAttempts}).`
       };
     }
 
-    // Exponential Backoff with Jitter: 5s, 15s, 45s (bounded to max 300s)
-    const baseDelaySec = 5;
-    const expDelaySec = Math.min(300, baseDelaySec * Math.pow(3, item.attempts - 1));
-    const jitter = Math.floor(Math.random() * 3);
-    const totalBackoffMs = (expDelaySec + jitter) * 1000;
+    await finalizeJobInFirestoreTransaction(db, claimedItem.id, "RETRYING", workerId, {
+      error: result.error || result.data?.description || `Temporary HTTP ${errCode} error`,
+      incrementAttempts: true
+    });
 
-    item.status = "RETRYING";
-    item.nextRetryAt = new Date(nowMs + totalBackoffMs).toISOString();
-    item.lastError = `${isServerError ? `Telegram server error (HTTP ${errCode})` : "Temporary connection error"}: ${result.error || result.data?.description || "Failed"}. Scheduled retry in ${expDelaySec + jitter}s.`;
-
-    saveDurableState();
     return {
       success: false,
       status: "RETRYING",
-      message: item.lastError
+      message: `Temporary dispatch failure: ${result.error || result.data?.description}. Scheduled retry.`
     };
-  } catch (netErr: any) {
-    if (item.attempts >= item.maxAttempts) {
-      item.status = "FAILED";
-      item.completedAt = new Date().toISOString();
-      item.nextRetryAt = null;
-      item.lastError = `Network failure: Exceeded max attempts (${item.attempts}/${item.maxAttempts}). Error: ${netErr.message}`;
-      saveDurableState();
-      return { success: false, status: "FAILED", message: item.lastError };
-    }
-
-    const backoffMs = 5000 * Math.pow(2, item.attempts - 1);
-    item.status = "RETRYING";
-    item.nextRetryAt = new Date(nowMs + backoffMs).toISOString();
-    item.lastError = `Network connection failure: ${netErr.message}. Retrying in ${backoffMs / 1000}s.`;
-    saveDurableState();
-    return { success: false, status: "RETRYING", message: item.lastError };
-  } finally {
-    releaseJobLock(item);
+  } catch (err: any) {
+    await finalizeJobInFirestoreTransaction(db, claimedItem.id, "RETRYING", workerId, {
+      error: `Network failure: ${err.message}`,
+      incrementAttempts: true
+    });
+    return { success: false, status: "RETRYING", message: err.message };
   }
 }
 
@@ -659,7 +777,7 @@ function formatJobPostHtml(job: any, locationCategory: string = "All India"): st
 }
 
 /**
- * Processes all eligible items in the queue (PENDING, or RETRYING/RATE_LIMITED whose nextRetryAt has arrived).
+ * Processes all eligible items in Firestore (PENDING, or RETRYING/RATE_LIMITED whose nextRetryAt has arrived).
  */
 export async function processEligibleQueue(options?: {
   forceAll?: boolean;
@@ -672,8 +790,21 @@ export async function processEligibleQueue(options?: {
   rateLimited: number;
   failed: number;
   expiredInQueue: number;
+  error?: string;
 }> {
-  loadDurableState();
+  const db = getFirestoreAdminDb();
+  if (!db) {
+    return {
+      processed: 0,
+      sent: 0,
+      retrying: 0,
+      rateLimited: 0,
+      failed: 0,
+      expiredInQueue: 0,
+      error: "Firebase Admin Firestore credentials not configured."
+    };
+  }
+
   const nowMs = Date.now();
   let processed = 0;
   let sent = 0;
@@ -683,34 +814,48 @@ export async function processEligibleQueue(options?: {
   let expiredInQueue = 0;
   const worker = options?.workerId || `worker-${Date.now()}`;
 
-  for (const item of activeState.items) {
-    if (item.status === "SENT" || item.status === "FAILED" || item.status === "EXPIRED_IN_QUEUE") {
-      continue;
+  try {
+    const snapshot = await db.collection(QUEUE_COLLECTION).get();
+    for (const doc of snapshot.docs) {
+      const item = doc.data() as JobQueueItem;
+      if (item.status === "SENT" || item.status === "FAILED" || item.status === "EXPIRED_IN_QUEUE") {
+        continue;
+      }
+
+      const isPending = item.status === "PENDING";
+      const retryDue = item.nextRetryAt && new Date(item.nextRetryAt).getTime() <= nowMs;
+      const eligible = isPending || retryDue || options?.forceAll;
+
+      if (eligible) {
+        processed++;
+        const res = await processQueueItem(item, options?.mockDispatcher, worker);
+        if (res.status === "SENT") sent++;
+        else if (res.status === "RETRYING") retrying++;
+        else if (res.status === "RATE_LIMITED") rateLimited++;
+        else if (res.status === "FAILED") failed++;
+        else if (res.status === "EXPIRED_IN_QUEUE") expiredInQueue++;
+      }
     }
 
-    const isPending = item.status === "PENDING";
-    const retryDue = item.nextRetryAt && new Date(item.nextRetryAt).getTime() <= nowMs;
-    const eligible = isPending || retryDue || options?.forceAll;
-
-    if (eligible) {
-      processed++;
-      const res = await processQueueItem(item, options?.mockDispatcher, worker);
-      if (res.status === "SENT") sent++;
-      else if (res.status === "RETRYING") retrying++;
-      else if (res.status === "RATE_LIMITED") rateLimited++;
-      else if (res.status === "FAILED") failed++;
-      else if (res.status === "EXPIRED_IN_QUEUE") expiredInQueue++;
-    }
+    return {
+      processed,
+      sent,
+      retrying,
+      rateLimited,
+      failed,
+      expiredInQueue
+    };
+  } catch (err: any) {
+    return {
+      processed,
+      sent,
+      retrying,
+      rateLimited,
+      failed,
+      expiredInQueue,
+      error: err.message
+    };
   }
-
-  return {
-    processed,
-    sent,
-    retrying,
-    rateLimited,
-    failed,
-    expiredInQueue
-  };
 }
 
 /**
@@ -721,34 +866,92 @@ export async function retryPendingNow(): Promise<{
   processedCount: number;
   message: string;
 }> {
-  activeState.channelRateLimitUntilMs = 0;
-  saveDurableState();
+  const db = getFirestoreAdminDb();
+  if (!db) {
+    return {
+      success: false,
+      processedCount: 0,
+      message: "Cannot retry: Firebase Admin Firestore is not configured in Vercel environment variables."
+    };
+  }
+
+  // Clear global rate limit cool-down
+  await db.collection(CONFIG_COLLECTION).doc("global").set({ channelRateLimitUntilMs: 0 }, { merge: true });
 
   const result = await processEligibleQueue({ forceAll: true });
   return {
     success: true,
     processedCount: result.processed,
-    message: `Queue processed: ${result.sent} sent, ${result.retrying} retrying, ${result.rateLimited} rate-limited, ${result.expiredInQueue} blocked as expired, ${result.failed} failed.`
+    message: `Firestore Queue Processed: ${result.sent} sent, ${result.retrying} retrying, ${result.rateLimited} rate-limited, ${result.expiredInQueue} blocked as expired, ${result.failed} failed.`
   };
 }
 
 /**
- * Resets the durable queue state (used for testing).
+ * Migrates existing 4 real pending jobs safely into Firestore.
+ * Preserves original data, verification evidence, status, and avoids auto-broadcast.
  */
-export function resetQueueForTesting() {
-  activeState = {
-    version: 1,
-    updatedAt: new Date().toISOString(),
-    channelRateLimitUntilMs: 0,
-    lastSuccessfulDeliveryTime: null,
-    lastSuccessfulMsgId: null,
-    sentIdempotencyKeys: [],
-    items: []
-  };
-  const filePath = getStorageFilePath();
-  try {
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
+export async function migrateJobsToFirestore(
+  jobsToMigrate: any[]
+): Promise<{ migratedCount: number; skippedDuplicates: number; errors: string[] }> {
+  const db = getFirestoreAdminDb();
+  if (!db) return { migratedCount: 0, skippedDuplicates: 0, errors: ["Firestore not configured"] };
+
+  let migratedCount = 0;
+  let skippedDuplicates = 0;
+  const errors: string[] = [];
+
+  for (const job of jobsToMigrate) {
+    try {
+      const key = calculateIdempotencyKey(job);
+      const docId = `q-${key.slice(0, 16)}`;
+      const docRef = db.collection(QUEUE_COLLECTION).doc(docId);
+      const existing = await docRef.get();
+
+      if (existing.exists) {
+        skippedDuplicates++;
+        continue;
+      }
+
+      const item: JobQueueItem = {
+        id: docId,
+        jobId: job.id,
+        title: job.title,
+        organization: job.organization_name || job.organization || "Official Authority",
+        locationCategory: job.location?.toLowerCase().includes("chennai")
+          ? "Chennai"
+          : job.location?.toLowerCase().includes("remote")
+          ? "Remote"
+          : "All India",
+        applyUrl: job.official_application_url || "",
+        status: "PENDING",
+        attempts: 0,
+        maxAttempts: 4,
+        nextRetryAt: null,
+        lastError: null,
+        idempotencyKey: key,
+        telegramMessageId: null,
+        channel: TELEGRAM_PUBLIC_CHANNEL_ID,
+        jobData: job,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        completedAt: null,
+        auditHistory: [
+          {
+            timestamp: new Date().toISOString(),
+            fromStatus: "PENDING",
+            toStatus: "PENDING",
+            reason: "Initial migration into Cloud Firestore production queue",
+            workerId: "MIGRATION_SCRIPT"
+          }
+        ]
+      };
+
+      await docRef.set(item);
+      migratedCount++;
+    } catch (e: any) {
+      errors.push(e.message);
     }
-  } catch (_) {}
+  }
+
+  return { migratedCount, skippedDuplicates, errors };
 }

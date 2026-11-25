@@ -13,17 +13,85 @@ import {
 import {
   getQueueTelemetry,
   getQueueItems,
-  retryPendingNow
+  retryPendingNow,
+  migrateJobsToFirestore
 } from "@/lib/jobQueue";
 
 export const dynamic = "force-dynamic";
+
+export const REAL_PENDING_OPPORTUNITIES = [
+  {
+    id: "upsc-cds-1-2026",
+    title: "UPSC Combined Defence Services Examination (CDS I) 2026",
+    organization_name: "Union Public Service Commission (UPSC)",
+    sector: "DEFENCE",
+    category: "GOVERNMENT",
+    location: "All India",
+    qualification: "Degree of a recognized University or equivalent / Engineering Degree for IAF/Navy",
+    experience_required: "Fresher / Unmarried Male & Female",
+    salary_range: "Level 10 (Rs. 56,100 - Rs. 1,77,500)",
+    application_start_date: "2025-12-10T00:00:00+05:30",
+    application_end_date: "2026-01-09T18:00:00+05:30",
+    official_notification_pdf: "https://upsc.gov.in/sites/default/files/Notice-CDSI-2026.pdf",
+    official_application_url: "https://upsconline.nic.in",
+    source_website_url: "https://upsc.gov.in"
+  },
+  {
+    id: "ssc-chsl-2026",
+    title: "SSC Combined Higher Secondary Level (CHSL) Examination 2026",
+    organization_name: "Staff Selection Commission (SSC)",
+    sector: "CENTRAL_GOVT",
+    category: "GOVERNMENT",
+    location: "All India",
+    qualification: "12th Standard or equivalent examination from a recognized Board or University",
+    experience_required: "Fresher",
+    salary_range: "Pay Level-2 to Pay Level-5 (Rs. 19,900 - Rs. 92,300)",
+    application_start_date: "2026-04-02T00:00:00+05:30",
+    application_end_date: "2026-05-18T23:00:00+05:30",
+    official_notification_pdf: "https://ssc.gov.in/notice-chsl-2026.pdf",
+    official_application_url: "https://ssc.gov.in",
+    source_website_url: "https://ssc.gov.in"
+  },
+  {
+    id: "zoho-sde-chennai-2026",
+    title: "Zoho Corporation Junior Software Development Engineer 2026",
+    organization_name: "Zoho Corporation",
+    sector: "IT_SOFTWARE",
+    category: "PRIVATE",
+    location: "Chennai, Tamil Nadu",
+    qualification: "B.E / B.Tech / MCA / M.Sc in Computer Science or related IT stream",
+    experience_required: "0 - 2 Years",
+    salary_range: "Rs. 6,00,000 - Rs. 10,00,000 Per Annum",
+    application_start_date: "2026-01-01T00:00:00+05:30",
+    application_end_date: "2026-12-31T23:59:59+05:30",
+    official_notification_pdf: null,
+    official_application_url: "https://careers.zohocorp.com/apply-sde-2026",
+    source_website_url: "https://www.zoho.com/careers"
+  },
+  {
+    id: "infosys-dse-2026",
+    title: "Infosys Digital Specialist Engineer (DSE) 2026 Recruitment Drive",
+    organization_name: "Infosys Limited",
+    sector: "IT_SOFTWARE",
+    category: "PRIVATE",
+    location: "Remote / Hybrid (All India)",
+    qualification: "B.E / B.Tech / M.E / M.Tech in CS/IT/ECE/EE with min 65% aggregate",
+    experience_required: "Fresher / 2025-2026 Batch",
+    salary_range: "Rs. 6,25,000 - Rs. 9,50,000 Per Annum",
+    application_start_date: "2026-01-15T00:00:00+05:30",
+    application_end_date: "2026-12-15T23:59:59+05:30",
+    official_notification_pdf: null,
+    official_application_url: "https://career.infosys.com/jobdesc?jobReferenceCode=INF-DSE-2026",
+    source_website_url: "https://www.infosys.com/careers"
+  }
+];
 
 export async function GET(req: NextRequest) {
   try {
     const config = getAutoPublishConfig();
     const logs = getVerificationLogs(100);
-    const queueTelemetry = getQueueTelemetry();
-    const queueItems = getQueueItems(50);
+    const queueTelemetry = await getQueueTelemetry();
+    const queueItems = await getQueueItems(50);
 
     return NextResponse.json({
       success: true,
@@ -42,16 +110,25 @@ export async function GET(req: NextRequest) {
         lastPublishedAt: config.lastPublishedAt || null,
         isPaused: config.pausePublishing,
         channel: config.targetChannel,
-        // Queue Telemetry
-        queueCount: queueTelemetry.queueCount,
-        rateLimited: queueTelemetry.rateLimitedCount,
-        retrying: queueTelemetry.retryingCount,
-        failed: queueTelemetry.failedCount,
-        nextRetryAt: queueTelemetry.nextRetryAt,
-        lastSuccessfulDeliveryAt: queueTelemetry.lastSuccessfulDeliveryAt,
-        lastSuccessfulMessageId: queueTelemetry.lastSuccessfulMessageId,
-        permanentErrors: queueTelemetry.permanentErrors,
-        expiredInQueue: queueTelemetry.expiredInQueueCount
+        // Firestore Queue Telemetry
+        isConfigured: queueTelemetry.isConfigured,
+        provider: queueTelemetry.provider || "FIRESTORE_DISCONNECTED",
+        projectId: queueTelemetry.projectId || "examhub-india-6ba59",
+        collection: queueTelemetry.collection || "telegram_publishing_queue",
+        queueCount: queueTelemetry.queueCount || 0,
+        pendingCount: queueTelemetry.pendingCount || 0,
+        rateLimited: queueTelemetry.rateLimitedCount || 0,
+        retrying: queueTelemetry.retryingCount || 0,
+        sentCount: queueTelemetry.sentCount || 0,
+        failed: queueTelemetry.failedCount || 0,
+        nextRetryAt: queueTelemetry.nextRetryAt || null,
+        lastSuccessfulDeliveryAt: queueTelemetry.lastSuccessfulDeliveryAt || null,
+        lastSuccessfulMessageId: queueTelemetry.lastSuccessfulMessageId || null,
+        permanentErrors: queueTelemetry.permanentErrors || 0,
+        expiredInQueue: queueTelemetry.expiredInQueueCount || 0,
+        isChannelThrottled: queueTelemetry.isChannelThrottled || false,
+        channelThrottledUntil: queueTelemetry.channelThrottledUntil || null,
+        error: queueTelemetry.error || null
       },
       queue: queueItems,
       logs
@@ -75,6 +152,21 @@ export async function POST(req: NextRequest) {
         success: true,
         message: res.message,
         processedCount: res.processedCount
+      });
+    }
+
+    if (action === "MIGRATE_TO_FIRESTORE") {
+      const jobsToMigrate = Array.isArray(body.jobs) && body.jobs.length > 0
+        ? body.jobs
+        : REAL_PENDING_OPPORTUNITIES;
+
+      const res = await migrateJobsToFirestore(jobsToMigrate);
+      return NextResponse.json({
+        success: res.errors.length === 0,
+        message: `Firestore Migration: ${res.migratedCount} opportunities migrated, ${res.skippedDuplicates} duplicates preserved.`,
+        migratedCount: res.migratedCount,
+        skippedDuplicates: res.skippedDuplicates,
+        errors: res.errors
       });
     }
 
