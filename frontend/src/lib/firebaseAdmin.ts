@@ -40,6 +40,18 @@ export function cleanPrivateKey(raw: string | undefined): string {
     } catch (_) {}
   }
 
+  // 1. Try direct clean first (unescape newlines and carriage returns)
+  let directClean = key.replace(/\\n/g, "\n").replace(/\r/g, "").trim();
+  directClean = directClean.replace(/^["'\s\\]+/, "").replace(/["'\s\\,]+$/, "");
+  try {
+    crypto.createPrivateKey(directClean);
+    return directClean;
+  } catch (_) {}
+
+  // 2. Determine original header type (PKCS#1 vs PKCS#8)
+  const isPkcs1 = key.includes("RSA PRIVATE KEY");
+  const headerType = isPkcs1 ? "RSA PRIVATE KEY" : "PRIVATE KEY";
+
   // Strip headers and footers, and extract pure base64 characters only
   const base64Body = key
     .replace(/-----BEGIN [A-Z ]+-----/gi, "")
@@ -48,7 +60,24 @@ export function cleanPrivateKey(raw: string | undefined): string {
 
   if (base64Body.length > 100) {
     const chunks = base64Body.match(/.{1,64}/g) || [];
-    return `-----BEGIN PRIVATE KEY-----\n${chunks.join("\n")}\n-----END PRIVATE KEY-----\n`;
+    const formatted = chunks.join("\n");
+
+    // Candidate A: with detected header type
+    const candidateA = `-----BEGIN ${headerType}-----\n${formatted}\n-----END ${headerType}-----\n`;
+    try {
+      crypto.createPrivateKey(candidateA);
+      return candidateA;
+    } catch (_) {}
+
+    // Candidate B: with alternate header type
+    const altHeader = isPkcs1 ? "PRIVATE KEY" : "RSA PRIVATE KEY";
+    const candidateB = `-----BEGIN ${altHeader}-----\n${formatted}\n-----END ${altHeader}-----\n`;
+    try {
+      crypto.createPrivateKey(candidateB);
+      return candidateB;
+    } catch (_) {}
+
+    return candidateA;
   }
 
   return key;
