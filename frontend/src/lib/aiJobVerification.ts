@@ -521,7 +521,7 @@ export async function verifyJobOpportunity(job: any): Promise<JobVerificationRes
     score -= 30;
   } else {
     // Check if organization has recognized government or corporate presence
-    const knownGovDomains = [".gov.in", ".nic.in", ".ac.in", ".edu.in", ".org.in", ".res.in"];
+    const knownGovDomains = [".gov.in", ".nic.in", ".ac.in", ".edu.in", ".org.in", ".res.in", "tnpscexams.in"];
     const knownCorporateDomains = ["tcs.com", "infosys.com", "zoho.com", "wipro.com", "freshworks.com", "cognizant.com", "swiggy.com", "accenture.com", "hcltech.com"];
     
     const urlToCheck = applyUrl.toLowerCase();
