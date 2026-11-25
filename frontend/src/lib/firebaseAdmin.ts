@@ -23,10 +23,9 @@ let initError: string | null = null;
 function cleanEnvString(val: string | undefined): string {
   if (!val) return "";
   let cleaned = val.trim();
-  if ((cleaned.startsWith('"') && cleaned.endsWith('"')) || (cleaned.startsWith("'") && cleaned.endsWith("'"))) {
-    cleaned = cleaned.slice(1, -1).trim();
-  }
-  return cleaned;
+  cleaned = cleaned.replace(/^["'\s\\]+/, "");
+  cleaned = cleaned.replace(/["'\s\\,]+$/, "");
+  return cleaned.trim();
 }
 
 export function cleanPrivateKey(raw: string | undefined): string {
@@ -34,40 +33,22 @@ export function cleanPrivateKey(raw: string | undefined): string {
   let key = raw.trim();
 
   // If user pasted entire service account JSON into FIREBASE_PRIVATE_KEY
-  if (key.startsWith("{") && key.endsWith("}")) {
+  if (key.startsWith("{") && key.includes("private_key")) {
     try {
       const parsed = JSON.parse(key);
       if (parsed.private_key) key = parsed.private_key;
     } catch (_) {}
   }
 
-  // Strip wrapping quotes and backslashes
-  key = key.replace(/^["'\\s]+|["'\\s]+$/g, "");
-
-  // If base64-encoded PEM
-  if (!key.includes("BEGIN") && key.length > 200) {
-    try {
-      const decoded = Buffer.from(key, "base64").toString("utf8");
-      if (decoded.includes("BEGIN")) {
-        key = decoded;
-      }
-    } catch (_) {}
-  }
-
-  // Unescape literal backslash-n
-  while (key.includes("\\n")) {
-    key = key.replace(/\\n/g, "\n");
-  }
-
-  // Extract pure base64 payload to rebuild canonical 64-character PEM format
+  // Strip headers and footers, and extract pure base64 characters only
   const base64Body = key
-    .replace(/-----BEGIN [A-Z ]+-----/g, "")
-    .replace(/-----END [A-Z ]+-----/g, "")
-    .replace(/[\s\r\n]+/g, "");
+    .replace(/-----BEGIN [A-Z ]+-----/gi, "")
+    .replace(/-----END [A-Z ]+-----/gi, "")
+    .replace(/[^A-Za-z0-9+/=]/g, "");
 
-  if (base64Body.length > 50) {
+  if (base64Body.length > 100) {
     const chunks = base64Body.match(/.{1,64}/g) || [];
-    return "-----BEGIN PRIVATE KEY-----\n" + chunks.join("\n") + "\n-----END PRIVATE KEY-----\n";
+    return `-----BEGIN PRIVATE KEY-----\n${chunks.join("\n")}\n-----END PRIVATE KEY-----\n`;
   }
 
   return key;
