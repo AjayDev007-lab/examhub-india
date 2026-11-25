@@ -1,8 +1,12 @@
 // ============================================================================
-// EXAMHUB INDIA — TELEGRAM JOB DELIVERY QUEUE & RELIABILITY ENGINE
+// EXAMHUB INDIA — DURABLE TELEGRAM JOB PUBLISHING QUEUE & RELIABILITY ENGINE
 // Ensures 100% reliable, rate-limit resilient, idempotent job publishing
+// Backed by atomic file-based durable persistence surviving cold starts
 // ============================================================================
 
+import fs from "fs";
+import path from "path";
+import os from "os";
 import crypto from "crypto";
 import { parseIndianDeadline } from "./aiJobVerification";
 import {
@@ -38,18 +42,126 @@ export interface JobQueueItem {
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
+  lockedBy?: string | null;
+  lockedAt?: string | null;
+  lockExpiresAt?: string | null;
 }
 
-// Global in-memory persistent delivery queue
-const deliveryQueue: JobQueueItem[] = [];
+export interface DurableQueueState {
+  version: number;
+  updatedAt: string;
+  channelRateLimitUntilMs: number;
+  lastSuccessfulDeliveryTime: string | null;
+  lastSuccessfulMsgId: number | null;
+  sentIdempotencyKeys: string[];
+  items: JobQueueItem[];
+}
 
-// Track sent idempotency keys
-const sentIdempotencyKeys = new Set<string>();
+/**
+ * Returns the durable filesystem path for the queue storage.
+ * In serverless environments (Vercel/Lambda), falls back to OS temp dir.
+ */
+export function getStorageFilePath(): string {
+  if (process.env.QUEUE_STORAGE_PATH) {
+    return process.env.QUEUE_STORAGE_PATH;
+  }
+  const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+  if (isServerless) {
+    return path.join(os.tmpdir(), "examhub_publishing_queue.json");
+  }
+  // Local project directory
+  const localDataDir = path.join(process.cwd(), "data");
+  if (!fs.existsSync(localDataDir)) {
+    try {
+      fs.mkdirSync(localDataDir, { recursive: true });
+    } catch (_) {}
+  }
+  return path.join(localDataDir, "publishing_queue.json");
+}
 
-// Global channel rate-limit backoff timestamp (ms)
-let channelRateLimitUntilMs = 0;
-let lastSuccessfulDeliveryTime: string | null = null;
-let lastSuccessfulMsgId: number | null = null;
+// In-memory working cache (synced to durable disk on every mutation)
+let activeState: DurableQueueState = {
+  version: 1,
+  updatedAt: new Date().toISOString(),
+  channelRateLimitUntilMs: 0,
+  lastSuccessfulDeliveryTime: null,
+  lastSuccessfulMsgId: null,
+  sentIdempotencyKeys: [],
+  items: []
+};
+
+// Initial load on module initialization
+loadDurableState();
+
+/**
+ * Atomically writes the queue state to durable disk using temp-file rename.
+ */
+export function saveDurableState(): void {
+  activeState.updatedAt = new Date().toISOString();
+  const filePath = getStorageFilePath();
+  const tmpPath = `${filePath}.tmp.${Date.now()}.${Math.random().toString(36).slice(2, 6)}`;
+
+  try {
+    const json = JSON.stringify(activeState, null, 2);
+    const parentDir = path.dirname(filePath);
+    if (!fs.existsSync(parentDir)) {
+      fs.mkdirSync(parentDir, { recursive: true });
+    }
+    fs.writeFileSync(tmpPath, json, "utf8");
+    fs.renameSync(tmpPath, filePath);
+  } catch (err: any) {
+    // If atomic rename fails (e.g. cross-device link), fallback to direct write
+    try {
+      fs.writeFileSync(filePath, JSON.stringify(activeState, null, 2), "utf8");
+    } catch (_) {}
+  }
+}
+
+/**
+ * Loads the queue state from durable storage and releases expired locks.
+ */
+export function loadDurableState(): DurableQueueState {
+  const filePath = getStorageFilePath();
+  const nowMs = Date.now();
+
+  try {
+    if (fs.existsSync(filePath)) {
+      const content = fs.readFileSync(filePath, "utf8");
+      const parsed = JSON.parse(content);
+      if (parsed && Array.isArray(parsed.items)) {
+        activeState = {
+          version: parsed.version || 1,
+          updatedAt: parsed.updatedAt || new Date().toISOString(),
+          channelRateLimitUntilMs: Number(parsed.channelRateLimitUntilMs) || 0,
+          lastSuccessfulDeliveryTime: parsed.lastSuccessfulDeliveryTime || null,
+          lastSuccessfulMsgId: parsed.lastSuccessfulMsgId || null,
+          sentIdempotencyKeys: Array.isArray(parsed.sentIdempotencyKeys) ? parsed.sentIdempotencyKeys : [],
+          items: parsed.items
+        };
+
+        // Automatic lock recovery: Unlock any orphaned items held by dead workers
+        for (const item of activeState.items) {
+          if (item.lockedBy) {
+            const exp = item.lockExpiresAt ? new Date(item.lockExpiresAt).getTime() : 0;
+            if (exp <= nowMs) {
+              item.lockedBy = null;
+              item.lockedAt = null;
+              item.lockExpiresAt = null;
+              if (item.status === "PENDING" || item.status === "RETRYING") {
+                item.status = "RETRYING";
+              }
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    // On corrupt file, keep active in-memory state and re-save
+    saveDurableState();
+  }
+
+  return activeState;
+}
 
 /**
  * Derives a SHA-256 idempotency key preventing duplicate queueing and double-broadcasts.
@@ -65,6 +177,7 @@ export function calculateIdempotencyKey(job: any): string {
  * Returns queue telemetry metrics for Admin Cockpit.
  */
 export function getQueueTelemetry() {
+  loadDurableState();
   const nowMs = Date.now();
   let pendingCount = 0;
   let retryingCount = 0;
@@ -74,7 +187,7 @@ export function getQueueTelemetry() {
   let expiredInQueueCount = 0;
   let earliestNextRetry: number | null = null;
 
-  for (const item of deliveryQueue) {
+  for (const item of activeState.items) {
     if (item.status === "PENDING") pendingCount++;
     else if (item.status === "RETRYING") {
       retryingCount++;
@@ -103,11 +216,11 @@ export function getQueueTelemetry() {
     expiredInQueueCount,
     permanentErrors: failedCount,
     nextRetryAt: earliestNextRetry ? new Date(earliestNextRetry).toISOString() : null,
-    lastSuccessfulDeliveryAt: lastSuccessfulDeliveryTime,
-    lastSuccessfulMessageId: lastSuccessfulMsgId,
-    totalQueuedLifetime: deliveryQueue.length,
-    isChannelThrottled: nowMs < channelRateLimitUntilMs,
-    channelThrottledUntil: nowMs < channelRateLimitUntilMs ? new Date(channelRateLimitUntilMs).toISOString() : null
+    lastSuccessfulDeliveryAt: activeState.lastSuccessfulDeliveryTime,
+    lastSuccessfulMessageId: activeState.lastSuccessfulMsgId,
+    totalQueuedLifetime: activeState.items.length,
+    isChannelThrottled: nowMs < activeState.channelRateLimitUntilMs,
+    channelThrottledUntil: nowMs < activeState.channelRateLimitUntilMs ? new Date(activeState.channelRateLimitUntilMs).toISOString() : null
   };
 }
 
@@ -115,7 +228,8 @@ export function getQueueTelemetry() {
  * Returns items in the delivery queue with optional filtering and pagination.
  */
 export function getQueueItems(limit: number = 50, filterStatus?: string): JobQueueItem[] {
-  let list = deliveryQueue;
+  loadDurableState();
+  let list = activeState.items;
   if (filterStatus && filterStatus !== "ALL") {
     list = list.filter(i => i.status === filterStatus);
   }
@@ -123,7 +237,7 @@ export function getQueueItems(limit: number = 50, filterStatus?: string): JobQue
 }
 
 /**
- * Adds a verified job into the persistent delivery queue.
+ * Adds a verified job into the persistent durable delivery queue.
  * Performs duplicate checking using SHA-256 idempotency key.
  */
 export async function enqueueVerifiedJob(
@@ -139,12 +253,13 @@ export async function enqueueVerifiedJob(
   item: JobQueueItem;
   immediateResult?: any;
 }> {
+  loadDurableState();
   const idempotencyKey = calculateIdempotencyKey(job);
   const targetChannel = options?.customChannel || TELEGRAM_PUBLIC_CHANNEL_ID;
 
-  // 1. Idempotency Check: Reject if already SENT
-  if (sentIdempotencyKeys.has(idempotencyKey)) {
-    const existing = deliveryQueue.find(i => i.idempotencyKey === idempotencyKey);
+  // 1. Idempotency Check: Reject if already SENT in durable store
+  if (activeState.sentIdempotencyKeys.includes(idempotencyKey)) {
+    const existing = activeState.items.find(i => i.idempotencyKey === idempotencyKey);
     return {
       queued: false,
       duplicateBlocked: true,
@@ -171,8 +286,8 @@ export async function enqueueVerifiedJob(
     };
   }
 
-  // 2. Reject if already in active queue (PENDING, RETRYING, RATE_LIMITED)
-  const existingActive = deliveryQueue.find(
+  // 2. Reject if already in active queue
+  const existingActive = activeState.items.find(
     i => i.idempotencyKey === idempotencyKey &&
          (i.status === "PENDING" || i.status === "RETRYING" || i.status === "RATE_LIMITED")
   );
@@ -203,10 +318,14 @@ export async function enqueueVerifiedJob(
     jobData: job,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    completedAt: null
+    completedAt: null,
+    lockedBy: null,
+    lockedAt: null,
+    lockExpiresAt: null
   };
 
-  deliveryQueue.unshift(newItem);
+  activeState.items.unshift(newItem);
+  saveDurableState();
 
   // If immediate dispatch is requested, attempt processing now
   if (options?.forceImmediate) {
@@ -227,64 +346,122 @@ export async function enqueueVerifiedJob(
 }
 
 /**
+ * Claims a job for exclusive atomic processing by a specific worker instance.
+ * Returns null if the job is locked by another concurrent worker.
+ */
+export function claimJobAtomically(item: JobQueueItem, workerId: string, lockDurationMs: number = 30000): boolean {
+  loadDurableState();
+  const current = activeState.items.find(i => i.id === item.id);
+  if (!current) return false;
+
+  const nowMs = Date.now();
+  if (current.lockedBy && current.lockExpiresAt) {
+    const expiresMs = new Date(current.lockExpiresAt).getTime();
+    if (expiresMs > nowMs && current.lockedBy !== workerId) {
+      return false; // Locked by another worker
+    }
+  }
+
+  // Acquire lock
+  current.lockedBy = workerId;
+  current.lockedAt = new Date().toISOString();
+  current.lockExpiresAt = new Date(nowMs + lockDurationMs).toISOString();
+  saveDurableState();
+
+  item.lockedBy = current.lockedBy;
+  item.lockedAt = current.lockedAt;
+  item.lockExpiresAt = current.lockExpiresAt;
+  return true;
+}
+
+/**
+ * Releases the atomic lock on a job after processing completes or fails.
+ */
+export function releaseJobLock(item: JobQueueItem): void {
+  loadDurableState();
+  const current = activeState.items.find(i => i.id === item.id);
+  if (current) {
+    current.lockedBy = null;
+    current.lockedAt = null;
+    current.lockExpiresAt = null;
+    saveDurableState();
+  }
+  item.lockedBy = null;
+  item.lockedAt = null;
+  item.lockExpiresAt = null;
+}
+
+/**
  * Processes a single queue item with strict pre-flight expiry check and error classification.
  */
 export async function processQueueItem(
   item: JobQueueItem,
-  mockDispatcher?: (item: JobQueueItem) => Promise<{ ok: boolean; status?: number; data?: any; error?: string }>
+  mockDispatcher?: (item: JobQueueItem) => Promise<{ ok: boolean; status?: number; data?: any; error?: string }>,
+  workerId: string = `worker-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
 ): Promise<{
   success: boolean;
   status: DeliveryStatus;
   message: string;
   messageId?: number;
 }> {
+  // 1. Atomic Lock Claim: Prevents concurrent workers from double-processing
+  const acquired = claimJobAtomically(item, workerId);
+  if (!acquired) {
+    return {
+      success: false,
+      status: item.status,
+      message: `Job is currently locked by another concurrent worker instance. Skipping duplicate dispatch.`
+    };
+  }
+
   const nowMs = Date.now();
   item.updatedAt = new Date().toISOString();
 
-  // 1. CRITICAL PRE-FLIGHT EXPIRY RE-CHECK:
-  // If the job has expired while sitting in the queue, abort delivery immediately!
-  const expiryCheck = parseIndianDeadline(item.jobData.application_end_date);
-  if (expiryCheck.valid && expiryCheck.isExpired) {
-    item.status = "EXPIRED_IN_QUEUE";
-    item.completedAt = new Date().toISOString();
-    item.lastError = `Pre-flight expiry block: Job application deadline passed on ${expiryCheck.istString} (Asia/Kolkata). Delivery aborted.`;
+  try {
+    // 2. CRITICAL PRE-FLIGHT EXPIRY RE-CHECK:
+    // If the job has expired while sitting in the queue, abort delivery immediately!
+    const expiryCheck = parseIndianDeadline(item.jobData.application_end_date);
+    if (expiryCheck.valid && expiryCheck.isExpired) {
+      item.status = "EXPIRED_IN_QUEUE";
+      item.completedAt = new Date().toISOString();
+      item.lastError = `Pre-flight expiry block: Job application deadline passed on ${expiryCheck.istString} (Asia/Kolkata). Delivery aborted.`;
 
-    // Also update storage if job exists
-    if ((dbStore as any).jobs) {
-      const dbJob = (dbStore as any).jobs.find((j: any) => j.id === item.jobId || j.title === item.title);
-      if (dbJob) {
-        dbJob.is_expired = true;
-        dbJob.status = "EXPIRED";
-        dbJob.application_action_disabled = true;
+      // Also update storage if job exists
+      if ((dbStore as any).jobs) {
+        const dbJob = (dbStore as any).jobs.find((j: any) => j.id === item.jobId || j.title === item.title);
+        if (dbJob) {
+          dbJob.is_expired = true;
+          dbJob.status = "EXPIRED";
+          dbJob.application_action_disabled = true;
+        }
       }
+
+      saveDurableState();
+      return {
+        success: false,
+        status: "EXPIRED_IN_QUEUE",
+        message: item.lastError
+      };
     }
 
-    return {
-      success: false,
-      status: "EXPIRED_IN_QUEUE",
-      message: item.lastError
-    };
-  }
+    // 3. Channel Rate-Limit Check
+    if (nowMs < activeState.channelRateLimitUntilMs) {
+      const waitSec = Math.ceil((activeState.channelRateLimitUntilMs - nowMs) / 1000);
+      item.status = "RATE_LIMITED";
+      item.nextRetryAt = new Date(activeState.channelRateLimitUntilMs).toISOString();
+      item.lastError = `Telegram channel rate-limited. Global cool-down active for ${waitSec}s.`;
+      saveDurableState();
+      return {
+        success: false,
+        status: "RATE_LIMITED",
+        message: item.lastError
+      };
+    }
 
-  // 2. Channel Rate-Limit Check
-  if (nowMs < channelRateLimitUntilMs) {
-    const waitSec = Math.ceil((channelRateLimitUntilMs - nowMs) / 1000);
-    item.status = "RATE_LIMITED";
-    item.nextRetryAt = new Date(channelRateLimitUntilMs).toISOString();
-    item.lastError = `Telegram channel rate-limited. Global cool-down active for ${waitSec}s.`;
-    return {
-      success: false,
-      status: "RATE_LIMITED",
-      message: item.lastError
-    };
-  }
+    item.attempts++;
 
-  item.attempts++;
-
-  // 3. Dispatch to Telegram (Real API or injected test harness dispatcher)
-  try {
+    // 4. Dispatch to Telegram (Real API or injected test harness dispatcher)
     let result: { ok: boolean; status?: number; data?: any; error?: string };
-
     if (mockDispatcher) {
       result = await mockDispatcher(item);
     } else {
@@ -300,15 +477,18 @@ export async function processQueueItem(
       item.lastError = null;
       item.nextRetryAt = null;
 
-      sentIdempotencyKeys.add(item.idempotencyKey);
-      lastSuccessfulDeliveryTime = item.completedAt;
-      lastSuccessfulMsgId = msgId;
+      if (!activeState.sentIdempotencyKeys.includes(item.idempotencyKey)) {
+        activeState.sentIdempotencyKeys.push(item.idempotencyKey);
+      }
+      activeState.lastSuccessfulDeliveryTime = item.completedAt;
+      activeState.lastSuccessfulMsgId = msgId;
 
       // Update parent job model
       item.jobData.telegram_posted = true;
       item.jobData.telegram_posted_at = item.completedAt;
       item.jobData.telegram_message_id = msgId;
 
+      saveDurableState();
       return {
         success: true,
         status: "SENT",
@@ -322,12 +502,13 @@ export async function processQueueItem(
     if (errCode === 429) {
       const retryAfter = result.data?.parameters?.retry_after || 30;
       const retryMs = retryAfter * 1000;
-      channelRateLimitUntilMs = nowMs + retryMs;
+      activeState.channelRateLimitUntilMs = nowMs + retryMs;
 
       item.status = "RATE_LIMITED";
       item.nextRetryAt = new Date(nowMs + retryMs).toISOString();
       item.lastError = `Telegram API rate limit (HTTP 429). Retry after ${retryAfter}s.`;
 
+      saveDurableState();
       return {
         success: false,
         status: "RATE_LIMITED",
@@ -342,6 +523,7 @@ export async function processQueueItem(
       item.nextRetryAt = null;
       item.lastError = "Permanent configuration error (HTTP 403): Bot lacks rights to post in channel.";
 
+      saveDurableState();
       return {
         success: false,
         status: "FAILED",
@@ -359,6 +541,7 @@ export async function processQueueItem(
       item.nextRetryAt = null;
       item.lastError = `Exceeded maximum retry attempts (${item.attempts}/${item.maxAttempts}). Last error: ${result.error || result.data?.description || "Unknown error"}`;
 
+      saveDurableState();
       return {
         success: false,
         status: "FAILED",
@@ -376,6 +559,7 @@ export async function processQueueItem(
     item.nextRetryAt = new Date(nowMs + totalBackoffMs).toISOString();
     item.lastError = `${isServerError ? `Telegram server error (HTTP ${errCode})` : "Temporary connection error"}: ${result.error || result.data?.description || "Failed"}. Scheduled retry in ${expDelaySec + jitter}s.`;
 
+    saveDurableState();
     return {
       success: false,
       status: "RETRYING",
@@ -387,6 +571,7 @@ export async function processQueueItem(
       item.completedAt = new Date().toISOString();
       item.nextRetryAt = null;
       item.lastError = `Network failure: Exceeded max attempts (${item.attempts}/${item.maxAttempts}). Error: ${netErr.message}`;
+      saveDurableState();
       return { success: false, status: "FAILED", message: item.lastError };
     }
 
@@ -394,7 +579,10 @@ export async function processQueueItem(
     item.status = "RETRYING";
     item.nextRetryAt = new Date(nowMs + backoffMs).toISOString();
     item.lastError = `Network connection failure: ${netErr.message}. Retrying in ${backoffMs / 1000}s.`;
+    saveDurableState();
     return { success: false, status: "RETRYING", message: item.lastError };
+  } finally {
+    releaseJobLock(item);
   }
 }
 
@@ -412,7 +600,6 @@ async function dispatchJobToTelegramChannel(item: JobQueueItem): Promise<{
     return { ok: false, error: "Missing TELEGRAM_BOT_TOKEN" };
   }
 
-  // Format HTML message
   const html = formatJobPostHtml(item.jobData, item.locationCategory);
 
   try {
@@ -477,6 +664,7 @@ function formatJobPostHtml(job: any, locationCategory: string = "All India"): st
 export async function processEligibleQueue(options?: {
   forceAll?: boolean;
   mockDispatcher?: (item: JobQueueItem) => Promise<any>;
+  workerId?: string;
 }): Promise<{
   processed: number;
   sent: number;
@@ -485,6 +673,7 @@ export async function processEligibleQueue(options?: {
   failed: number;
   expiredInQueue: number;
 }> {
+  loadDurableState();
   const nowMs = Date.now();
   let processed = 0;
   let sent = 0;
@@ -492,8 +681,9 @@ export async function processEligibleQueue(options?: {
   let rateLimited = 0;
   let failed = 0;
   let expiredInQueue = 0;
+  const worker = options?.workerId || `worker-${Date.now()}`;
 
-  for (const item of deliveryQueue) {
+  for (const item of activeState.items) {
     if (item.status === "SENT" || item.status === "FAILED" || item.status === "EXPIRED_IN_QUEUE") {
       continue;
     }
@@ -504,7 +694,7 @@ export async function processEligibleQueue(options?: {
 
     if (eligible) {
       processed++;
-      const res = await processQueueItem(item, options?.mockDispatcher);
+      const res = await processQueueItem(item, options?.mockDispatcher, worker);
       if (res.status === "SENT") sent++;
       else if (res.status === "RETRYING") retrying++;
       else if (res.status === "RATE_LIMITED") rateLimited++;
@@ -531,8 +721,8 @@ export async function retryPendingNow(): Promise<{
   processedCount: number;
   message: string;
 }> {
-  // Clear channel rate limit cool-down on manual admin trigger
-  channelRateLimitUntilMs = 0;
+  activeState.channelRateLimitUntilMs = 0;
+  saveDurableState();
 
   const result = await processEligibleQueue({ forceAll: true });
   return {
@@ -543,12 +733,22 @@ export async function retryPendingNow(): Promise<{
 }
 
 /**
- * Resets the in-memory queue state (used for testing).
+ * Resets the durable queue state (used for testing).
  */
 export function resetQueueForTesting() {
-  deliveryQueue.length = 0;
-  sentIdempotencyKeys.clear();
-  channelRateLimitUntilMs = 0;
-  lastSuccessfulDeliveryTime = null;
-  lastSuccessfulMsgId = null;
+  activeState = {
+    version: 1,
+    updatedAt: new Date().toISOString(),
+    channelRateLimitUntilMs: 0,
+    lastSuccessfulDeliveryTime: null,
+    lastSuccessfulMsgId: null,
+    sentIdempotencyKeys: [],
+    items: []
+  };
+  const filePath = getStorageFilePath();
+  try {
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+  } catch (_) {}
 }

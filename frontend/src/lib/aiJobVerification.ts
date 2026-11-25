@@ -231,6 +231,10 @@ export interface DeadlineParseResult {
   day?: number;
   hours?: number;
   minutes?: number;
+  interpretation?:
+    | "DATE_ONLY_INDIAN_CALENDAR_END_OF_DAY_IST"
+    | "EXPLICIT_ISO_WITH_TIMEZONE"
+    | "NAIVE_DATETIME_AS_IST";
 }
 
 export function parseIndianDeadline(dateInput: any): DeadlineParseResult {
@@ -244,71 +248,128 @@ export function parseIndianDeadline(dateInput: any): DeadlineParseResult {
   }
 
   const nowMs = Date.now();
-  let year: number = 0;
-  let month: number = 0;
-  let day: number = 0;
-  let hours: number = 23;
-  let minutes: number = 59;
-  let seconds: number = 59;
-  let ms: number = 999;
 
-  // 1. Check for explicit timezone offset preceded by time (e.g. +05:30, +0530, or Z)
+  // ==========================================================================
+  // RULE B: EXPLICIT ISO TIMESTAMPS WITH TIMEZONE (trailing Z or [+-]HH:mm)
+  // Strictly preserves the exact instant represented by the input.
+  // Never replaces explicit UTC (Z) or other offsets with Asia/Kolkata.
+  // ==========================================================================
   const tzMatch = str.match(/(?:T|\s)\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?([+-]\d{2}:?\d{2}|Z)$/i);
   if (tzMatch) {
-    const tzStr = tzMatch[1];
-    // If it is explicitly +05:30, or if it is UTC 18:29:59Z (which is 23:59:59 IST), parse directly
-    if (tzStr === "+05:30" || tzStr === "+0530" || (tzStr.toUpperCase() === "Z" && str.includes("18:29:59"))) {
-      const parsed = new Date(str);
-      if (!isNaN(parsed.getTime())) {
-        const parsedMs = parsed.getTime();
-        return {
-          valid: true,
-          timestampMs: parsedMs,
-          isExpired: parsedMs < nowMs,
-          istString: parsed.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
-          utcString: parsed.toISOString(),
-          year: parsed.getFullYear(),
-          month: parsed.getMonth() + 1,
-          day: parsed.getDate()
-        };
-      }
+    const parsed = new Date(str);
+    if (!isNaN(parsed.getTime())) {
+      const ms = parsed.getTime();
+      return {
+        valid: true,
+        timestampMs: ms,
+        isExpired: ms < nowMs,
+        istString: parsed.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
+        utcString: parsed.toISOString(),
+        year: parsed.getUTCFullYear(),
+        month: parsed.getUTCMonth() + 1,
+        day: parsed.getUTCDate(),
+        interpretation: "EXPLICIT_ISO_WITH_TIMEZONE"
+      };
     }
+    return { valid: false, isExpired: false, error: `Malformed ISO timestamp with timezone: "${str}".` };
   }
 
-  // 2. ISO format (YYYY-MM-DD or YYYY/MM/DD)
-  const ymdMatch = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})(?:[T\s](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
-  if (ymdMatch) {
-    year = parseInt(ymdMatch[1], 10);
-    month = parseInt(ymdMatch[2], 10);
-    day = parseInt(ymdMatch[3], 10);
-    if (ymdMatch[4] !== undefined) {
-      hours = parseInt(ymdMatch[4], 10);
-      minutes = parseInt(ymdMatch[5], 10);
-      seconds = ymdMatch[6] ? parseInt(ymdMatch[6], 10) : 0;
-      ms = (hours === 23 && minutes === 59) ? 999 : 0;
+  // ==========================================================================
+  // RULE C: NAIVE ISO DATETIME WITHOUT TIMEZONE (e.g. 2026-03-28T23:59:59)
+  // Documented Source Policy: Indian recruitment notices published without
+  // an explicit timezone offset are legally interpreted in Indian Standard Time (IST, UTC+05:30).
+  // ==========================================================================
+  const naiveIsoMatch = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})[T\s](\d{1,2}):(\d{1,2})(?::(\d{1,2})(?:\.(\d+))?)?$/);
+  if (naiveIsoMatch) {
+    const year = parseInt(naiveIsoMatch[1], 10);
+    const month = parseInt(naiveIsoMatch[2], 10);
+    const day = parseInt(naiveIsoMatch[3], 10);
+    const hours = parseInt(naiveIsoMatch[4], 10);
+    const minutes = parseInt(naiveIsoMatch[5], 10);
+    const seconds = naiveIsoMatch[6] ? parseInt(naiveIsoMatch[6], 10) : 0;
+    const ms = naiveIsoMatch[7] ? parseInt(naiveIsoMatch[7].padEnd(3, "0").slice(0, 3), 10) : 0;
+
+    if (
+      year < 2020 || year > 2100 ||
+      month < 1 || month > 12 ||
+      day < 1 || day > 31 ||
+      hours > 23 || minutes > 59 || seconds > 59
+    ) {
+      return { valid: false, isExpired: false, error: `Naive datetime components out of bounds: "${str}".` };
     }
-  } else {
-    // 3. DD/MM/YYYY or DD-MM-YYYY
-    const dmyMatch = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:[T\s](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
-    if (dmyMatch) {
-      day = parseInt(dmyMatch[1], 10);
-      month = parseInt(dmyMatch[2], 10);
-      year = parseInt(dmyMatch[3], 10);
-      if (dmyMatch[4] !== undefined) {
-        hours = parseInt(dmyMatch[4], 10);
-        minutes = parseInt(dmyMatch[5], 10);
-        seconds = dmyMatch[6] ? parseInt(dmyMatch[6], 10) : 0;
-        ms = (hours === 23 && minutes === 59) ? 999 : 0;
+    const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    if (day > daysInMonth) {
+      return { valid: false, isExpired: false, error: `Invalid date: Day ${day} exceeds maximum days (${daysInMonth}) for month ${month}.` };
+    }
+
+    // Convert IST to UTC (-330 minutes)
+    const totalIstMinutes = hours * 60 + minutes;
+    const totalUtcMinutes = totalIstMinutes - 330;
+    let utcHours = Math.floor(totalUtcMinutes / 60);
+    let utcMinutes = (totalUtcMinutes % 60 + 60) % 60;
+    let utcDay = day;
+    let utcMonth = month;
+    let utcYear = year;
+    if (utcHours < 0) {
+      utcHours += 24;
+      utcDay -= 1;
+      if (utcDay < 1) {
+        utcMonth -= 1;
+        if (utcMonth < 1) {
+          utcMonth = 12;
+          utcYear -= 1;
+        }
+        utcDay = new Date(Date.UTC(utcYear, utcMonth, 0)).getUTCDate();
       }
+    }
+    const deadlineUtcMs = Date.UTC(utcYear, utcMonth - 1, utcDay, utcHours, utcMinutes, seconds, ms);
+    const istObj = new Date(deadlineUtcMs);
+    return {
+      valid: true,
+      timestampMs: deadlineUtcMs,
+      isExpired: deadlineUtcMs < nowMs,
+      istString: istObj.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
+      utcString: istObj.toISOString(),
+      year,
+      month,
+      day,
+      hours,
+      minutes,
+      interpretation: "NAIVE_DATETIME_AS_IST"
+    };
+  }
+
+  // ==========================================================================
+  // RULE A: DATE-ONLY INDIAN RECRUITMENT DEADLINES
+  // DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD, or Text dates (e.g. 28 March 2026)
+  // Closes at the end of the specified calendar day: 23:59:59.999 Asia/Kolkata (18:29:59.999 UTC)
+  // ==========================================================================
+  let year = 0;
+  let month = 0;
+  let day = 0;
+
+  // DD/MM/YYYY or DD-MM-YYYY
+  const dmyMatch = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (dmyMatch) {
+    day = parseInt(dmyMatch[1], 10);
+    month = parseInt(dmyMatch[2], 10);
+    year = parseInt(dmyMatch[3], 10);
+  } else {
+    // YYYY-MM-DD or YYYY/MM/DD
+    const ymdMatch = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+    if (ymdMatch) {
+      year = parseInt(ymdMatch[1], 10);
+      month = parseInt(ymdMatch[2], 10);
+      day = parseInt(ymdMatch[3], 10);
     } else {
-      // 4. Text format ('28 March 2026', '28-Mar-2026', 'March 28, 2026', '28th March 2026')
+      // Text formats ('28 March 2026', '28-Mar-2026', 'March 28, 2026', '28th March 2026')
       const monthNames: Record<string, number> = {
         jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
         jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12
       };
       const cleaned = str.replace(/(\d+)(st|nd|rd|th)/gi, (m, d) => d);
-      const textMatch1 = cleaned.match(/^(\d{1,2})[\s\-\/]+([a-zA-Z]+)[\s\-\/]+(\d{4})/);
-      const textMatch2 = cleaned.match(/^([a-zA-Z]+)[\s\-\/]+(\d{1,2}),?[\s\-\/]+(\d{4})/);
+      const textMatch1 = cleaned.match(/^(\d{1,2})[\s\-\/]+([a-zA-Z]+)[\s\-\/]+(\d{4})$/);
+      const textMatch2 = cleaned.match(/^([a-zA-Z]+)[\s\-\/]+(\d{1,2}),?[\s\-\/]+(\d{4})$/);
       if (textMatch1) {
         day = parseInt(textMatch1[1], 10);
         const mKey = textMatch1[2].toLowerCase().slice(0, 3);
@@ -330,36 +391,13 @@ export function parseIndianDeadline(dateInput: any): DeadlineParseResult {
     return { valid: false, isExpired: false, error: `Deadline date components out of bounds (${day}/${month}/${year}).` };
   }
 
-  // Handle month length validation
   const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
   if (day > daysInMonth) {
     return { valid: false, isExpired: false, error: `Invalid date: Day ${day} exceeds maximum days (${daysInMonth}) for month ${month}.` };
   }
 
-  // Convert IST (Asia/Kolkata, UTC+05:30) to UTC:
-  // Offset is -330 minutes (-5h 30m)
-  const totalIstMinutes = hours * 60 + minutes;
-  const totalUtcMinutes = totalIstMinutes - 330;
-  let utcHours = Math.floor(totalUtcMinutes / 60);
-  let utcMinutes = (totalUtcMinutes % 60 + 60) % 60;
-  let utcDay = day;
-  let utcMonth = month;
-  let utcYear = year;
-
-  if (utcHours < 0) {
-    utcHours += 24;
-    utcDay -= 1;
-    if (utcDay < 1) {
-      utcMonth -= 1;
-      if (utcMonth < 1) {
-        utcMonth = 12;
-        utcYear -= 1;
-      }
-      utcDay = new Date(Date.UTC(utcYear, utcMonth, 0)).getUTCDate();
-    }
-  }
-
-  const deadlineUtcMs = Date.UTC(utcYear, utcMonth - 1, utcDay, utcHours, utcMinutes, seconds, ms);
+  // Official Indian recruitment deadline: 23:59:59.999 IST = 18:29:59.999 UTC
+  const deadlineUtcMs = Date.UTC(year, month - 1, day, 18, 29, 59, 999);
   const istObj = new Date(deadlineUtcMs);
 
   return {
@@ -371,8 +409,9 @@ export function parseIndianDeadline(dateInput: any): DeadlineParseResult {
     year,
     month,
     day,
-    hours,
-    minutes
+    hours: 23,
+    minutes: 59,
+    interpretation: "DATE_ONLY_INDIAN_CALENDAR_END_OF_DAY_IST"
   };
 }
 
