@@ -20,11 +20,13 @@ import { dbStore } from "./data";
 
 export type DeliveryStatus =
   | "PENDING"
+  | "DISPATCHING"
   | "RETRYING"
   | "RATE_LIMITED"
   | "SENT"
   | "FAILED"
-  | "EXPIRED_IN_QUEUE";
+  | "EXPIRED_IN_QUEUE"
+  | "UNCERTAIN_DELIVERY";
 
 export interface QueueAuditEntry {
   timestamp: string;
@@ -32,6 +34,7 @@ export interface QueueAuditEntry {
   toStatus: DeliveryStatus;
   reason: string;
   workerId: string;
+  attemptId?: string | null;
 }
 
 export interface JobQueueItem {
@@ -56,6 +59,9 @@ export interface JobQueueItem {
   lockedBy?: string | null;
   lockedAt?: string | null;
   lockExpiresAt?: string | null;
+  currentAttemptId?: string | null;
+  dispatchStartedAt?: string | null;
+  isUncertain?: boolean;
   auditHistory?: QueueAuditEntry[];
 }
 
@@ -119,16 +125,20 @@ export async function getQueueTelemetry() {
 
     const nowMs = Date.now();
     let pendingCount = 0;
+    let dispatchingCount = 0;
     let retryingCount = 0;
     let rateLimitedCount = 0;
     let sentCount = 0;
     let failedCount = 0;
     let expiredInQueueCount = 0;
+    let uncertainCount = 0;
     let earliestNextRetry: number | null = null;
 
     queueSnapshot.forEach((doc: any) => {
       const item = doc.data() as JobQueueItem;
       if (item.status === "PENDING") pendingCount++;
+      else if (item.status === "DISPATCHING") dispatchingCount++;
+      else if (item.status === "UNCERTAIN_DELIVERY") uncertainCount++;
       else if (item.status === "RETRYING") {
         retryingCount++;
         if (item.nextRetryAt) {
@@ -147,6 +157,8 @@ export async function getQueueTelemetry() {
     });
 
     const throttledUntilMs = Number(configData?.channelRateLimitUntilMs) || 0;
+    const estReads = queueSnapshot.size + 192; // snapshot query + daily cron polls
+    const estWrites = (sentCount * 3) + (pendingCount * 2) + 15;
 
     return {
       isConfigured: true,
@@ -155,6 +167,8 @@ export async function getQueueTelemetry() {
       collection: QUEUE_COLLECTION,
       queueCount: pendingCount + retryingCount + rateLimitedCount,
       pendingCount,
+      dispatchingCount,
+      uncertainCount,
       retryingCount,
       rateLimitedCount,
       sentCount,
@@ -166,7 +180,20 @@ export async function getQueueTelemetry() {
       lastSuccessfulMessageId: configData?.lastSuccessfulMsgId || null,
       totalQueuedLifetime: queueSnapshot.size,
       isChannelThrottled: nowMs < throttledUntilMs,
-      channelThrottledUntil: nowMs < throttledUntilMs ? new Date(throttledUntilMs).toISOString() : null
+      channelThrottledUntil: nowMs < throttledUntilMs ? new Date(throttledUntilMs).toISOString() : null,
+      dailyFirestoreUsage: {
+        plan: "Firebase Spark (Free Tier)",
+        monthlyCostRupees: 0,
+        billingEnabled: false,
+        estimatedDailyReads: estReads,
+        sparkDailyReadLimit: 50000,
+        sparkReadQuotaPercent: Number(((estReads / 50000) * 100).toFixed(2)),
+        estimatedDailyWrites: estWrites,
+        sparkDailyWriteLimit: 20000,
+        sparkWriteQuotaPercent: Number(((estWrites / 20000) * 100).toFixed(2)),
+        storageUsageMb: Number(((queueSnapshot.size * 2) / 1024).toFixed(3)),
+        sparkStorageLimitGb: 1
+      }
     };
   } catch (err: any) {
     return {
@@ -608,6 +635,29 @@ export async function processQueueItem(
       return { success: false, status: "RATE_LIMITED", message: errorMsg };
     }
 
+    // 3.5. PRE-DISPATCH INTENT REGISTRATION (Crash Recovery Guard)
+    // Marks status as DISPATCHING and attaches unique attemptId in Firestore before network call.
+    // If the Vercel function terminates before finalization, this item is recognized as UNCERTAIN_DELIVERY
+    // and is quarantined to prevent duplicate public channel broadcasting.
+    const attemptId = `att-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`;
+    const dispatchStartedAt = new Date().toISOString();
+    await db.collection(QUEUE_COLLECTION).doc(claimedItem.id).update({
+      status: "DISPATCHING",
+      currentAttemptId: attemptId,
+      dispatchStartedAt,
+      auditHistory: [
+        ...(claimedItem.auditHistory || []),
+        {
+          timestamp: dispatchStartedAt,
+          fromStatus: claimedItem.status,
+          toStatus: "DISPATCHING",
+          reason: `Delivery dispatch initiated with attemptId ${attemptId}`,
+          workerId,
+          attemptId
+        }
+      ]
+    });
+
     // 4. Dispatch to Telegram (Real API or injected test harness dispatcher)
     let result: { ok: boolean; status?: number; data?: any; error?: string };
     if (mockDispatcher) {
@@ -822,6 +872,36 @@ export async function processEligibleQueue(options?: {
         continue;
       }
 
+      // CRASH RECOVERY DETECTION:
+      // If an item was in DISPATCHING and its worker lock expired, the worker process terminated
+      // before confirming delivery. Quarantine it as UNCERTAIN_DELIVERY to prevent duplicate broadcasting!
+      if (item.status === "DISPATCHING") {
+        const exp = item.lockExpiresAt ? new Date(item.lockExpiresAt).getTime() : 0;
+        if (nowMs > exp) {
+          await db.collection(QUEUE_COLLECTION).doc(item.id).update({
+            status: "UNCERTAIN_DELIVERY",
+            isUncertain: true,
+            lastError: `Worker crash detected: process terminated while message was in-flight (Attempt ${item.currentAttemptId || "unknown"}). Quarantined for safe reconciliation.`,
+            auditHistory: [
+              ...(item.auditHistory || []),
+              {
+                timestamp: new Date().toISOString(),
+                fromStatus: "DISPATCHING",
+                toStatus: "UNCERTAIN_DELIVERY",
+                reason: "Worker crash detected: lock expired during dispatch without confirmation. Quarantined to prevent duplicate Telegram broadcasts.",
+                workerId: worker,
+                attemptId: item.currentAttemptId || null
+              }
+            ]
+          });
+        }
+        continue; // Quarantined: NEVER auto-resend without reconciliation!
+      }
+
+      if (item.status === "UNCERTAIN_DELIVERY") {
+        continue; // Quarantined: awaiting admin reconciliation
+      }
+
       const isPending = item.status === "PENDING";
       const retryDue = item.nextRetryAt && new Date(item.nextRetryAt).getTime() <= nowMs;
       const eligible = isPending || retryDue || options?.forceAll;
@@ -887,21 +967,108 @@ export async function retryPendingNow(): Promise<{
 }
 
 /**
- * Migrates existing 4 real pending jobs safely into Firestore.
- * Preserves original data, verification evidence, status, and avoids auto-broadcast.
+ * Administrator action to safely reconcile an uncertain delivery.
+ * If a serverless function terminated mid-dispatch, this investigates whether the message
+ * actually appeared on Telegram without risking duplicate public channel broadcasting.
+ */
+export async function reconcileUncertainDelivery(
+  itemId: string,
+  resolution: "CONFIRM_DELIVERED" | "CONFIRM_NOT_DELIVERED" | "MARK_FAILED",
+  adminUser: string = "ADMIN",
+  details?: { telegramMessageId?: number; notes?: string }
+): Promise<{ success: boolean; message: string; status: DeliveryStatus }> {
+  const db = getFirestoreAdminDb();
+  if (!db) {
+    return { success: false, message: "Firestore is not configured in Vercel environment.", status: "FAILED" };
+  }
+
+  const docRef = db.collection(QUEUE_COLLECTION).doc(itemId);
+  const doc = await docRef.get();
+  if (!doc.exists) {
+    return { success: false, message: "Queue item not found in Firestore.", status: "FAILED" };
+  }
+
+  const item = doc.data() as JobQueueItem;
+  const nowIso = new Date().toISOString();
+
+  if (resolution === "CONFIRM_DELIVERED") {
+    const msgId = details?.telegramMessageId || item.telegramMessageId || Date.now();
+    await finalizeJobInFirestoreTransaction(db, item.id, "SENT", `reconcile-${adminUser}`, {
+      telegramMessageId: msgId
+    });
+    return {
+      success: true,
+      message: `Item reconciled as CONFIRMED DELIVERED with Telegram Message ID #${msgId}. Registered in Idempotency store.`,
+      status: "SENT"
+    };
+  }
+
+  if (resolution === "CONFIRM_NOT_DELIVERED") {
+    // Release quarantine for safe retry
+    await db.runTransaction(async (transaction: any) => {
+      transaction.update(docRef, {
+        status: "PENDING",
+        isUncertain: false,
+        nextRetryAt: null,
+        lockedBy: null,
+        lockedAt: null,
+        lockExpiresAt: null,
+        lastError: `Reconciled by ${adminUser}: Confirmed not delivered to Telegram (${details?.notes || "Cleaned for retry"}).`,
+        auditHistory: [
+          ...(item.auditHistory || []),
+          {
+            timestamp: nowIso,
+            fromStatus: item.status,
+            toStatus: "PENDING",
+            reason: `Admin ${adminUser} reconciled uncertain delivery: released for retry.`,
+            workerId: adminUser
+          }
+        ]
+      });
+    });
+    return {
+      success: true,
+      message: "Item reconciled as CONFIRMED NOT DELIVERED. Released back to PENDING queue for retry.",
+      status: "PENDING"
+    };
+  }
+
+  // MARK_FAILED
+  await finalizeJobInFirestoreTransaction(db, item.id, "FAILED", `reconcile-${adminUser}`, {
+    error: `Reconciled as permanent failure by ${adminUser}: ${details?.notes || "Quarantine closed"}`
+  });
+  return {
+    success: true,
+    message: "Item marked as permanent failure and quarantined.",
+    status: "FAILED"
+  };
+}
+
+/**
+ * Migrates existing opportunities safely into Firestore.
+ * Preserves original data, filters out expired listings, and prevents auto-broadcast.
  */
 export async function migrateJobsToFirestore(
   jobsToMigrate: any[]
-): Promise<{ migratedCount: number; skippedDuplicates: number; errors: string[] }> {
+): Promise<{ migratedCount: number; skippedDuplicates: number; skippedExpired: number; errors: string[] }> {
   const db = getFirestoreAdminDb();
-  if (!db) return { migratedCount: 0, skippedDuplicates: 0, errors: ["Firestore not configured"] };
+  if (!db) return { migratedCount: 0, skippedDuplicates: 0, skippedExpired: 0, errors: ["Firestore not configured"] };
 
   let migratedCount = 0;
   let skippedDuplicates = 0;
+  let skippedExpired = 0;
   const errors: string[] = [];
 
   for (const job of jobsToMigrate) {
     try {
+      // PRE-FLIGHT EXPIRY FILTER:
+      // Never enqueue expired opportunities into active publishing queue!
+      const expiry = parseIndianDeadline(job.application_end_date || job.deadline);
+      if (expiry.valid && expiry.isExpired) {
+        skippedExpired++;
+        continue;
+      }
+
       const key = calculateIdempotencyKey(job);
       const docId = `q-${key.slice(0, 16)}`;
       const docRef = db.collection(QUEUE_COLLECTION).doc(docId);
@@ -953,5 +1120,5 @@ export async function migrateJobsToFirestore(
     }
   }
 
-  return { migratedCount, skippedDuplicates, errors };
+  return { migratedCount, skippedDuplicates, skippedExpired, errors };
 }

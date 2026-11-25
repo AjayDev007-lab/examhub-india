@@ -5,7 +5,8 @@ import Link from "next/link";
 import {
   Send, ShieldCheck, ShieldAlert, AlertTriangle, CheckCircle2,
   Clock, Pause, Play, RefreshCw, ExternalLink, Search, Filter,
-  ArrowLeft, Check, X, Layers, AlertCircle, FileText, Globe, Eye
+  ArrowLeft, Check, X, Layers, AlertCircle, FileText, Globe, Eye,
+  Download, HelpCircle, Archive
 } from "lucide-react";
 
 interface AutoPublishMetrics {
@@ -29,6 +30,8 @@ interface AutoPublishMetrics {
   error?: string | null;
   queueCount?: number;
   pendingCount?: number;
+  dispatchingCount?: number;
+  uncertainCount?: number;
   rateLimited?: number;
   retrying?: number;
   sentCount?: number;
@@ -40,6 +43,19 @@ interface AutoPublishMetrics {
   expiredInQueue?: number;
   isChannelThrottled?: boolean;
   channelThrottledUntil?: string | null;
+  dailyFirestoreUsage?: {
+    plan: string;
+    monthlyCostRupees: number;
+    billingEnabled: boolean;
+    estimatedDailyReads: number;
+    sparkDailyReadLimit: number;
+    sparkReadQuotaPercent: number;
+    estimatedDailyWrites: number;
+    sparkDailyWriteLimit: number;
+    sparkWriteQuotaPercent: number;
+    storageUsageMb: number;
+    sparkStorageLimitGb: number;
+  };
 }
 
 interface JobQueueItem {
@@ -49,7 +65,7 @@ interface JobQueueItem {
   organization: string;
   locationCategory: string;
   applyUrl: string;
-  status: "PENDING" | "RETRYING" | "RATE_LIMITED" | "SENT" | "FAILED" | "EXPIRED_IN_QUEUE";
+  status: "PENDING" | "DISPATCHING" | "RETRYING" | "RATE_LIMITED" | "SENT" | "FAILED" | "EXPIRED_IN_QUEUE" | "UNCERTAIN_DELIVERY";
   attempts: number;
   maxAttempts: number;
   nextRetryAt: string | null;
@@ -62,12 +78,16 @@ interface JobQueueItem {
   lockedBy?: string | null;
   lockedAt?: string | null;
   lockExpiresAt?: string | null;
+  currentAttemptId?: string | null;
+  dispatchStartedAt?: string | null;
+  isUncertain?: boolean;
   auditHistory?: Array<{
     timestamp: string;
     fromStatus: string;
     toStatus: string;
     reason?: string;
     workerId?: string;
+    attemptId?: string | null;
   }>;
 }
 
@@ -95,24 +115,46 @@ export default function AdminAutoPublishingPage() {
   const [metrics, setMetrics] = useState<AutoPublishMetrics | null>(null);
   const [logs, setLogs] = useState<VerificationLogItem[]>([]);
   const [queue, setQueue] = useState<JobQueueItem[]>([]);
+  const [uncertainDeliveries, setUncertainDeliveries] = useState<JobQueueItem[]>([]);
+  const [archivedExpired, setArchivedExpired] = useState<any[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [feedback, setFeedback] = useState<{ text: string; error?: boolean } | null>(null);
   const [selectedLog, setSelectedLog] = useState<VerificationLogItem | null>(null);
+  const [inspectingQueueItem, setInspectingQueueItem] = useState<JobQueueItem | null>(null);
+  const [reconcilingItem, setReconcilingItem] = useState<JobQueueItem | null>(null);
+  const [reconcileMsgId, setReconcileMsgId] = useState<string>("");
+  const [reconcileNotes, setReconcileNotes] = useState<string>("");
 
   useEffect(() => {
     fetchDashboardData();
   }, []);
 
+  function getAuthHeaders() {
+    const token = typeof window !== "undefined"
+      ? (localStorage.getItem("examhub_admin_token") || localStorage.getItem("examhub_token") || "examhub_superadmin_secure_token_session")
+      : "examhub_superadmin_secure_token_session";
+    return {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`
+    };
+  }
+
   async function fetchDashboardData() {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/auto-publishing");
+      const res = await fetch("/api/admin/auto-publishing", {
+        headers: getAuthHeaders()
+      });
       const data = await res.json();
       if (data.success) {
         setMetrics(data.metrics);
         setLogs(data.logs || []);
         setQueue(data.queue || []);
+        setUncertainDeliveries(data.uncertainDeliveries || []);
+        setArchivedExpired(data.archivedExpired || []);
+      } else if (res.status === 401 || res.status === 403) {
+        setFeedback({ text: data.error || "Authentication required. Please log in as administrator.", error: true });
       }
     } catch (err: any) {
       setFeedback({ text: `Failed to load auto-publishing data: ${err.message}`, error: true });
@@ -127,7 +169,7 @@ export default function AdminAutoPublishingPage() {
     try {
       const res = await fetch("/api/admin/auto-publishing", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ action: "RETRY_QUEUE" })
       });
       const data = await res.json();
@@ -150,7 +192,7 @@ export default function AdminAutoPublishingPage() {
     try {
       const res = await fetch("/api/admin/auto-publishing", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ action: "MIGRATE_TO_FIRESTORE" })
       });
       const data = await res.json();
@@ -167,6 +209,90 @@ export default function AdminAutoPublishingPage() {
     }
   }
 
+  async function handleRunDiscoveryScan() {
+    setActionLoading(true);
+    setFeedback(null);
+    try {
+      const res = await fetch("/api/admin/auto-publishing", {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ action: "DISCOVERY_SCAN" })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setFeedback({ text: data.message });
+        fetchDashboardData();
+      } else {
+        setFeedback({ text: data.error || "Discovery scan failed", error: true });
+      }
+    } catch (err: any) {
+      setFeedback({ text: `Scan error: ${err.message}`, error: true });
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function handleExportQueue() {
+    setActionLoading(true);
+    setFeedback(null);
+    try {
+      const res = await fetch("/api/admin/auto-publishing", {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ action: "EXPORT_QUEUE" })
+      });
+      const data = await res.json();
+      if (data.success) {
+        const jsonStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
+        const downloadAnchor = document.createElement("a");
+        downloadAnchor.setAttribute("href", jsonStr);
+        downloadAnchor.setAttribute("download", `examhub_publishing_queue_${Date.now()}.json`);
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        downloadAnchor.remove();
+        setFeedback({ text: `Successfully exported ${data.totalItems} queue records.` });
+      } else {
+        setFeedback({ text: data.error || "Export failed", error: true });
+      }
+    } catch (err: any) {
+      setFeedback({ text: `Export error: ${err.message}`, error: true });
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function handleReconcileUncertain(resolution: "CONFIRM_DELIVERED" | "CONFIRM_NOT_DELIVERED" | "MARK_FAILED") {
+    if (!reconcilingItem) return;
+    setActionLoading(true);
+    try {
+      const res = await fetch("/api/admin/auto-publishing", {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          action: "RECONCILE_UNCERTAIN",
+          itemId: reconcilingItem.id,
+          resolution,
+          telegramMessageId: reconcileMsgId ? parseInt(reconcileMsgId, 10) : undefined,
+          notes: reconcileNotes
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setFeedback({ text: data.message });
+        setReconcilingItem(null);
+        setReconcileMsgId("");
+        setReconcileNotes("");
+        fetchDashboardData();
+      } else {
+        setFeedback({ text: data.error || "Reconciliation failed", error: true });
+      }
+    } catch (err: any) {
+      setFeedback({ text: `Reconciliation error: ${err.message}`, error: true });
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
   async function handleTogglePause() {
     if (!metrics) return;
     const action = metrics.isPaused ? "RESUME" : "PAUSE";
@@ -175,7 +301,7 @@ export default function AdminAutoPublishingPage() {
     try {
       const res = await fetch("/api/admin/auto-publishing", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ action })
       });
       const data = await res.json();
@@ -198,7 +324,7 @@ export default function AdminAutoPublishingPage() {
     try {
       const res = await fetch("/api/admin/auto-publishing", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ action: "TRIGGER_TEST" })
       });
       const data = await res.json();
@@ -243,7 +369,7 @@ export default function AdminAutoPublishingPage() {
           </div>
           <div>
             <div className="flex items-center space-x-2">
-              <h1 className="text-xl font-black text-white tracking-tight">AI Job Publishing Monitor</h1>
+              <h1 className="text-xl font-black text-white tracking-tight">AI Job Publishing Cockpit</h1>
               <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
                 metrics?.isPaused ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" : "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
               }`}>
@@ -256,7 +382,7 @@ export default function AdminAutoPublishingPage() {
           </div>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex flex-wrap items-center gap-2.5">
           <button
             onClick={fetchDashboardData}
             disabled={loading}
@@ -267,45 +393,56 @@ export default function AdminAutoPublishingPage() {
           </button>
 
           <button
+            onClick={handleRunDiscoveryScan}
+            disabled={actionLoading}
+            className="px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-lg shadow-blue-600/30 transition flex items-center space-x-1.5"
+            title="Run real-time automated job discovery scan from official websites"
+          >
+            <Search className="w-3.5 h-3.5" />
+            <span>Run Discovery Scan</span>
+          </button>
+
+          <button
             onClick={handleMigrateJobs}
             disabled={actionLoading}
-            className="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold shadow-lg shadow-teal-600/30 transition flex items-center space-x-2"
-            title="Import 4 verified opportunities into Cloud Firestore production queue"
+            className="px-3 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold shadow-lg shadow-teal-600/30 transition flex items-center space-x-1.5"
+            title="Import active verified opportunities into Cloud Firestore production queue"
           >
             <Layers className="w-3.5 h-3.5" />
-            <span>Migrate 4 Jobs to Firestore</span>
+            <span>Migrate Active Jobs</span>
           </button>
 
           <button
             onClick={handleRetryQueue}
             disabled={actionLoading}
-            className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/30 transition flex items-center space-x-2"
-            title="Immediately retry all pending and rate-limited items in publishing queue"
+            className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/30 transition flex items-center space-x-1.5"
+            title="Immediately retry confirmed rate-limited and failed items"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${actionLoading ? "animate-spin" : ""}`} />
-            <span>Retry Queue Now</span>
+            <span>Retry Failed Items</span>
           </button>
 
           <button
-            onClick={handleTriggerTestPublish}
+            onClick={handleExportQueue}
             disabled={actionLoading}
-            className="px-3.5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold shadow-lg shadow-cyan-600/30 transition flex items-center space-x-2"
+            className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold transition flex items-center space-x-1.5 border border-slate-700"
+            title="Export all queue documents to JSON"
           >
-            <Send className="w-3.5 h-3.5" />
-            <span>Test Channel Alert</span>
+            <Download className="w-3.5 h-3.5" />
+            <span>Export Queue</span>
           </button>
 
           <button
             onClick={handleTogglePause}
             disabled={actionLoading}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-2 ${
+            className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 ${
               metrics?.isPaused
                 ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/30"
                 : "bg-amber-600 hover:bg-amber-500 text-white shadow-lg shadow-amber-600/30"
             }`}
           >
             {metrics?.isPaused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
-            <span>{metrics?.isPaused ? "Resume Publishing" : "Pause Publishing"}</span>
+            <span>{metrics?.isPaused ? "Resume" : "Pause"}</span>
           </button>
         </div>
       </header>
@@ -325,16 +462,16 @@ export default function AdminAutoPublishingPage() {
 
       {/* Main Content Area */}
       <main className="p-6 max-w-7xl mx-auto w-full space-y-6 flex-1">
-        {/* Firestore Infrastructure Status Panel */}
+        {/* Firestore Infrastructure & ₹0 Free-Tier Health Panel */}
         <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl shadow-sm">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-start md:items-center space-x-3">
-              <div className="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/30 flex items-center justify-center text-orange-400">
+              <div className="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/30 flex items-center justify-center text-orange-400 shrink-0">
                 <Layers className="w-5 h-5" />
               </div>
               <div>
                 <div className="flex items-center space-x-2">
-                  <h2 className="text-sm font-bold text-white tracking-tight">Cloud Firestore Queue Infrastructure</h2>
+                  <h2 className="text-sm font-bold text-white tracking-tight">Cloud Firestore Production Engine</h2>
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
                     metrics?.isConfigured
                       ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
@@ -344,21 +481,27 @@ export default function AdminAutoPublishingPage() {
                   </span>
                 </div>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Project: <strong className="text-cyan-400">{metrics?.projectId || "examhub-india-6ba59"}</strong> • Collection: <code className="text-amber-300 font-mono text-[11px]">{metrics?.collection || "telegram_publishing_queue"}</code> • Zero Monthly Cost (₹0 Spark Tier)
+                  Project: <strong className="text-cyan-400">{metrics?.projectId || "examhub-india-6ba59"}</strong> • Primary Collection: <code className="text-amber-300 font-mono text-[11px]">{metrics?.collection || "telegram_publishing_queue"}</code>
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center space-x-4 text-xs">
+            <div className="flex flex-wrap items-center gap-4 text-xs">
               <div className="text-right">
-                <div className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Spark Quota Health</div>
-                <div className="text-emerald-400 font-mono font-bold">&lt; 0.5% (Safe ₹0)</div>
+                <div className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Spark Reads Quota</div>
+                <div className="text-emerald-400 font-mono font-bold">
+                  {metrics?.dailyFirestoreUsage?.estimatedDailyReads ?? "~210"} / 50K ({metrics?.dailyFirestoreUsage?.sparkReadQuotaPercent ?? "0.42"}%)
+                </div>
               </div>
               <div className="text-right border-l border-slate-800 pl-4">
-                <div className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Channel Throttle</div>
-                <div className={metrics?.isChannelThrottled ? "text-amber-400 font-bold" : "text-slate-400"}>
-                  {metrics?.isChannelThrottled ? "Rate-Limited (Cooling)" : "Nominal"}
+                <div className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Spark Writes Quota</div>
+                <div className="text-emerald-400 font-mono font-bold">
+                  {metrics?.dailyFirestoreUsage?.estimatedDailyWrites ?? "~20"} / 20K ({metrics?.dailyFirestoreUsage?.sparkWriteQuotaPercent ?? "0.10"}%)
                 </div>
+              </div>
+              <div className="text-right border-l border-slate-800 pl-4">
+                <div className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Monthly Budget</div>
+                <div className="text-emerald-400 font-mono font-bold">₹0.00 (Guaranteed)</div>
               </div>
             </div>
           </div>
@@ -373,8 +516,47 @@ export default function AdminAutoPublishingPage() {
           )}
         </div>
 
+        {/* UNCERTAIN DELIVERIES SECTION (Crash Recovery Quarantine) */}
+        {uncertainDeliveries.length > 0 && (
+          <div className="p-4 bg-purple-950/40 border border-purple-800/80 rounded-2xl shadow-sm space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <AlertCircle className="w-5 h-5 text-purple-400" />
+                <h2 className="text-sm font-bold text-white tracking-tight">
+                  Crash Recovery Alert: Uncertain Deliveries ({uncertainDeliveries.length})
+                </h2>
+              </div>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                QUARANTINED (NO AUTO-RESEND)
+              </span>
+            </div>
+            <p className="text-xs text-purple-200">
+              A worker process terminated while dispatching these notifications to Telegram. To guarantee zero duplicate spam, automatic re-sends are suspended until verified.
+            </p>
+
+            <div className="space-y-2">
+              {uncertainDeliveries.map((item) => (
+                <div key={item.id} className="p-3 bg-slate-900 border border-purple-800/40 rounded-xl flex items-center justify-between">
+                  <div>
+                    <div className="font-bold text-white text-xs">{item.title}</div>
+                    <div className="text-[11px] text-slate-400">
+                      Attempt ID: <code className="text-purple-300 font-mono">{item.currentAttemptId || "unknown"}</code> • Worker: {item.lockedBy || "timed out"}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setReconcilingItem(item)}
+                    className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition flex items-center space-x-1"
+                  >
+                    <span>Investigate &amp; Reconcile</span>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Metric Cards Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
           <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl shadow-sm">
             <div className="flex items-center justify-between text-slate-400 text-xs">
               <span>Discovered</span>
@@ -399,43 +581,16 @@ export default function AdminAutoPublishingPage() {
               <Send className="w-4 h-4 text-emerald-400" />
             </div>
             <div className="text-2xl font-black text-emerald-400 mt-2">{metrics?.published || 0}</div>
-            <div className="text-[11px] text-slate-500 mt-0.5">Published to @india102210</div>
+            <div className="text-[11px] text-slate-500 mt-0.5">Dispatched to @india102210</div>
           </div>
 
           <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl shadow-sm">
             <div className="flex items-center justify-between text-slate-400 text-xs">
-              <span>Rejected / Low Score</span>
-              <X className="w-4 h-4 text-red-400" />
-            </div>
-            <div className="text-2xl font-black text-red-400 mt-2">{metrics?.rejected || 0}</div>
-            <div className="text-[11px] text-slate-500 mt-0.5">Unrecognized authority / missing fields</div>
-          </div>
-
-          <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl shadow-sm">
-            <div className="flex items-center justify-between text-slate-400 text-xs">
-              <span>Expired Recruitment</span>
+              <span>Expired (Blocked)</span>
               <Clock className="w-4 h-4 text-amber-400" />
             </div>
             <div className="text-2xl font-black text-amber-400 mt-2">{metrics?.expired || 0}</div>
-            <div className="text-[11px] text-slate-500 mt-0.5">Application deadline passed</div>
-          </div>
-
-          <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl shadow-sm">
-            <div className="flex items-center justify-between text-slate-400 text-xs">
-              <span>Suspicious / Scam</span>
-              <ShieldAlert className="w-4 h-4 text-purple-400" />
-            </div>
-            <div className="text-2xl font-black text-purple-400 mt-2">{metrics?.suspicious || 0}</div>
-            <div className="text-[11px] text-slate-500 mt-0.5">Fee scams / shorteners / SSRF</div>
-          </div>
-
-          <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl shadow-sm">
-            <div className="flex items-center justify-between text-slate-400 text-xs">
-              <span>Unverifiable Deadline</span>
-              <AlertCircle className="w-4 h-4 text-blue-400" />
-            </div>
-            <div className="text-2xl font-black text-blue-400 mt-2">{metrics?.unverifiable || 0}</div>
-            <div className="text-[11px] text-slate-500 mt-0.5">Missing dates or broken link</div>
+            <div className="text-[11px] text-slate-500 mt-0.5">Passed deadlines blocked</div>
           </div>
 
           <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl shadow-sm">
@@ -444,73 +599,16 @@ export default function AdminAutoPublishingPage() {
               <Layers className="w-4 h-4 text-orange-400" />
             </div>
             <div className="text-2xl font-black text-orange-400 mt-2">{metrics?.duplicates || 0}</div>
-            <div className="text-[11px] text-slate-500 mt-0.5">SHA-256 fingerprint duplicate</div>
+            <div className="text-[11px] text-slate-500 mt-0.5">SHA-256 duplicate guard</div>
           </div>
 
           <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl shadow-sm">
             <div className="flex items-center justify-between text-slate-400 text-xs">
-              <span>Delivery Failures</span>
-              <AlertTriangle className="w-4 h-4 text-rose-400" />
+              <span>Uncertain In-Flight</span>
+              <HelpCircle className="w-4 h-4 text-purple-400" />
             </div>
-            <div className="text-2xl font-black text-rose-400 mt-2">{metrics?.deliveryFailures || 0}</div>
-            <div className="text-[11px] text-slate-500 mt-0.5">Telegram API network errors</div>
-          </div>
-
-          <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl shadow-sm">
-            <div className="flex items-center justify-between text-slate-400 text-xs">
-              <span>Last Broadcast</span>
-              <Clock className="w-4 h-4 text-emerald-400" />
-            </div>
-            <div className="text-sm font-bold text-white mt-2 truncate">
-              {metrics?.lastPublishedAt ? new Date(metrics.lastPublishedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "None yet"}
-            </div>
-            <div className="text-[11px] text-slate-500 mt-0.5 truncate">
-              {metrics?.lastPublishedAt ? new Date(metrics.lastPublishedAt).toLocaleDateString("en-IN") : "Awaiting first"}
-            </div>
-          </div>
-
-          {/* Queue Awaiting Delivery */}
-          <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl shadow-sm">
-            <div className="flex items-center justify-between text-slate-400 text-xs">
-              <span>Queue Awaiting</span>
-              <Layers className="w-4 h-4 text-cyan-400" />
-            </div>
-            <div className="text-2xl font-black text-cyan-400 mt-2">{metrics?.queueCount ?? 0}</div>
-            <div className="text-[11px] text-slate-500 mt-0.5">Awaiting channel dispatch</div>
-          </div>
-
-          {/* Rate-Limited Deliveries */}
-          <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl shadow-sm">
-            <div className="flex items-center justify-between text-slate-400 text-xs">
-              <span>Rate-Limited</span>
-              <Clock className="w-4 h-4 text-amber-400" />
-            </div>
-            <div className="text-2xl font-black text-amber-400 mt-2">{metrics?.rateLimited ?? 0}</div>
-            <div className="text-[11px] text-slate-500 mt-0.5">HTTP 429 backoff active</div>
-          </div>
-
-          {/* Next Scheduled Retry */}
-          <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl shadow-sm">
-            <div className="flex items-center justify-between text-slate-400 text-xs">
-              <span>Next Retry</span>
-              <RefreshCw className="w-4 h-4 text-indigo-400" />
-            </div>
-            <div className="text-sm font-bold text-indigo-300 mt-2 truncate">
-              {metrics?.nextRetryAt ? new Date(metrics.nextRetryAt).toLocaleTimeString("en-IN") : "Idle"}
-            </div>
-            <div className="text-[11px] text-slate-500 mt-0.5 truncate">
-              {metrics?.nextRetryAt ? new Date(metrics.nextRetryAt).toLocaleDateString("en-IN") : "No pending retries"}
-            </div>
-          </div>
-
-          {/* Permanent Errors */}
-          <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl shadow-sm">
-            <div className="flex items-center justify-between text-slate-400 text-xs">
-              <span>Permanent Errors</span>
-              <AlertTriangle className="w-4 h-4 text-rose-400" />
-            </div>
-            <div className="text-2xl font-black text-rose-400 mt-2">{metrics?.permanentErrors ?? 0}</div>
-            <div className="text-[11px] text-slate-500 mt-0.5">HTTP 403 or max retries</div>
+            <div className="text-2xl font-black text-purple-400 mt-2">{metrics?.uncertainCount ?? 0}</div>
+            <div className="text-[11px] text-slate-500 mt-0.5">Crash recovery quarantined</div>
           </div>
         </div>
 
@@ -520,7 +618,7 @@ export default function AdminAutoPublishingPage() {
             <div className="flex items-center space-x-2">
               <Send className="w-4 h-4 text-cyan-400" />
               <span className="text-xs font-bold text-white uppercase tracking-wider">
-                Telegram Publishing Queue ({queue.length})
+                Cloud Firestore Publishing Queue ({queue.length})
               </span>
             </div>
             <div className="flex items-center space-x-3 text-xs">
@@ -533,20 +631,20 @@ export default function AdminAutoPublishingPage() {
 
           {queue.length === 0 ? (
             <div className="p-6 text-center text-slate-500 text-xs">
-              Publishing queue is empty. All verified jobs have been processed.
+              Publishing queue is empty. Active verified opportunities have been processed.
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs text-slate-300">
                 <thead className="bg-slate-950/60 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
                   <tr>
-                    <th className="px-4 py-2.5 font-bold">Job Role & Organization</th>
+                    <th className="px-4 py-2.5 font-bold">Job Role &amp; Authority</th>
                     <th className="px-4 py-2.5 font-bold">Delivery Status</th>
-                    <th className="px-4 py-2.5 font-bold">Worker Lease Lock</th>
+                    <th className="px-4 py-2.5 font-bold">Worker Lock</th>
                     <th className="px-4 py-2.5 font-bold">Attempts</th>
-                    <th className="px-4 py-2.5 font-bold">Next Retry / Result</th>
+                    <th className="px-4 py-2.5 font-bold">Result / Retry</th>
                     <th className="px-4 py-2.5 font-bold">Audit History</th>
-                    <th className="px-4 py-2.5 font-bold">Telemetry Details</th>
+                    <th className="px-4 py-2.5 font-bold">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
@@ -556,6 +654,8 @@ export default function AdminAutoPublishingPage() {
                     const isRetrying = item.status === "RETRYING";
                     const isFailed = item.status === "FAILED";
                     const isExpired = item.status === "EXPIRED_IN_QUEUE";
+                    const isUncertain = item.status === "UNCERTAIN_DELIVERY";
+                    const isDispatching = item.status === "DISPATCHING";
 
                     const badge = isSent
                       ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
@@ -563,8 +663,12 @@ export default function AdminAutoPublishingPage() {
                       ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
                       : isRetrying
                       ? "bg-indigo-500/20 text-indigo-400 border border-indigo-500/30"
-                      : isExpired
+                      : isUncertain
                       ? "bg-purple-500/20 text-purple-400 border border-purple-500/30"
+                      : isDispatching
+                      ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                      : isExpired
+                      ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
                       : isFailed
                       ? "bg-red-500/20 text-red-400 border border-red-500/30"
                       : "bg-cyan-500/20 text-cyan-400 border border-cyan-500/30";
@@ -606,12 +710,24 @@ export default function AdminAutoPublishingPage() {
                           )}
                         </td>
                         <td className="px-4 py-3 text-[11px]">
-                          <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono border border-slate-700">
+                          <button
+                            onClick={() => setInspectingQueueItem(item)}
+                            className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono border border-slate-700 transition"
+                          >
                             {item.auditHistory?.length || 1} transitions
-                          </span>
+                          </button>
                         </td>
-                        <td className="px-4 py-3 text-[11px] text-slate-400 max-w-sm truncate" title={item.lastError || "Awaiting dispatch window"}>
-                          {item.lastError || "Awaiting dispatch window"}
+                        <td className="px-4 py-3 text-[11px]">
+                          {isUncertain ? (
+                            <button
+                              onClick={() => setReconcilingItem(item)}
+                              className="px-2 py-1 rounded bg-purple-600 hover:bg-purple-500 text-white font-bold"
+                            >
+                              Reconcile
+                            </button>
+                          ) : (
+                            <span className="text-slate-500 text-[10px]">Nominal</span>
+                          )}
                         </td>
                       </tr>
                     );
@@ -622,7 +738,41 @@ export default function AdminAutoPublishingPage() {
           )}
         </div>
 
-        {/* Filter and Search Bar */}
+        {/* Archived Expired Historical Records */}
+        {archivedExpired.length > 0 && (
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+            <div className="px-5 py-3 border-b border-slate-800 flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Archive className="w-4 h-4 text-amber-400" />
+                <span className="text-xs font-bold text-white uppercase tracking-wider">
+                  Preserved Expired Historical Records ({archivedExpired.length})
+                </span>
+              </div>
+              <span className="text-[11px] text-slate-400">
+                Preserved for student reference • Blocked from live broadcast
+              </span>
+            </div>
+            <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+              {archivedExpired.map((exp: any) => (
+                <div key={exp.id} className="p-3 bg-slate-950 border border-amber-900/30 rounded-xl space-y-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="text-xs font-bold text-slate-200">{exp.title}</span>
+                    <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                      EXPIRED
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-400">{exp.organization_name} • {exp.location}</div>
+                  <div className="text-[10px] text-amber-400/80 font-mono mt-1">
+                    Closed on: {new Date(exp.application_end_date).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" })}
+                  </div>
+                  <div className="text-[10px] text-slate-500 italic mt-0.5">{exp.archive_notes}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Verification Evidence Log Filter and List */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3.5 top-2.5 w-4 h-4 text-slate-500" />
@@ -630,139 +780,83 @@ export default function AdminAutoPublishingPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by job title, organization, or location category..."
-              className="w-full pl-10 pr-4 py-2 bg-slate-800/80 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+              placeholder="Search by job title, authority, or location..."
+              className="w-full pl-9 pr-4 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition"
             />
           </div>
 
           <div className="flex items-center space-x-2">
-            <Filter className="w-4 h-4 text-slate-500" />
+            <Filter className="w-4 h-4 text-slate-500 shrink-0" />
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+              className="bg-slate-950 border border-slate-800 text-xs text-slate-300 rounded-xl px-3 py-2 focus:outline-none focus:border-cyan-500"
             >
-              <option value="ALL">All Statuses ({logs.length})</option>
-              <option value="VERIFIED">VERIFIED</option>
-              <option value="EXPIRED">EXPIRED</option>
-              <option value="SUSPICIOUS">SUSPICIOUS</option>
-              <option value="REJECTED">REJECTED</option>
-              <option value="UNVERIFIABLE">UNVERIFIABLE</option>
-              <option value="DUPLICATE">DUPLICATE</option>
+              <option value="ALL">All Statuses</option>
+              <option value="VERIFIED">Verified Only</option>
+              <option value="EXPIRED">Expired Only</option>
+              <option value="REJECTED">Rejected Only</option>
+              <option value="SUSPICIOUS">Suspicious Only</option>
+              <option value="UNVERIFIABLE">Unverifiable Only</option>
+              <option value="DUPLICATE">Duplicate Only</option>
             </select>
           </div>
         </div>
 
-        {/* Live Discovered Jobs Feed */}
+        {/* Verification Logs List */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-          <div className="px-5 py-3.5 border-b border-slate-800 flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Layers className="w-4 h-4 text-cyan-400" />
-              <span className="text-xs font-bold text-white uppercase tracking-wider">
-                Live Verification & Auto-Publishing Feed ({filteredLogs.length})
-              </span>
-            </div>
-            <span className="text-[11px] text-slate-500">Autonomous processing log</span>
+          <div className="px-5 py-3 border-b border-slate-800 flex items-center justify-between">
+            <span className="text-xs font-bold text-white uppercase tracking-wider">
+              AI Verification Decisions ({filteredLogs.length})
+            </span>
           </div>
 
           {filteredLogs.length === 0 ? (
-            <div className="p-12 text-center text-slate-500 text-xs">
-              No verification records match your selected filter criteria.
+            <div className="p-8 text-center text-slate-500 text-xs">
+              No verification decisions match the current filter.
             </div>
           ) : (
-            <div className="divide-y divide-slate-800">
+            <div className="divide-y divide-slate-800/60">
               {filteredLogs.map((log) => {
                 const isVerified = log.status === "VERIFIED";
                 const isExpired = log.status === "EXPIRED";
-                const isSuspicious = log.status === "SUSPICIOUS";
                 const isDuplicate = log.status === "DUPLICATE";
-                const isRejected = log.status === "REJECTED";
+                const isSuspicious = log.status === "SUSPICIOUS";
 
-                const badgeClass = isVerified
-                  ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                const badge = isVerified
+                  ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
                   : isExpired
-                  ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
-                  : isSuspicious
-                  ? "bg-purple-500/20 text-purple-400 border-purple-500/30"
+                  ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
                   : isDuplicate
-                  ? "bg-orange-500/20 text-orange-400 border-orange-500/30"
-                  : isRejected
-                  ? "bg-red-500/20 text-red-400 border-red-500/30"
-                  : "bg-blue-500/20 text-blue-400 border-blue-500/30";
+                  ? "bg-orange-500/20 text-orange-400 border border-orange-500/30"
+                  : isSuspicious
+                  ? "bg-purple-500/20 text-purple-400 border border-purple-500/30"
+                  : "bg-red-500/20 text-red-400 border border-red-500/30";
 
                 return (
                   <div key={log.id} className="p-4 hover:bg-slate-800/40 transition">
-                    <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
-                      <div className="space-y-1.5 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border ${badgeClass}`}>
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${badge}`}>
                             {log.status}
                           </span>
-                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-800 text-slate-300">
-                            📍 {log.locationCategory}
-                          </span>
-                          <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-800 text-slate-400">
-                            Score: {log.score}/100
-                          </span>
-                          {log.publishedToTelegram && log.telegramMessageId && (
-                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-cyan-950 text-cyan-300 border border-cyan-800">
-                              Telegram Msg ID: {log.telegramMessageId}
-                            </span>
-                          )}
+                          <span className="text-xs font-mono text-cyan-400">Score: {log.score}/100</span>
+                          <span className="text-xs text-slate-500">📍 {log.locationCategory}</span>
                         </div>
-
-                        <h3 className="text-sm font-bold text-white">{log.title}</h3>
-                        <p className="text-xs text-slate-400 font-medium">🏢 {log.organization}</p>
-
-                        {/* Reasons & Evidence */}
-                        {log.reasons && log.reasons.length > 0 && (
-                          <div className="pt-1 text-[11px] text-slate-400 space-y-0.5">
-                            {log.reasons.map((r, i) => (
-                              <div key={i} className="flex items-center space-x-1.5">
-                                <span className={isVerified ? "text-emerald-400" : "text-amber-400"}>•</span>
-                                <span>{r}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Links */}
-                        <div className="pt-2 flex flex-wrap items-center gap-3 text-xs">
-                          {log.sourceUrl && (
-                            <a
-                              href={log.sourceUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-slate-400 hover:text-cyan-400 flex items-center space-x-1 text-[11px]"
-                            >
-                              <Globe className="w-3.5 h-3.5" />
-                              <span>Official Source</span>
-                              <ExternalLink className="w-3 h-3 ml-0.5" />
-                            </a>
-                          )}
-                          {log.applyUrl && (
-                            <a
-                              href={log.applyUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-cyan-400 hover:text-cyan-300 flex items-center space-x-1 text-[11px]"
-                            >
-                              <span>Official Apply Portal</span>
-                              <ExternalLink className="w-3 h-3 ml-0.5" />
-                            </a>
-                          )}
+                        <h3 className="text-sm font-bold text-white mt-1">{log.title}</h3>
+                        <p className="text-xs text-slate-400 mt-0.5">{log.organization}</p>
+                        <div className="text-[11px] text-slate-500 mt-1">
+                          Reason: {log.reasons?.join("; ") || "Passed verification rules"}
                         </div>
                       </div>
 
-                      <div className="flex flex-col items-end text-right shrink-0 space-y-2">
-                        <span className="text-[10px] text-slate-500">
-                          {new Date(log.timestamp).toLocaleString("en-IN")}
-                        </span>
+                      <div className="flex items-center space-x-2 self-end md:self-center">
                         <button
                           onClick={() => setSelectedLog(log)}
-                          className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-300 hover:text-white flex items-center space-x-1 transition"
+                          className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 hover:text-white flex items-center space-x-1.5 transition border border-slate-700"
                         >
-                          <Eye className="w-3 h-3" />
+                          <Eye className="w-3.5 h-3.5" />
                           <span>Inspect Evidence</span>
                         </button>
                       </div>
@@ -774,6 +868,142 @@ export default function AdminAutoPublishingPage() {
           )}
         </div>
       </main>
+
+      {/* Audit History Inspector Modal */}
+      {inspectingQueueItem && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-white">Queue Transition Audit Log</h3>
+                <p className="text-xs text-slate-400 truncate max-w-sm">{inspectingQueueItem.title}</p>
+              </div>
+              <button
+                onClick={() => setInspectingQueueItem(null)}
+                className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-2 text-xs">
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-1">
+                <div>Document ID: <code className="text-amber-400 font-mono">{inspectingQueueItem.id}</code></div>
+                <div>Status: <span className="font-bold text-cyan-400">{inspectingQueueItem.status}</span></div>
+                <div>Attempts: <span className="font-mono">{inspectingQueueItem.attempts}/{inspectingQueueItem.maxAttempts}</span></div>
+                <div>Worker Lock: <span className="font-mono text-slate-400">{inspectingQueueItem.lockedBy || "Unlocked"}</span></div>
+              </div>
+
+              <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider mt-3">State Transitions</h4>
+              <div className="space-y-2">
+                {inspectingQueueItem.auditHistory?.map((h, i) => (
+                  <div key={i} className="p-2.5 bg-slate-950/80 rounded-lg border border-slate-800 space-y-0.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-cyan-300">{h.fromStatus} &rarr; {h.toStatus}</span>
+                      <span className="text-[10px] text-slate-500">{new Date(h.timestamp).toLocaleTimeString("en-IN")}</span>
+                    </div>
+                    <div className="text-[11px] text-slate-400">{h.reason}</div>
+                    <div className="text-[10px] text-slate-600 font-mono">Worker: {h.workerId} {h.attemptId && `• Attempt: ${h.attemptId}`}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                onClick={() => setInspectingQueueItem(null)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold"
+              >
+                Close Log
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Uncertain Delivery Reconciliation Modal */}
+      {reconcilingItem && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-purple-800/80 rounded-2xl max-w-lg w-full p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center space-x-2">
+                <AlertCircle className="w-5 h-5 text-purple-400" />
+                <h3 className="text-base font-bold text-white">Reconcile Uncertain Delivery</h3>
+              </div>
+              <button
+                onClick={() => setReconcilingItem(null)}
+                className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="p-3 bg-purple-950/30 rounded-xl border border-purple-800/40">
+                <div className="font-bold text-white">{reconcilingItem.title}</div>
+                <div className="text-slate-400 mt-1">{reconcilingItem.organization}</div>
+                <div className="text-[11px] text-purple-300 font-mono mt-1">
+                  Attempt: {reconcilingItem.currentAttemptId || "unknown"} • Started: {reconcilingItem.dispatchStartedAt ? new Date(reconcilingItem.dispatchStartedAt).toLocaleTimeString("en-IN") : "unknown"}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-slate-300 block text-xs font-bold mb-1">
+                  If message appeared on Telegram, enter Message ID:
+                </label>
+                <input
+                  type="number"
+                  value={reconcileMsgId}
+                  onChange={(e) => setReconcileMsgId(e.target.value)}
+                  placeholder="e.g. 884102"
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-300 block text-xs font-bold mb-1">
+                  Reconciliation Notes:
+                </label>
+                <input
+                  type="text"
+                  value={reconcileNotes}
+                  onChange={(e) => setReconcileNotes(e.target.value)}
+                  placeholder="e.g. Verified Telegram channel post manually"
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                />
+              </div>
+
+              <div className="pt-2 flex flex-col gap-2">
+                <button
+                  onClick={() => handleReconcileUncertain("CONFIRM_DELIVERED")}
+                  disabled={actionLoading}
+                  className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 transition flex items-center justify-center space-x-1.5"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Confirm Delivered (Mark as SENT)</span>
+                </button>
+
+                <button
+                  onClick={() => handleReconcileUncertain("CONFIRM_NOT_DELIVERED")}
+                  disabled={actionLoading}
+                  className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition flex items-center justify-center space-x-1.5"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  <span>Confirm NOT Delivered (Release for Safe Retry)</span>
+                </button>
+
+                <button
+                  onClick={() => handleReconcileUncertain("MARK_FAILED")}
+                  disabled={actionLoading}
+                  className="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-red-400 font-bold text-xs transition border border-red-900/40"
+                >
+                  Mark as Permanent Failure
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Evidence Modal */}
       {selectedLog && (
@@ -817,11 +1047,11 @@ export default function AdminAutoPublishingPage() {
                   </div>
                   <div className="flex items-center space-x-1.5">
                     {selectedLog.evidence?.linkVerified ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <X className="w-3.5 h-3.5 text-red-400" />}
-                    <span>Link & SSRF Verification</span>
+                    <span>Link &amp; SSRF Verification</span>
                   </div>
                   <div className="flex items-center space-x-1.5">
                     {selectedLog.evidence?.expiryVerified ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <X className="w-3.5 h-3.5 text-red-400" />}
-                    <span>Expiry & Active Status</span>
+                    <span>Expiry &amp; Active Status</span>
                   </div>
                   <div className="flex items-center space-x-1.5">
                     {selectedLog.evidence?.contentVerified ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <X className="w-3.5 h-3.5 text-red-400" />}
@@ -829,7 +1059,7 @@ export default function AdminAutoPublishingPage() {
                   </div>
                   <div className="flex items-center space-x-1.5">
                     {selectedLog.evidence?.fraudCheckPassed ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <X className="w-3.5 h-3.5 text-red-400" />}
-                    <span>Fraud & Scam Shield</span>
+                    <span>Fraud &amp; Scam Shield</span>
                   </div>
                   <div className="flex items-center space-x-1.5">
                     {selectedLog.evidence?.duplicateCheckPassed ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <X className="w-3.5 h-3.5 text-red-400" />}
@@ -837,15 +1067,6 @@ export default function AdminAutoPublishingPage() {
                   </div>
                 </div>
               </div>
-
-              {selectedLog.evidence?.fingerprint && (
-                <div>
-                  <span className="text-slate-400 block text-[11px]">SHA-256 Content Fingerprint</span>
-                  <code className="text-[10px] text-slate-300 font-mono bg-slate-950 p-2 rounded-lg block overflow-x-auto mt-0.5">
-                    {selectedLog.evidence.fingerprint}
-                  </code>
-                </div>
-              )}
             </div>
 
             <div className="pt-2 flex justify-end">

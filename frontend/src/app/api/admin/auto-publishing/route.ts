@@ -1,6 +1,7 @@
 // ============================================================================
 // EXAMHUB INDIA — ADMIN AUTO-PUBLISHING API ROUTE
-// Provides real-time metrics, verification evidence log, pause/resume controls
+// Secured server-side administrative controller for Cloud Firestore publishing queue
+// Protected with strict authentication, CSRF checks, and role validation
 // ============================================================================
 
 import { NextRequest, NextResponse } from "next/server";
@@ -14,14 +15,25 @@ import {
   getQueueTelemetry,
   getQueueItems,
   retryPendingNow,
-  migrateJobsToFirestore
+  migrateJobsToFirestore,
+  reconcileUncertainDelivery
 } from "@/lib/jobQueue";
+import {
+  verifyAdminAuthorization,
+  unauthorizedResponse,
+  sanitizeAdminPayload
+} from "@/lib/adminAuth";
+import { runAutomatedJobDiscovery } from "@/lib/jobDiscovery";
 
 export const dynamic = "force-dynamic";
 
-export const REAL_PENDING_OPPORTUNITIES = [
+// ----------------------------------------------------------------------------
+// PHASE 1: PRESERVED HISTORICAL EXPIRED ARCHIVE (Never Enqueued to Active Queue)
+// Current System Date: 25 November 2026
+// ----------------------------------------------------------------------------
+export const HISTORICAL_EXPIRED_ARCHIVE = [
   {
-    id: "upsc-cds-1-2026",
+    id: "upsc-cds-1-2026-expired",
     title: "UPSC Combined Defence Services Examination (CDS I) 2026",
     organization_name: "Union Public Service Commission (UPSC)",
     sector: "DEFENCE",
@@ -31,13 +43,17 @@ export const REAL_PENDING_OPPORTUNITIES = [
     experience_required: "Fresher / Unmarried Male & Female",
     salary_range: "Level 10 (Rs. 56,100 - Rs. 1,77,500)",
     application_start_date: "2025-12-10T00:00:00+05:30",
-    application_end_date: "2026-01-09T18:00:00+05:30",
+    application_end_date: "2026-01-09T18:00:00+05:30", // EXPIRED: Closed 9 Jan 2026
+    status: "EXPIRED",
+    is_expired: true,
+    application_action_disabled: true,
     official_notification_pdf: "https://upsc.gov.in/sites/default/files/Notice-CDSI-2026.pdf",
     official_application_url: "https://upsconline.nic.in",
-    source_website_url: "https://upsc.gov.in"
+    source_website_url: "https://upsc.gov.in",
+    archive_notes: "Application window closed on 9 January 2026 (18:00 IST). Historical archive record."
   },
   {
-    id: "ssc-chsl-2026",
+    id: "ssc-chsl-2026-expired",
     title: "SSC Combined Higher Secondary Level (CHSL) Examination 2026",
     organization_name: "Staff Selection Commission (SSC)",
     sector: "CENTRAL_GOVT",
@@ -47,11 +63,21 @@ export const REAL_PENDING_OPPORTUNITIES = [
     experience_required: "Fresher",
     salary_range: "Pay Level-2 to Pay Level-5 (Rs. 19,900 - Rs. 92,300)",
     application_start_date: "2026-04-02T00:00:00+05:30",
-    application_end_date: "2026-05-18T23:00:00+05:30",
+    application_end_date: "2026-05-18T23:00:00+05:30", // EXPIRED: Closed 18 May 2026
+    status: "EXPIRED",
+    is_expired: true,
+    application_action_disabled: true,
     official_notification_pdf: "https://ssc.gov.in/notice-chsl-2026.pdf",
     official_application_url: "https://ssc.gov.in",
-    source_website_url: "https://ssc.gov.in"
-  },
+    source_website_url: "https://ssc.gov.in",
+    archive_notes: "Application window closed on 18 May 2026 (23:00 IST). Historical archive record."
+  }
+];
+
+// ----------------------------------------------------------------------------
+// PHASE 1 & 6: ACTIVE VERIFIED OPPORTUNITIES (Audited Official Career Portals)
+// ----------------------------------------------------------------------------
+export const ACTIVE_VERIFIED_OPPORTUNITIES = [
   {
     id: "zoho-sde-chennai-2026",
     title: "Zoho Corporation Junior Software Development Engineer 2026",
@@ -63,10 +89,13 @@ export const REAL_PENDING_OPPORTUNITIES = [
     experience_required: "0 - 2 Years",
     salary_range: "Rs. 6,00,000 - Rs. 10,00,000 Per Annum",
     application_start_date: "2026-01-01T00:00:00+05:30",
-    application_end_date: "2026-12-31T23:59:59+05:30",
+    application_end_date: "2026-12-31T23:59:59+05:30", // ACTIVE future date (Dec 2026)
+    status: "OPEN",
+    is_expired: false,
+    application_action_disabled: false,
     official_notification_pdf: null,
-    official_application_url: "https://careers.zohocorp.com/apply-sde-2026",
-    source_website_url: "https://www.zoho.com/careers"
+    official_application_url: "https://www.zoho.com/careers/",
+    source_website_url: "https://www.zoho.com/careers/"
   },
   {
     id: "infosys-dse-2026",
@@ -79,15 +108,24 @@ export const REAL_PENDING_OPPORTUNITIES = [
     experience_required: "Fresher / 2025-2026 Batch",
     salary_range: "Rs. 6,25,000 - Rs. 9,50,000 Per Annum",
     application_start_date: "2026-01-15T00:00:00+05:30",
-    application_end_date: "2026-12-15T23:59:59+05:30",
+    application_end_date: "2026-12-15T23:59:59+05:30", // ACTIVE future date (Dec 2026)
+    status: "OPEN",
+    is_expired: false,
+    application_action_disabled: false,
     official_notification_pdf: null,
-    official_application_url: "https://career.infosys.com/jobdesc?jobReferenceCode=INF-DSE-2026",
+    official_application_url: "https://career.infosys.com",
     source_website_url: "https://www.infosys.com/careers"
   }
 ];
 
 export async function GET(req: NextRequest) {
   try {
+    // 1. Mandatory Server-Side Admin Authentication Check
+    const auth = verifyAdminAuthorization(req);
+    if (!auth.authorized) {
+      return unauthorizedResponse(auth);
+    }
+
     const config = getAutoPublishConfig();
     const logs = getVerificationLogs(100);
     const queueTelemetry = await getQueueTelemetry();
@@ -96,6 +134,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       success: true,
       timestamp: new Date().toISOString(),
+      authenticatedAdmin: auth.adminUser?.email,
       config,
       metrics: {
         discovered: config.totalDiscoveredCount,
@@ -117,6 +156,8 @@ export async function GET(req: NextRequest) {
         collection: queueTelemetry.collection || "telegram_publishing_queue",
         queueCount: queueTelemetry.queueCount || 0,
         pendingCount: queueTelemetry.pendingCount || 0,
+        dispatchingCount: queueTelemetry.dispatchingCount || 0,
+        uncertainCount: queueTelemetry.uncertainCount || 0,
         rateLimited: queueTelemetry.rateLimitedCount || 0,
         retrying: queueTelemetry.retryingCount || 0,
         sentCount: queueTelemetry.sentCount || 0,
@@ -128,9 +169,12 @@ export async function GET(req: NextRequest) {
         expiredInQueue: queueTelemetry.expiredInQueueCount || 0,
         isChannelThrottled: queueTelemetry.isChannelThrottled || false,
         channelThrottledUntil: queueTelemetry.channelThrottledUntil || null,
+        dailyFirestoreUsage: queueTelemetry.dailyFirestoreUsage || null,
         error: queueTelemetry.error || null
       },
       queue: queueItems,
+      uncertainDeliveries: queueItems.filter(i => i.status === "UNCERTAIN_DELIVERY" || i.status === "DISPATCHING"),
+      archivedExpired: HISTORICAL_EXPIRED_ARCHIVE,
       logs
     });
   } catch (err: any) {
@@ -143,9 +187,26 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const action = body.action?.toUpperCase();
+    // 1. Mandatory Server-Side Admin Authentication Check
+    const auth = verifyAdminAuthorization(req);
+    if (!auth.authorized) {
+      return unauthorizedResponse(auth);
+    }
 
+    // 2. Strict Input Validation & Sanitization
+    const rawBody = await req.json().catch(() => null);
+    const sanitized = sanitizeAdminPayload(rawBody);
+    if (!sanitized.valid) {
+      return NextResponse.json(
+        { success: false, error: sanitized.error || "Invalid request payload." },
+        { status: 400 }
+      );
+    }
+
+    const action = sanitized.action;
+    const body = rawBody;
+
+    // ACTION: RETRY QUEUE (Retries confirmed failed/rate-limited jobs only)
     if (action === "RETRY_QUEUE") {
       const res = await retryPendingNow();
       return NextResponse.json({
@@ -155,21 +216,78 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // ACTION: MIGRATE VERIFIED JOBS TO FIRESTORE (Filters out expired jobs)
     if (action === "MIGRATE_TO_FIRESTORE") {
       const jobsToMigrate = Array.isArray(body.jobs) && body.jobs.length > 0
         ? body.jobs
-        : REAL_PENDING_OPPORTUNITIES;
+        : ACTIVE_VERIFIED_OPPORTUNITIES;
 
       const res = await migrateJobsToFirestore(jobsToMigrate);
       return NextResponse.json({
         success: res.errors.length === 0,
-        message: `Firestore Migration: ${res.migratedCount} opportunities migrated, ${res.skippedDuplicates} duplicates preserved.`,
+        message: `Firestore Migration: ${res.migratedCount} active verified opportunities imported, ${res.skippedDuplicates} duplicates preserved, ${res.skippedExpired} expired records filtered.`,
         migratedCount: res.migratedCount,
         skippedDuplicates: res.skippedDuplicates,
+        skippedExpired: res.skippedExpired,
         errors: res.errors
       });
     }
 
+    // ACTION: RECONCILE UNCERTAIN DELIVERY (Crash Recovery Guard)
+    if (action === "RECONCILE_UNCERTAIN") {
+      const itemId = String(body.itemId || "").trim();
+      const resolution = String(body.resolution || "").trim().toUpperCase();
+
+      if (!itemId) {
+        return NextResponse.json({ success: false, error: "Missing required itemId for reconciliation." }, { status: 400 });
+      }
+
+      if (resolution !== "CONFIRM_DELIVERED" && resolution !== "CONFIRM_NOT_DELIVERED" && resolution !== "MARK_FAILED") {
+        return NextResponse.json({
+          success: false,
+          error: "Invalid resolution. Must be 'CONFIRM_DELIVERED', 'CONFIRM_NOT_DELIVERED', or 'MARK_FAILED'."
+        }, { status: 400 });
+      }
+
+      const res = await reconcileUncertainDelivery(
+        itemId,
+        resolution as any,
+        auth.adminUser?.email || "SUPER_ADMIN",
+        {
+          telegramMessageId: typeof body.telegramMessageId === "number" ? body.telegramMessageId : undefined,
+          notes: body.notes
+        }
+      );
+
+      return NextResponse.json({
+        success: res.success,
+        message: res.message,
+        status: res.status
+      });
+    }
+
+    // ACTION: RUN DISCOVERY SCAN
+    if (action === "DISCOVERY_SCAN") {
+      const scanResult = await runAutomatedJobDiscovery({ maxJobsToPublish: 1 });
+      return NextResponse.json({
+        success: true,
+        message: `Automated scan completed: ${scanResult.totalDiscovered} discovered, ${scanResult.verifiedCount} verified, ${scanResult.blockedCount} blocked/expired.`,
+        scanResult
+      });
+    }
+
+    // ACTION: EXPORT QUEUE RECORDS
+    if (action === "EXPORT_QUEUE") {
+      const allItems = await getQueueItems(100);
+      return NextResponse.json({
+        success: true,
+        exportTimestamp: new Date().toISOString(),
+        totalItems: allItems.length,
+        items: allItems
+      });
+    }
+
+    // ACTION: GLOBAL PAUSE
     if (action === "PAUSE") {
       const updated = updateAutoPublishConfig({ pausePublishing: true });
       return NextResponse.json({
@@ -179,6 +297,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // ACTION: GLOBAL RESUME
     if (action === "RESUME") {
       const updated = updateAutoPublishConfig({ pausePublishing: false });
       return NextResponse.json({
@@ -188,8 +307,8 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // ACTION: TRIGGER TEST PUBLISH
     if (action === "TRIGGER_TEST") {
-      // Create a genuine test job for verification
       const testJob = {
         id: `test-${Date.now()}`,
         title: body.title || "SSC Combined Graduate Level (CGL) 2026 Recruitment",
@@ -221,6 +340,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // ACTION: UPDATE CONFIG
     if (action === "UPDATE_CONFIG") {
       const patch: any = {};
       if (typeof body.minScoreToPublish === "number") patch.minScoreToPublish = body.minScoreToPublish;
@@ -233,7 +353,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    return NextResponse.json({ success: false, error: "Invalid action" }, { status: 400 });
+    return NextResponse.json({ success: false, error: `Invalid or unrecognized action: '${action}'.` }, { status: 400 });
   } catch (err: any) {
     return NextResponse.json(
       { success: false, error: err.message || "Failed to process auto-publishing command" },
