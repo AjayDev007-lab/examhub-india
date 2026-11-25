@@ -17,6 +17,29 @@ export interface FirebaseAdminConfigStatus {
 
 let adminApp: App | null = null;
 let firestoreDb: Firestore | null = null;
+let initError: string | null = null;
+
+function cleanEnvString(val: string | undefined): string {
+  if (!val) return "";
+  let cleaned = val.trim();
+  if ((cleaned.startsWith('"') && cleaned.endsWith('"')) || (cleaned.startsWith("'") && cleaned.endsWith("'"))) {
+    cleaned = cleaned.slice(1, -1).trim();
+  }
+  return cleaned;
+}
+
+export function cleanPrivateKey(raw: string | undefined): string {
+  if (!raw) return "";
+  let key = raw.trim();
+  if ((key.startsWith('"') && key.endsWith('"')) || (key.startsWith("'") && key.endsWith("'"))) {
+    key = key.slice(1, -1).trim();
+  }
+  key = key.replace(/\\n/g, "\n").replace(/\r/g, "").trim();
+  if (!key.includes("BEGIN PRIVATE KEY")) {
+    key = `-----BEGIN PRIVATE KEY-----\n${key}\n-----END PRIVATE KEY-----\n`;
+  }
+  return key;
+}
 
 /**
  * Returns the current Firebase Admin configuration status.
@@ -24,18 +47,20 @@ let firestoreDb: Firestore | null = null;
  */
 export function getFirebaseAdminConfigStatus(): FirebaseAdminConfigStatus {
   const projectId =
-    process.env.FIREBASE_PROJECT_ID?.trim() ||
-    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID?.trim() ||
+    cleanEnvString(process.env.FIREBASE_PROJECT_ID) ||
+    cleanEnvString(process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID) ||
     "examhub-india-6ba59";
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL?.trim() || "";
-  const rawKey = process.env.FIREBASE_PRIVATE_KEY?.trim() || "";
+  const clientEmail = cleanEnvString(process.env.FIREBASE_CLIENT_EMAIL);
+  const rawKey = cleanPrivateKey(process.env.FIREBASE_PRIVATE_KEY);
 
   const hasClientEmail = Boolean(clientEmail && clientEmail.includes("@"));
   const hasPrivateKey = Boolean(rawKey && (rawKey.includes("BEGIN PRIVATE KEY") || rawKey.length > 50));
-  const isConfigured = Boolean(projectId && hasClientEmail && hasPrivateKey);
+  const isConfigured = Boolean(projectId && hasClientEmail && hasPrivateKey && !initError);
 
   let error: string | undefined;
-  if (!isConfigured) {
+  if (initError) {
+    error = initError;
+  } else if (!isConfigured) {
     const missing: string[] = [];
     if (!hasClientEmail) missing.push("FIREBASE_CLIENT_EMAIL");
     if (!hasPrivateKey) missing.push("FIREBASE_PRIVATE_KEY");
@@ -66,7 +91,7 @@ export function getFirebaseAdminApp(): App | null {
   if (adminApp) return adminApp;
 
   const status = getFirebaseAdminConfigStatus();
-  if (!status.isConfigured) {
+  if (!status.hasClientEmail || !status.hasPrivateKey) {
     return null;
   }
 
@@ -77,20 +102,22 @@ export function getFirebaseAdminApp(): App | null {
       return adminApp;
     }
 
-    const rawKey = process.env.FIREBASE_PRIVATE_KEY || "";
-    // Handle both raw newlines and escaped string \n from Vercel env UI
-    const privateKey = rawKey.replace(/\\n/g, "\n").trim();
+    const projectId = status.projectId;
+    const clientEmail = cleanEnvString(process.env.FIREBASE_CLIENT_EMAIL);
+    const privateKey = cleanPrivateKey(process.env.FIREBASE_PRIVATE_KEY);
 
     adminApp = initializeApp({
       credential: cert({
-        projectId: status.projectId,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL?.trim(),
-        privateKey: privateKey
+        projectId,
+        clientEmail,
+        privateKey
       })
     });
 
+    initError = null;
     return adminApp;
   } catch (err: any) {
+    initError = `Firebase Admin initialization error: ${err.message}`;
     console.error("Firebase Admin initialization error:", err.message);
     return null;
   }
@@ -112,6 +139,7 @@ export function getFirestoreAdminDb(): Firestore | null {
     firestoreDb.settings({ ignoreUndefinedProperties: true });
     return firestoreDb;
   } catch (err: any) {
+    initError = `Failed to obtain Firestore Admin instance: ${err.message}`;
     console.error("Failed to obtain Firestore Admin instance:", err.message);
     return null;
   }

@@ -111,9 +111,10 @@ export async function getQueueTelemetry() {
 
   const db = getFirestoreAdminDb();
   if (!db) {
+    const latestStatus = getFirebaseAdminConfigStatus();
     return {
       isConfigured: false,
-      error: "Failed to connect to Cloud Firestore with configured credentials.",
+      error: latestStatus.error || "Failed to connect to Cloud Firestore with configured credentials.",
       provider: "FIRESTORE_ERROR"
     };
   }
