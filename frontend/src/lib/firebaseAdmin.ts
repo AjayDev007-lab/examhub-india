@@ -31,13 +31,44 @@ function cleanEnvString(val: string | undefined): string {
 export function cleanPrivateKey(raw: string | undefined): string {
   if (!raw) return "";
   let key = raw.trim();
-  if ((key.startsWith('"') && key.endsWith('"')) || (key.startsWith("'") && key.endsWith("'"))) {
-    key = key.slice(1, -1).trim();
+
+  // If user pasted entire service account JSON into FIREBASE_PRIVATE_KEY
+  if (key.startsWith("{") && key.endsWith("}")) {
+    try {
+      const parsed = JSON.parse(key);
+      if (parsed.private_key) key = parsed.private_key;
+    } catch (_) {}
   }
-  key = key.replace(/\\n/g, "\n").replace(/\r/g, "").trim();
-  if (!key.includes("BEGIN PRIVATE KEY")) {
-    key = `-----BEGIN PRIVATE KEY-----\n${key}\n-----END PRIVATE KEY-----\n`;
+
+  // Strip wrapping quotes and backslashes
+  key = key.replace(/^["'\\s]+|["'\\s]+$/g, "");
+
+  // If base64-encoded PEM
+  if (!key.includes("BEGIN") && key.length > 200) {
+    try {
+      const decoded = Buffer.from(key, "base64").toString("utf8");
+      if (decoded.includes("BEGIN")) {
+        key = decoded;
+      }
+    } catch (_) {}
   }
+
+  // Unescape literal backslash-n
+  while (key.includes("\\n")) {
+    key = key.replace(/\\n/g, "\n");
+  }
+
+  // Extract pure base64 payload to rebuild canonical 64-character PEM format
+  const base64Body = key
+    .replace(/-----BEGIN [A-Z ]+-----/g, "")
+    .replace(/-----END [A-Z ]+-----/g, "")
+    .replace(/[\s\r\n]+/g, "");
+
+  if (base64Body.length > 50) {
+    const chunks = base64Body.match(/.{1,64}/g) || [];
+    return "-----BEGIN PRIVATE KEY-----\n" + chunks.join("\n") + "\n-----END PRIVATE KEY-----\n";
+  }
+
   return key;
 }
 
