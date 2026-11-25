@@ -6,6 +6,7 @@
 
 import { initializeApp, getApps, cert, App } from "firebase-admin/app";
 import { getFirestore, Firestore } from "firebase-admin/firestore";
+import crypto from "crypto";
 
 export interface FirebaseAdminConfigStatus {
   isConfigured: boolean;
@@ -136,6 +137,16 @@ export function getFirebaseAdminApp(): App | null {
     const projectId = status.projectId;
     const clientEmail = cleanEnvString(process.env.FIREBASE_CLIENT_EMAIL);
     const privateKey = cleanPrivateKey(process.env.FIREBASE_PRIVATE_KEY);
+    const rawKey = process.env.FIREBASE_PRIVATE_KEY || "";
+
+    try {
+      crypto.createPrivateKey(privateKey);
+    } catch (pemErr: any) {
+      const keyDiag = `len=${rawKey.length}, hasBegin=${rawKey.includes("BEGIN")}, hasEnd=${rawKey.includes("END")}, emailPrefix=${(clientEmail || "").slice(0, 8)}`;
+      initError = `Firebase Admin initialization error: Invalid PEM key format [${pemErr.message}] (${keyDiag})`;
+      console.error(initError);
+      return null;
+    }
 
     adminApp = initializeApp({
       credential: cert({
@@ -148,7 +159,9 @@ export function getFirebaseAdminApp(): App | null {
     initError = null;
     return adminApp;
   } catch (err: any) {
-    initError = `Firebase Admin initialization error: ${err.message}`;
+    const rawKey = process.env.FIREBASE_PRIVATE_KEY || "";
+    const keyDiag = `len=${rawKey.length}, hasBegin=${rawKey.includes("BEGIN")}, hasEnd=${rawKey.includes("END")}, emailPrefix=${(process.env.FIREBASE_CLIENT_EMAIL || "").slice(0, 8)}`;
+    initError = `Firebase Admin initialization error: ${err.message} (${keyDiag})`;
     console.error("Firebase Admin initialization error:", err.message);
     return null;
   }
