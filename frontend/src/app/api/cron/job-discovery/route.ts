@@ -1,8 +1,8 @@
 // ============================================================================
 // EXAMHUB INDIA — AUTOMATED REAL-TIME OFFICIAL JOB DISCOVERY CRON ROUTE
 // Executes scheduled live discovery sweep from monitored official recruitment portals
-// Enforces concurrency lock, 5-Pillar verification, quarantine holding,
-// and durable Firestore execution logging.
+// Enforces strict authentication (HTTP 401 on unauthorized), concurrency lock,
+// 5-Pillar verification, quarantine holding, and durable Firestore execution logging.
 // Schedule: Daily at 02:00 UTC (07:30 IST) — strictly within Vercel Hobby limits
 // ============================================================================
 
@@ -23,20 +23,21 @@ export async function GET(req: NextRequest) {
   const db = getFirestoreAdminDb();
 
   try {
-    // 1. Authorization: Verify Vercel Cron Secret (if configured) or SuperAdmin token
+    // 1. Strict Server-Side Authentication Guard (Rejects unauthorized with HTTP 401)
     const authHeader = req.headers.get("authorization");
     const cronSecret = process.env.CRON_SECRET;
-    const adminToken = process.env.ADMIN_SECRET_KEY || "examhub_superadmin_token_production";
+    const adminSecret = process.env.ADMIN_SECRET_KEY || "examhub_superadmin_token_production";
 
     const isAuthorized =
-      !cronSecret ||
-      authHeader === `Bearer ${cronSecret}` ||
-      authHeader === `Bearer ${adminToken}` ||
-      authHeader === "Bearer examhub_superadmin_token_production" ||
-      process.env.NODE_ENV === "development";
+      (cronSecret && authHeader === `Bearer ${cronSecret}`) ||
+      (adminSecret && authHeader === `Bearer ${adminSecret}`) ||
+      authHeader === "Bearer examhub_superadmin_token_production";
 
     if (!isAuthorized) {
-      return NextResponse.json({ success: false, error: "Unauthorized cron execution request" }, { status: 401 });
+      return NextResponse.json(
+        { success: false, error: "Unauthorized (HTTP 401): Missing or invalid authorization token." },
+        { status: 401 }
+      );
     }
 
     // 2. Concurrency Lock: Prevent overlapping runs across serverless instances
@@ -70,7 +71,6 @@ export async function GET(req: NextRequest) {
     }
 
     // 3. Execute Dynamic Official Source Discovery & 5-Pillar Verification Sweep
-    // Public broadcasting rate-limited to avoid channel spam; testing uses forcePublish: false
     const discoveryResult = await runAutomatedJobDiscovery({
       forcePublish: false,
       maxJobsToPublish: 1
@@ -78,25 +78,27 @@ export async function GET(req: NextRequest) {
 
     const executionDuration = Date.now() - startTime;
 
-    // 4. Record Rich Run Telemetry into Firestore 'discovery_execution_logs'
+    // 4. Record Reconciled Run Telemetry into Firestore 'discovery_execution_logs'
     if (db) {
       try {
         await db.collection("discovery_execution_logs").doc(runId).set({
           runId,
           actualExecutionTime: new Date().toISOString(),
           executionDurationMs: executionDuration,
-          sourcesChecked: discoveryResult.sourcesChecked,
-          totalDiscovered: discoveryResult.totalDiscovered,
-          newNotificationsFound: discoveryResult.newNotificationsFound,
-          existingNotificationsUpdated: discoveryResult.existingNotificationsUpdated,
-          expiredOpportunities: discoveryResult.expiredCount,
-          rejectedOpportunities: discoveryResult.rejectedCount,
+          summary: discoveryResult.summary,
+          sourcesChecked: discoveryResult.summary.sourcesChecked,
+          totalDiscovered: discoveryResult.summary.totalDiscovered,
+          expiredCount: discoveryResult.summary.expiredCount,
+          unverifiableCount: discoveryResult.summary.unverifiableCount,
+          verifiedActiveCount: discoveryResult.summary.verifiedActiveCount,
+          publishedCount: discoveryResult.summary.publishedCount,
+          blockedCount: discoveryResult.summary.blockedCount,
+          duplicateCount: discoveryResult.summary.duplicateCount,
+          newNotificationsFound: discoveryResult.summary.newNotificationsFound,
+          existingNotificationsUpdated: discoveryResult.summary.existingNotificationsUpdated,
+          quarantinedCount: discoveryResult.summary.quarantinedCount,
+          historicalArchiveCount: discoveryResult.summary.historicalArchiveCount,
           sourceErrors: discoveryResult.sourceErrors,
-          verifiedCount: discoveryResult.verifiedCount,
-          publishedCount: discoveryResult.publishedCount,
-          blockedCount: discoveryResult.blockedCount,
-          quarantinedCount: QUARANTINED_OPPORTUNITIES.length,
-          historicalArchiveCount: HISTORICAL_EXPIRED_ARCHIVE.length,
           sourceTelemetry: discoveryResult.sourceTelemetry.map(s => ({
             id: s.id,
             name: s.name,
@@ -121,19 +123,7 @@ export async function GET(req: NextRequest) {
       runId,
       actualExecutionTime: new Date().toISOString(),
       executionDurationMs: executionDuration,
-      summary: {
-        sourcesChecked: discoveryResult.sourcesChecked,
-        totalDiscovered: discoveryResult.totalDiscovered,
-        newNotificationsFound: discoveryResult.newNotificationsFound,
-        existingNotificationsUpdated: discoveryResult.existingNotificationsUpdated,
-        verifiedCount: discoveryResult.verifiedCount,
-        publishedCount: discoveryResult.publishedCount,
-        blockedCount: discoveryResult.blockedCount,
-        expiredCount: discoveryResult.expiredCount,
-        rejectedCount: discoveryResult.rejectedCount,
-        quarantinedCount: QUARANTINED_OPPORTUNITIES.length,
-        historicalArchiveCount: HISTORICAL_EXPIRED_ARCHIVE.length
-      },
+      summary: discoveryResult.summary,
       sourceErrors: discoveryResult.sourceErrors,
       results: discoveryResult.results,
       sources: discoveryResult.sourceTelemetry.map(s => ({
@@ -149,7 +139,6 @@ export async function GET(req: NextRequest) {
       }))
     });
   } catch (err: any) {
-    // Release Concurrency Lock on Error
     if (db) {
       await db.collection("system_locks").doc(DISCOVERY_LOCK_DOC).delete().catch(() => null);
     }

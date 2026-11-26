@@ -10,10 +10,10 @@ import { dbStore } from "./data";
 import {
   verifyJobOpportunity,
   processAndAutoPublishJob,
-  JobLocationCategory,
-  JobVerificationResult
+  JobLocationCategory
 } from "./aiJobVerification";
 import { enqueueVerifiedJob } from "./jobQueue";
+import { QUARANTINED_OPPORTUNITIES, HISTORICAL_EXPIRED_ARCHIVE } from "./historicalExpiredArchive";
 
 export interface DiscoverySource {
   id: string;
@@ -49,11 +49,14 @@ export interface DiscoveredOpportunity {
   notification_number?: string;
   application_start_date: string;
   application_end_date: string | null;
+  closing_time_ist?: string | null;
+  timezone: string;
+  official_notification_url: string;
   official_notification_pdf?: string | null;
   official_application_url: string;
   source_website_url: string;
   is_genuine_official: boolean;
-  last_checked_at?: string;
+  last_checked_at: string;
 }
 
 export interface SourceExecutionError {
@@ -63,30 +66,53 @@ export interface SourceExecutionError {
   httpStatus?: number;
 }
 
+export interface DiscoveryRunSummary {
+  sourcesChecked: number;
+  totalDiscovered: number;
+  // Primary Mutually Exclusive Categories:
+  expiredCount: number;
+  unverifiableCount: number;
+  verifiedActiveCount: number;
+  // Publishing & Delivery Status:
+  publishedCount: number;
+  blockedCount: number;
+  // Secondary Tracking & Holding Archives:
+  duplicateCount: number;
+  newNotificationsFound: number;
+  existingNotificationsUpdated: number;
+  quarantinedCount: number;
+  historicalArchiveCount: number;
+}
+
+export interface DiscoveryResultItem {
+  title: string;
+  organization: string;
+  locationCategory: JobLocationCategory;
+  primaryClassification: "EXPIRED" | "UNVERIFIABLE" | "VERIFIED_ACTIVE";
+  status: string;
+  published: boolean;
+  officialNotificationUrl: string;
+  directPdfUrl: string | null;
+  closingDeadline: string | null;
+  telegramMessageId?: number;
+  reasons: string[];
+}
+
 export interface DiscoveryRunResult {
   runId: string;
   timestamp: string;
   durationMs: number;
   sourcesChecked: number;
   totalDiscovered: number;
-  newNotificationsFound: number;
-  existingNotificationsUpdated: number;
   verifiedCount: number;
   publishedCount: number;
   blockedCount: number;
   expiredCount: number;
-  rejectedCount: number;
+  unverifiableCount: number;
+  summary: DiscoveryRunSummary;
   sourceErrors: SourceExecutionError[];
   sourceTelemetry: DiscoverySource[];
-  results: {
-    title: string;
-    organization: string;
-    locationCategory: JobLocationCategory;
-    status: string;
-    published: boolean;
-    telegramMessageId?: number;
-    reasons: string[];
-  }[];
+  results: DiscoveryResultItem[];
 }
 
 // ----------------------------------------------------------------------------
@@ -100,7 +126,7 @@ export const OFFICIAL_DISCOVERY_SOURCES: DiscoverySource[] = [
     name: "Union Public Service Commission (UPSC)",
     category: "CENTRAL_GOVT",
     locationScope: "All India",
-    officialPortal: "https://upsc.gov.in",
+    officialPortal: "https://upsc.gov.in/active-examinations/",
     careersPortal: "https://upsconline.nic.in",
     status: "ACTIVE",
     lastSuccessfulCheckAt: new Date().toISOString(),
@@ -119,7 +145,7 @@ export const OFFICIAL_DISCOVERY_SOURCES: DiscoverySource[] = [
     locationScope: "All India",
     officialPortal: "https://ssc.gov.in",
     careersPortal: "https://ssc.gov.in/candidate-portal",
-    status: "MANUAL_REVIEW", // Angular Single Page Application requiring manual review
+    status: "MANUAL_REVIEW", // Angular Single Page Application requiring manual administrative review
     lastSuccessfulCheckAt: new Date().toISOString(),
     pagesChecked: 1,
     jobsDiscovered: 0,
@@ -151,7 +177,7 @@ export const OFFICIAL_DISCOVERY_SOURCES: DiscoverySource[] = [
     name: "Greater Chennai Corporation (GCC)",
     category: "HEALTHCARE",
     locationScope: "Chennai",
-    officialPortal: "https://chennaicorporation.gov.in",
+    officialPortal: "https://chennaicorporation.gov.in/gcc/",
     careersPortal: "https://chennaicorporation.gov.in/gcc/",
     status: "ACTIVE",
     lastSuccessfulCheckAt: new Date().toISOString(),
@@ -168,8 +194,8 @@ export const OFFICIAL_DISCOVERY_SOURCES: DiscoverySource[] = [
     name: "Zoho Corporation Tech Careers",
     category: "IT_CAREERS",
     locationScope: "Chennai",
-    officialPortal: "https://www.zoho.com",
-    careersPortal: "https://www.zoho.com/careers/",
+    officialPortal: "https://www.zoho.com/careers/",
+    careersPortal: "https://careers.zohocorp.com/candidateportal",
     status: "ACTIVE",
     lastSuccessfulCheckAt: new Date().toISOString(),
     pagesChecked: 3,
@@ -185,8 +211,8 @@ export const OFFICIAL_DISCOVERY_SOURCES: DiscoverySource[] = [
     name: "Infosys Limited Talent Portal",
     category: "IT_CAREERS",
     locationScope: "Remote",
-    officialPortal: "https://www.infosys.com",
-    careersPortal: "https://www.infosys.com/careers.html",
+    officialPortal: "https://www.infosys.com/careers.html",
+    careersPortal: "https://career.infosys.com",
     status: "ACTIVE",
     lastSuccessfulCheckAt: new Date().toISOString(),
     pagesChecked: 2,
@@ -208,16 +234,16 @@ const BROWSER_HEADERS = {
 // ----------------------------------------------------------------------------
 // 2. INDIAN TIMEZONE DATE PARSING HELPERS
 // ----------------------------------------------------------------------------
-export function parseUpscTableDate(str: string | undefined): string | null {
-  if (!str || str.trim() === "NA" || str.trim() === "—") return null;
+export function parseUpscTableDate(str: string | undefined): { iso: string | null; timeIst: string | null } {
+  if (!str || str.trim() === "NA" || str.trim() === "—") return { iso: null, timeIst: null };
   const m = str.match(/(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})(?:,\s+(\d{1,2}):(\d{2})\s*(AM|PM)?)?/i);
-  if (!m) return null;
+  if (!m) return { iso: null, timeIst: null };
   const day = parseInt(m[1], 10);
   const monthNames: Record<string, number> = {
     jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12
   };
   const month = monthNames[m[2].slice(0, 3).toLowerCase()];
-  if (!month) return null;
+  if (!month) return { iso: null, timeIst: null };
   const year = parseInt(m[3], 10);
   let hour = m[4] ? parseInt(m[4], 10) : 18;
   const min = m[5] ? parseInt(m[5], 10) : 0;
@@ -229,17 +255,18 @@ export function parseUpscTableDate(str: string | undefined): string | null {
   const dd = String(day).padStart(2, "0");
   const hh = String(hour).padStart(2, "0");
   const mi = String(min).padStart(2, "0");
-  return `${year}-${mm}-${dd}T${hh}:${mi}:00+05:30`;
+  const timeIst = `${hh}:${mi}:00 IST`;
+  return { iso: `${year}-${mm}-${dd}T${hh}:${mi}:00+05:30`, timeIst };
 }
 
-export function parseTnpscTableDate(str: string | undefined): string | null {
-  if (!str) return null;
+export function parseTnpscTableDate(str: string | undefined): { iso: string | null; timeIst: string | null } {
+  if (!str) return { iso: null, timeIst: null };
   const m = str.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-  if (!m) return null;
+  if (!m) return { iso: null, timeIst: null };
   const day = String(parseInt(m[1], 10)).padStart(2, "0");
   const month = String(parseInt(m[2], 10)).padStart(2, "0");
   const year = m[3];
-  return `${year}-${month}-${day}T23:59:59+05:30`;
+  return { iso: `${year}-${month}-${day}T23:59:59+05:30`, timeIst: "23:59:59 IST" };
 }
 
 // ----------------------------------------------------------------------------
@@ -276,7 +303,7 @@ async function fetchUpscLiveNotifications(): Promise<{ jobs: DiscoveredOpportuni
           ? (linkMatch[1].startsWith("http") ? linkMatch[1] : `https://upsc.gov.in${linkMatch[1]}`)
           : "https://upsc.gov.in/active-examinations/";
 
-        const endDate = parseUpscTableDate(lastDateRaw);
+        const parsedDate = parseUpscTableDate(lastDateRaw);
         const slug = `upsc-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
 
         jobs.push({
@@ -292,8 +319,11 @@ async function fetchUpscLiveNotifications(): Promise<{ jobs: DiscoveredOpportuni
           vacancies_count: null, // UPSC vacancies notified in detailed Gazette
           notification_number: noticeNo,
           application_start_date: new Date().toISOString(),
-          application_end_date: endDate,
-          official_notification_pdf: detailUrl,
+          application_end_date: parsedDate.iso,
+          closing_time_ist: parsedDate.timeIst,
+          timezone: "Asia/Kolkata",
+          official_notification_url: detailUrl,
+          official_notification_pdf: null,
           official_application_url: "https://upsconline.nic.in",
           source_website_url: "https://upsc.gov.in/active-examinations/",
           is_genuine_official: true,
@@ -309,6 +339,7 @@ async function fetchUpscLiveNotifications(): Promise<{ jobs: DiscoveredOpportuni
 
 /**
  * TNPSC Live Scraper: Fetches and parses English notifications table from tnpsc.gov.in
+ * Extracts direct PDF links and exact gazette numbers
  */
 async function fetchTnpscLiveNotifications(): Promise<{ jobs: DiscoveredOpportunity[]; error?: string; status: number }> {
   try {
@@ -323,7 +354,7 @@ async function fetchTnpscLiveNotifications(): Promise<{ jobs: DiscoveredOpportun
     const rows = [...html.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)];
     const jobs: DiscoveredOpportunity[] = [];
 
-    // Parse top 15 most recent notifications
+    // Parse top 14 most recent notifications
     const limit = Math.min(rows.length, 16);
     for (let i = 1; i < limit; i++) {
       const cols = [...rows[i][1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)].map(m =>
@@ -338,8 +369,15 @@ async function fetchTnpscLiveNotifications(): Promise<{ jobs: DiscoveredOpportun
         // Clean title
         const cleanTitle = rawTitle.replace(/\b(APPLY ONLINE|ADDENDUM|Download Hall Ticket)\b.*/i, "").trim();
         if (cleanTitle.length > 5) {
-          const startDate = parseTnpscTableDate(regStart) || new Date().toISOString();
-          const endDate = parseTnpscTableDate(regEnd);
+          const startDateObj = parseTnpscTableDate(regStart);
+          const endDateObj = parseTnpscTableDate(regEnd);
+
+          // Extract direct PDF link from row
+          const pdfMatch = rows[i][1].match(/href="(\.\.\/Document\/[^"]+\.pdf)"/i) || rows[i][1].match(/href="([^"]+\.pdf)"/i);
+          const directPdfUrl = pdfMatch
+            ? (pdfMatch[1].startsWith("http") ? pdfMatch[1] : `https://www.tnpsc.gov.in/${pdfMatch[1].replace(/^\.\.\//, "")}`)
+            : null;
+
           const slug = `tnpsc-${notifNo.replace(/[^a-z0-9]+/gi, "-")}-${cleanTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 30)}`;
 
           jobs.push({
@@ -354,9 +392,12 @@ async function fetchTnpscLiveNotifications(): Promise<{ jobs: DiscoveredOpportun
             experience_required: "Fresher / As per norms",
             vacancies_count: null,
             notification_number: notifNo,
-            application_start_date: startDate,
-            application_end_date: endDate,
-            official_notification_pdf: "https://www.tnpsc.gov.in/english/Notification1.aspx",
+            application_start_date: startDateObj.iso || new Date().toISOString(),
+            application_end_date: endDateObj.iso,
+            closing_time_ist: endDateObj.timeIst,
+            timezone: "Asia/Kolkata",
+            official_notification_url: "https://www.tnpsc.gov.in/english/Notification1.aspx",
+            official_notification_pdf: directPdfUrl,
             official_application_url: "https://apply.tnpscexams.in",
             source_website_url: "https://www.tnpsc.gov.in/english/Notification1.aspx",
             is_genuine_official: true,
@@ -372,7 +413,7 @@ async function fetchTnpscLiveNotifications(): Promise<{ jobs: DiscoveredOpportun
 }
 
 /**
- * Greater Chennai Corporation Live Scraper: Fetches recruitment links from chennaicorporation.gov.in
+ * Greater Chennai Corporation Live Scraper: Fetches recruitment PDF links from chennaicorporation.gov.in
  */
 async function fetchGccLiveNotifications(): Promise<{ jobs: DiscoveredOpportunity[]; error?: string; status: number }> {
   try {
@@ -413,7 +454,10 @@ async function fetchGccLiveNotifications(): Promise<{ jobs: DiscoveredOpportunit
         experience_required: "As per official notification",
         vacancies_count: null,
         application_start_date: new Date().toISOString(),
-        application_end_date: null, // GCC contractual notices have specific dates inside PDF; missing dates held back
+        application_end_date: null, // GCC contractual notices have dates embedded in CID-encoded PDF; missing machine dates held back
+        closing_time_ist: null,
+        timezone: "Asia/Kolkata",
+        official_notification_url: pdfUrl,
         official_notification_pdf: pdfUrl,
         official_application_url: "https://chennaicorporation.gov.in/gcc/",
         source_website_url: "https://chennaicorporation.gov.in",
@@ -440,7 +484,6 @@ async function fetchZohoLiveOpportunity(): Promise<{ jobs: DiscoveredOpportunity
       return { jobs: [], error: `Zoho HTTP ${res.status}`, status: res.status };
     }
 
-    // Official rolling opportunity (deadline & vacancies not published publicly)
     const job: DiscoveredOpportunity = {
       id: "real-zoho-sde-rolling",
       sourceId: "src-zoho",
@@ -452,10 +495,13 @@ async function fetchZohoLiveOpportunity(): Promise<{ jobs: DiscoveredOpportunity
       qualification: "B.E. / B.Tech / MCA / M.Sc in Computer Science or Equivalent",
       experience_required: "0 - 2 Years (Freshers eligible)",
       salary_range: "As per company standards",
-      vacancies_count: null, // Not specified by official Zoho portal
+      vacancies_count: null, // Rolling hiring: vacancy count not published
       application_start_date: "2026-01-01T00:00:00+05:30",
       application_end_date: null, // Rolling recruitment: held back from public automated broadcast
-      official_notification_pdf: "https://www.zoho.com/careers/",
+      closing_time_ist: null,
+      timezone: "Asia/Kolkata",
+      official_notification_url: "https://www.zoho.com/careers/",
+      official_notification_pdf: null,
       official_application_url: "https://careers.zohocorp.com/candidateportal",
       source_website_url: "https://www.zoho.com/careers/",
       is_genuine_official: true,
@@ -480,7 +526,6 @@ async function fetchInfosysLiveOpportunity(): Promise<{ jobs: DiscoveredOpportun
       return { jobs: [], error: `Infosys HTTP ${res.status}`, status: res.status };
     }
 
-    // Official continuous talent registration (deadline & vacancies not published publicly)
     const job: DiscoveredOpportunity = {
       id: "real-infosys-dse-continuous",
       sourceId: "src-infosys",
@@ -492,10 +537,13 @@ async function fetchInfosysLiveOpportunity(): Promise<{ jobs: DiscoveredOpportun
       qualification: "B.E. / B.Tech / M.E. / M.Tech / MCA in CS / IT / Electronics",
       experience_required: "0 - 1 Years",
       salary_range: "As per company standards",
-      vacancies_count: null, // Not specified by official Infosys portal
+      vacancies_count: null, // Continuous registration: vacancy quota not published
       application_start_date: "2026-01-15T00:00:00+05:30",
       application_end_date: null, // Continuous registration: held back from public automated broadcast
-      official_notification_pdf: "https://www.infosys.com/careers.html",
+      closing_time_ist: null,
+      timezone: "Asia/Kolkata",
+      official_notification_url: "https://www.infosys.com/careers.html",
+      official_notification_pdf: null,
       official_application_url: "https://career.infosys.com",
       source_website_url: "https://www.infosys.com/careers.html",
       is_genuine_official: true,
@@ -539,7 +587,7 @@ export function getDiscoveryHistory(limit: number = 20): DiscoveryRunResult[] {
 }
 
 // ----------------------------------------------------------------------------
-// 4. MAIN DYNAMIC JOB DISCOVERY SWEEP
+// 4. MAIN DYNAMIC JOB DISCOVERY SWEEP & RECONCILIATION ENGINE
 // ----------------------------------------------------------------------------
 export async function runAutomatedJobDiscovery(options?: {
   forcePublish?: boolean;
@@ -569,7 +617,6 @@ export async function runAutomatedJobDiscovery(options?: {
 
   const allDiscoveredJobs: DiscoveredOpportunity[] = [];
 
-  // Update telemetry and gather jobs
   function processSourceResult(
     sourceId: string,
     result: PromiseSettledResult<{ jobs: DiscoveredOpportunity[]; error?: string; status: number }>
@@ -619,14 +666,15 @@ export async function runAutomatedJobDiscovery(options?: {
   let totalDiscovered = allDiscoveredJobs.length;
   let newNotificationsFound = 0;
   let existingNotificationsUpdated = 0;
-  let verifiedCount = 0;
-  let publishedCount = 0;
-  let blockedCount = 0;
   let expiredCount = 0;
-  let rejectedCount = 0;
+  let unverifiableCount = 0;
+  let verifiedActiveCount = 0;
+  let duplicateCount = 0;
+  let publishedCount = 0;
 
-  const results: DiscoveryRunResult["results"] = [];
+  const results: DiscoveryResultItem[] = [];
   const existingJobs = (dbStore as any).jobs || [];
+  const seenSlugsInBatch = new Set<string>();
 
   for (const item of allDiscoveredJobs) {
     const src = activeSources.find(s => s.id === item.sourceId);
@@ -663,7 +711,7 @@ export async function runAutomatedJobDiscovery(options?: {
       created_at: new Date().toISOString()
     };
 
-    // Check if previously tracked
+    // Check tracking status
     const existingIndex = existingJobs.findIndex(
       (j: any) => j.title.toLowerCase() === newJob.title.toLowerCase()
     );
@@ -673,18 +721,77 @@ export async function runAutomatedJobDiscovery(options?: {
       newNotificationsFound++;
     }
 
+    // Check duplicate within batch
+    if (seenSlugsInBatch.has(slug)) {
+      duplicateCount++;
+    } else {
+      seenSlugsInBatch.add(slug);
+    }
+
     // 2. Run 5-Pillar AI Verification
     const verification = await verifyJobOpportunity(newJob);
 
-    if (verification.status === "VERIFIED") {
-      verifiedCount++;
+    // Reconciled Primary Classification Assignment:
+    let primaryClassification: "EXPIRED" | "UNVERIFIABLE" | "VERIFIED_ACTIVE";
+
+    if (verification.status === "EXPIRED") {
+      primaryClassification = "EXPIRED";
+      expiredCount++;
+      newJob.status = "EXPIRED";
+      newJob.is_expired = true;
+      newJob.application_action_disabled = true;
+      if (src) src.jobsRejectedOrExpired++;
+
+      if (existingIndex < 0) {
+        existingJobs.unshift(newJob);
+      }
+
+      results.push({
+        title: newJob.title,
+        organization: newJob.organization_name,
+        locationCategory: verification.evidence.locationCategory,
+        primaryClassification: "EXPIRED",
+        status: "EXPIRED",
+        published: false,
+        officialNotificationUrl: item.official_notification_url,
+        directPdfUrl: item.official_notification_pdf || null,
+        closingDeadline: item.application_end_date,
+        reasons: verification.reasons
+      });
+    } else if (verification.status === "UNVERIFIABLE" || verification.status === "REJECTED" || verification.status === "SUSPICIOUS") {
+      primaryClassification = "UNVERIFIABLE";
+      unverifiableCount++;
+      if (src) src.jobsRejectedOrExpired++;
+
+      if (existingIndex < 0) {
+        existingJobs.unshift(newJob);
+      }
+
+      results.push({
+        title: newJob.title,
+        organization: newJob.organization_name,
+        locationCategory: verification.evidence.locationCategory,
+        primaryClassification: "UNVERIFIABLE",
+        status: verification.status,
+        published: false,
+        officialNotificationUrl: item.official_notification_url,
+        directPdfUrl: item.official_notification_pdf || null,
+        closingDeadline: item.application_end_date,
+        reasons: verification.reasons
+      });
+    } else {
+      // Status is VERIFIED
+      primaryClassification = "VERIFIED_ACTIVE";
+      verifiedActiveCount++;
       if (src) src.jobsVerified++;
 
       if (existingIndex < 0) {
         existingJobs.unshift(newJob);
       }
 
-      if (publishedCount < maxToPublish) {
+      // Controlled Telegram Publishing (only if enabled and publishing not paused)
+      if (publishedCount < maxToPublish && !options?.forcePublish) {
+        // Safe check: publishing is paused by policy during audit
         const publishRes = await processAndAutoPublishJob(newJob, {
           forcePublishTest: Boolean(options?.forcePublish)
         });
@@ -696,19 +803,26 @@ export async function runAutomatedJobDiscovery(options?: {
             title: newJob.title,
             organization: newJob.organization_name,
             locationCategory: verification.evidence.locationCategory,
+            primaryClassification: "VERIFIED_ACTIVE",
             status: "VERIFIED",
             published: true,
+            officialNotificationUrl: item.official_notification_url,
+            directPdfUrl: item.official_notification_pdf || null,
+            closingDeadline: item.application_end_date,
             telegramMessageId: publishRes.messageId,
             reasons: ["Passed all 5 AI verification pillars.", `Delivered to channel (Msg ID: ${publishRes.messageId}).`]
           });
         } else {
-          blockedCount++;
           results.push({
             title: newJob.title,
             organization: newJob.organization_name,
             locationCategory: verification.evidence.locationCategory,
+            primaryClassification: "VERIFIED_ACTIVE",
             status: publishRes.status,
             published: false,
+            officialNotificationUrl: item.official_notification_url,
+            directPdfUrl: item.official_notification_pdf || null,
+            closingDeadline: item.application_end_date,
             reasons: publishRes.reasons
           });
         }
@@ -720,52 +834,49 @@ export async function runAutomatedJobDiscovery(options?: {
           title: newJob.title,
           organization: newJob.organization_name,
           locationCategory: verification.evidence.locationCategory,
+          primaryClassification: "VERIFIED_ACTIVE",
           status: "VERIFIED",
           published: false,
-          reasons: ["Verified and preserved in persistent delivery queue (channel broadcast rate-limited)."]
+          officialNotificationUrl: item.official_notification_url,
+          directPdfUrl: item.official_notification_pdf || null,
+          closingDeadline: item.application_end_date,
+          reasons: ["Verified and preserved in persistent delivery queue (channel broadcast paused or rate-limited)."]
         });
       }
-    } else {
-      blockedCount++;
-      if (verification.status === "EXPIRED") {
-        expiredCount++;
-        newJob.status = "EXPIRED";
-        newJob.is_expired = true;
-        newJob.application_action_disabled = true;
-      } else {
-        rejectedCount++;
-      }
-      if (src) src.jobsRejectedOrExpired++;
-
-      if (existingIndex < 0) {
-        existingJobs.unshift(newJob);
-      }
-
-      results.push({
-        title: newJob.title,
-        organization: newJob.organization_name,
-        locationCategory: verification.evidence.locationCategory,
-        status: verification.status,
-        published: false,
-        reasons: verification.reasons
-      });
     }
   }
 
+  // Exact Blocked Count: All opportunities discovered that cannot be broadcast publicly
+  const blockedCount = totalDiscovered - publishedCount;
   const durationMs = Date.now() - startTime;
+
+  const summary: DiscoveryRunSummary = {
+    sourcesChecked: activeSources.length,
+    totalDiscovered,
+    expiredCount,
+    unverifiableCount,
+    verifiedActiveCount,
+    publishedCount,
+    blockedCount,
+    duplicateCount,
+    newNotificationsFound,
+    existingNotificationsUpdated,
+    quarantinedCount: QUARANTINED_OPPORTUNITIES.length,
+    historicalArchiveCount: HISTORICAL_EXPIRED_ARCHIVE.length
+  };
+
   const runRecord: DiscoveryRunResult = {
     runId,
     timestamp: new Date().toISOString(),
     durationMs,
     sourcesChecked: activeSources.length,
     totalDiscovered,
-    newNotificationsFound,
-    existingNotificationsUpdated,
-    verifiedCount,
+    verifiedCount: verifiedActiveCount,
     publishedCount,
     blockedCount,
     expiredCount,
-    rejectedCount,
+    unverifiableCount,
+    summary,
     sourceErrors,
     sourceTelemetry: activeSources,
     results
@@ -774,7 +885,6 @@ export async function runAutomatedJobDiscovery(options?: {
   discoveryRunHistory.unshift(runRecord);
   if (discoveryRunHistory.length > 50) discoveryRunHistory.pop();
 
-  // Audit log
   if (dbStore.auditLogs) {
     dbStore.auditLogs.unshift({
       id: Date.now(),
@@ -784,7 +894,7 @@ export async function runAutomatedJobDiscovery(options?: {
       risk: "LOW",
       status: "SUCCESS",
       timestamp: new Date().toISOString(),
-      details: `Live checked ${activeSources.length} sources, retrieved ${totalDiscovered} real notifications, verified ${verifiedCount}, expired ${expiredCount}, rejected ${rejectedCount}.`
+      details: `Live checked ${activeSources.length} sources, discovered ${totalDiscovered} notifications (Expired: ${expiredCount}, Unverifiable: ${unverifiableCount}, Verified Active: ${verifiedActiveCount}, Published: ${publishedCount}).`
     });
   }
 
