@@ -9,12 +9,12 @@
   ],
   "crons": [
     {
-      "path": "/api/cron/daily-report",
-      "schedule": "30 3 * * *"
+      "path": "/api/cron/job-discovery",
+      "schedule": "0 2 * * *"
     },
     {
-      "path": "/api/cron/weekly-report",
-      "schedule": "0 4 * * 0"
+      "path": "/api/cron/daily-report",
+      "schedule": "30 3 * * *"
     }
   ]
 }

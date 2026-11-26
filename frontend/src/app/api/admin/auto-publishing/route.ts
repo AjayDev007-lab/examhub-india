@@ -26,7 +26,8 @@ import {
 import { runAutomatedJobDiscovery } from "@/lib/jobDiscovery";
 import {
   HISTORICAL_EXPIRED_ARCHIVE,
-  ACTIVE_VERIFIED_OPPORTUNITIES
+  ACTIVE_VERIFIED_OPPORTUNITIES,
+  QUARANTINED_OPPORTUNITIES
 } from "@/lib/historicalExpiredArchive";
 
 export const dynamic = "force-dynamic";
@@ -88,6 +89,8 @@ export async function GET(req: NextRequest) {
       queue: queueItems,
       uncertainDeliveries: queueItems.filter(i => i.status === "UNCERTAIN_DELIVERY" || i.status === "DISPATCHING"),
       archivedExpired: HISTORICAL_EXPIRED_ARCHIVE,
+      quarantined: QUARANTINED_OPPORTUNITIES,
+      activeVerified: ACTIVE_VERIFIED_OPPORTUNITIES,
       logs
     });
   } catch (err: any) {

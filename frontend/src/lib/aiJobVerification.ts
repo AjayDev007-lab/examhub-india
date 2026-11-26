@@ -587,14 +587,44 @@ export async function verifyJobOpportunity(job: any): Promise<JobVerificationRes
 
   // Mandatory rule: A missing deadline must not be treated as proof of active recruitment
   if (!endDate) {
-    reasons.push("Application deadline is missing. Missing deadlines are strictly unverifiable and held back from publication.");
-    score -= 35;
+    reasons.push("Application deadline is not specified on official portal. Opportunities without an explicit closing deadline are strictly marked UNVERIFIABLE and held back from public automated broadcast.");
+    return {
+      status: "UNVERIFIABLE",
+      reasons,
+      evidence: {
+        organizationVerified,
+        linkVerified,
+        expiryVerified: false,
+        contentVerified: false,
+        fraudCheckPassed: true,
+        duplicateCheckPassed: true,
+        locationCategory: categorizeJobLocation(job.location, title, org),
+        fingerprint: generateJobFingerprint(job),
+        details: { missingDeadline: true }
+      },
+      score: 0
+    };
   } else {
     const deadlineResult = parseIndianDeadline(endDate);
 
     if (!deadlineResult.valid) {
       reasons.push(deadlineResult.error || "Application deadline date format is ambiguous or invalid. Requires manual investigation.");
-      score -= 30;
+      return {
+        status: "UNVERIFIABLE",
+        reasons,
+        evidence: {
+          organizationVerified,
+          linkVerified,
+          expiryVerified: false,
+          contentVerified: false,
+          fraudCheckPassed: true,
+          duplicateCheckPassed: true,
+          locationCategory: categorizeJobLocation(job.location, title, org),
+          fingerprint: generateJobFingerprint(job),
+          details: { endDate, error: deadlineResult.error }
+        },
+        score: 0
+      };
     } else if (deadlineResult.isExpired) {
       reasons.push(`Application deadline officially expired on ${deadlineResult.istString} (Asia/Kolkata). Recruitment is officially closed.`);
       return {
@@ -614,9 +644,29 @@ export async function verifyJobOpportunity(job: any): Promise<JobVerificationRes
         score: 0
       };
     } else {
-      // Check start date vs end date conflict
+      // Check start date vs now (Upcoming recruitment check)
       if (startDate) {
         const startResult = parseIndianDeadline(startDate);
+        if (startResult.valid && startResult.timestampMs && startResult.timestampMs > Date.now()) {
+          reasons.push(`Recruitment notification / application opening date is scheduled for ${startResult.istString} (Asia/Kolkata). Applications are not yet open.`);
+          return {
+            status: "UNVERIFIABLE",
+            reasons,
+            evidence: {
+              organizationVerified,
+              linkVerified,
+              expiryVerified: false,
+              contentVerified: false,
+              fraudCheckPassed: true,
+              duplicateCheckPassed: true,
+              locationCategory: categorizeJobLocation(job.location, title, org),
+              fingerprint: generateJobFingerprint(job),
+              details: { startDate, startResult, isUpcoming: true }
+            },
+            score: 0
+          };
+        }
+
         if (startResult.valid && startResult.timestampMs && deadlineResult.timestampMs && startResult.timestampMs > deadlineResult.timestampMs) {
           reasons.push("Conflicting dates detected: application start date is after the closing deadline.");
           score -= 35;

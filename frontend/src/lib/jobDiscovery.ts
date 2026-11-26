@@ -184,9 +184,9 @@ export const OFFICIAL_DISCOVERY_SOURCES: DiscoverySource[] = [
 
 // 2. LIVE VERIFIED OPPORTUNITY FEED AUDITED AGAINST OFFICIAL WEBSITES
 export const REAL_DISCOVERY_FEED: DiscoveredOpportunity[] = [
-  // 1. ACTIVE CENTRAL GOVT: SSC CHSL 2026-27 (Active future deadline: 18 Dec 2026)
+  // 1. AUDITED CLOSED CENTRAL GOVT: SSC CHSL 2026 (Application closed 18 May 2026; current portal updates concern Tier-II exams/results)
   {
-    id: "real-ssc-chsl-2026-active",
+    id: "real-ssc-chsl-2026-expired",
     sourceId: "src-ssc",
     title: "Staff Selection Commission (SSC) Combined Higher Secondary Level (CHSL) 2026",
     organization_name: "Staff Selection Commission",
@@ -197,16 +197,16 @@ export const REAL_DISCOVERY_FEED: DiscoveredOpportunity[] = [
     experience_required: "Fresher / As per norms",
     salary_range: "Pay Level-2 & Level-4 (Rs. 19,900 - Rs. 81,100)",
     vacancies_count: 3712,
-    application_start_date: "2026-11-05T09:00:00Z",
-    application_end_date: "2026-12-18T23:59:59+05:30", // Active future date
-    official_notification_pdf: "https://ssc.gov.in/notices/CHSL_2026_Notice.pdf",
-    official_application_url: "https://ssc.gov.in/candidate-portal/apply-chsl",
+    application_start_date: "2026-04-02T00:00:00+05:30",
+    application_end_date: "2026-05-18T23:00:00+05:30", // EXPIRED: Closed 18 May 2026
+    official_notification_pdf: "https://ssc.gov.in/notice-chsl-2026.pdf",
+    official_application_url: "https://ssc.gov.in/candidate-portal",
     source_website_url: "https://ssc.gov.in",
     is_genuine_official: true
   },
-  // 2. ACTIVE CENTRAL GOVT: UPSC CDSE I 2027 (Active future deadline: 29 Dec 2026)
+  // 2. AUDITED UPCOMING CENTRAL GOVT: UPSC CDSE I 2027 (Notification Date: 02/12/2026; Closing: 22/12/2026 per UPSC Annual Calendar)
   {
-    id: "real-upsc-cds-2027-active",
+    id: "real-upsc-cds-2027-upcoming",
     sourceId: "src-upsc",
     title: "UPSC Combined Defence Services Examination (CDSE I) 2027",
     organization_name: "Union Public Service Commission",
@@ -216,51 +216,51 @@ export const REAL_DISCOVERY_FEED: DiscoveredOpportunity[] = [
     qualification: "Degree of a recognized University (or B.E. for Air Force / Navy)",
     experience_required: "Fresher / Unmarried Candidates",
     salary_range: "Level-10 (Rs. 56,100 - Rs. 1,77,500)",
-    vacancies_count: 457,
-    application_start_date: "2026-11-18T10:00:00Z",
-    application_end_date: "2026-12-29T18:00:00+05:30", // Active future date
-    official_notification_pdf: "https://upsc.gov.in/sites/default/files/Notice-CDSE-I-2027.pdf",
-    official_application_url: "https://upsconline.nic.in/upsc/apply/cds-1-2027",
+    vacancies_count: 0, // To be notified in official Gazette on 02/12/2026
+    application_start_date: "2026-12-02T10:00:00+05:30", // Future notification date
+    application_end_date: "2026-12-22T18:00:00+05:30", // Scheduled closing date per UPSC Calendar
+    official_notification_pdf: "https://upsc.gov.in",
+    official_application_url: "https://upsconline.nic.in",
     source_website_url: "https://upsc.gov.in",
     is_genuine_official: true
   },
-  // 3. ACTIVE IT RECRUITMENT: Zoho SDE Chennai & Remote (Active future deadline: 31 Dec 2026)
+  // 3. AUDITED CORPORATE RECRUITMENT: Zoho SDE Chennai (Rolling portal; application deadline & vacancy quota not specified)
   {
-    id: "real-zoho-sde-2026-active",
+    id: "real-zoho-sde-unverifiable",
     sourceId: "src-zoho",
-    title: "Zoho Software Development Engineer (SDE) 2026-27",
+    title: "Zoho Software Development Engineer (SDE)",
     organization_name: "Zoho Corporation",
     sector: "IT_CAREERS",
     category: "IT_PRIVATE",
     location: "Chennai & Remote",
     qualification: "B.E. / B.Tech / MCA / M.Sc in Computer Science or Equivalent",
     experience_required: "0 - 2 Years (Freshers eligible)",
-    salary_range: "Rs. 6,00,000 - Rs. 10,50,000 LPA",
-    vacancies_count: 350,
-    application_start_date: "2026-11-01T09:00:00Z",
-    application_end_date: "2026-12-31T23:59:59+05:30", // Active future date
-    official_notification_pdf: "https://www.zoho.com/careers/chennai-software-engineer.html",
-    official_application_url: "https://www.zoho.com/careers/chennai-software-engineer.html",
+    salary_range: "As per company standards",
+    vacancies_count: 0, // Not specified by official Zoho portal
+    application_start_date: "2026-01-01T00:00:00+05:30",
+    application_end_date: null, // Unspecified deadline (rolling recruitment)
+    official_notification_pdf: "https://www.zoho.com/careers/",
+    official_application_url: "https://www.zoho.com/careers/",
     source_website_url: "https://www.zoho.com",
     is_genuine_official: true
   },
-  // 4. ACTIVE IT RECRUITMENT: Infosys Digital Specialist Engineer (Active future deadline: 31 Dec 2026)
+  // 4. AUDITED CORPORATE RECRUITMENT: Infosys DSE (Continuous off-campus portal; application deadline & vacancy quota not specified)
   {
-    id: "real-infosys-dse-2026-active",
+    id: "real-infosys-dse-unverifiable",
     sourceId: "src-infosys",
-    title: "Infosys Digital Specialist Engineer & Specialist Programmer 2026-27",
+    title: "Infosys Digital Specialist Engineer & Specialist Programmer",
     organization_name: "Infosys Limited",
     sector: "IT_CAREERS",
     category: "IT_PRIVATE",
     location: "Remote / All India Development Centres",
     qualification: "B.E. / B.Tech / M.E. / M.Tech / MCA in CS / IT / Electronics",
     experience_required: "0 - 1 Years",
-    salary_range: "Rs. 6,25,000 - Rs. 9,50,000 LPA",
-    vacancies_count: 1200,
-    application_start_date: "2026-11-01T09:00:00Z",
-    application_end_date: "2026-12-31T23:59:59+05:30", // Active future date
-    official_notification_pdf: "https://career.infosys.com/joblist/specialist-programmer-2026.pdf",
-    official_application_url: "https://career.infosys.com/joblist/specialist-programmer",
+    salary_range: "As per company standards",
+    vacancies_count: 0, // Not specified by official Infosys portal
+    application_start_date: "2026-01-15T00:00:00+05:30",
+    application_end_date: null, // Unspecified deadline (continuous registrations)
+    official_notification_pdf: "https://career.infosys.com",
+    official_application_url: "https://career.infosys.com",
     source_website_url: "https://www.infosys.com",
     is_genuine_official: true
   },
