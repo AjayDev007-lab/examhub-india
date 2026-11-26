@@ -151,7 +151,7 @@ let autoPublishConfig: AutoPublishConfig = {
   enabled: true,
   targetChannel: "@india102210",
   minScoreToPublish: 85,
-  pausePublishing: false,
+  pausePublishing: true, // Safety guard: Public auto-publishing paused during development and testing
   totalDiscoveredCount: 14,
   totalVerifiedCount: 7,
   totalPublishedCount: 5,
@@ -677,6 +677,31 @@ export async function verifyJobOpportunity(job: any): Promise<JobVerificationRes
         expiryVerified = true;
       }
     }
+  }
+
+  // Check if notification is an internal departmental examination (LDCE)
+  if (
+    title.toUpperCase().includes("LDCE") ||
+    title.toLowerCase().includes("limited departmental") ||
+    description.toLowerCase().includes("limited departmental")
+  ) {
+    reasons.push("Departmental examination (LDCE) restricted to serving personnel; not open for general student recruitment.");
+    return {
+      status: "UNVERIFIABLE",
+      reasons,
+      evidence: {
+        organizationVerified,
+        linkVerified,
+        expiryVerified: false,
+        contentVerified: false,
+        fraudCheckPassed: true,
+        duplicateCheckPassed: true,
+        locationCategory: categorizeJobLocation(job.location, title, org),
+        fingerprint: generateJobFingerprint(job),
+        details: { isDepartmentalLdce: true }
+      },
+      score: 0
+    };
   }
 
   // Check if notification indicates cancellation or withdrawal
