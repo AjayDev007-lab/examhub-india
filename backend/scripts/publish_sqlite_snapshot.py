@@ -8,21 +8,15 @@ Pass --apply to publish. Existing snapshots are protected unless
 from __future__ import annotations
 
 import argparse
-import asyncio
 import os
 import sqlite3
-import sys
+import subprocess
 import tempfile
 from pathlib import Path
 
-from sqlalchemy.engine import URL
-
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = BACKEND_ROOT.parent
-if str(BACKEND_ROOT) not in sys.path:
-    sys.path.insert(0, str(BACKEND_ROOT))
-
-from app.firestore_sqlite import FirestoreSQLiteSnapshotStore
+REST_PUBLISHER = BACKEND_ROOT / "scripts" / "publish_firestore_snapshot.mjs"
 
 
 def inspect_database(path: Path) -> tuple[int, int]:
@@ -76,15 +70,20 @@ def omit_file_references(source: Path, target: Path) -> int:
         input_db.close()
 
 
-async def publish(path: Path, project_id: str, replace_existing: bool) -> None:
-    database_url = URL.create("sqlite+aiosqlite", database=path.resolve().as_posix())
-    store = FirestoreSQLiteSnapshotStore(str(database_url), project_id)
-    if await store.snapshot_exists() and not replace_existing:
-        raise RuntimeError(
-            "A Firestore snapshot already exists. Review it first; use --replace-existing only if replacing it is intended."
-        )
-    await store.publish()
-    print("Firestore snapshot published successfully.")
+def publish(path: Path, project_id: str, service_account: Path, replace_existing: bool) -> None:
+    command = [
+        "node",
+        str(REST_PUBLISHER),
+        "--database",
+        str(path.resolve()),
+        "--project-id",
+        project_id,
+        "--service-account",
+        str(service_account.resolve()),
+    ]
+    if replace_existing:
+        command.append("--replace-existing")
+    subprocess.run(command, cwd=REPO_ROOT, check=True)
 
 
 def main() -> int:
@@ -96,6 +95,12 @@ def main() -> int:
         help="SQLite source database (default: repository examhub_india.db)",
     )
     parser.add_argument("--project-id", default=os.getenv("FIREBASE_PROJECT_ID", ""))
+    parser.add_argument(
+        "--service-account",
+        type=Path,
+        default=os.getenv("FIREBASE_SERVICE_ACCOUNT_FILE", ""),
+        help="Path to the private Firebase service-account JSON file",
+    )
     parser.add_argument("--apply", action="store_true", help="Publish the snapshot to Firestore")
     parser.add_argument(
         "--replace-existing",
@@ -113,6 +118,8 @@ def main() -> int:
         parser.error("--replace-existing requires --apply")
     if not args.project_id and args.apply:
         parser.error("--apply requires --project-id or FIREBASE_PROJECT_ID")
+    if args.apply and not args.service_account:
+        parser.error("--apply requires --service-account or FIREBASE_SERVICE_ACCOUNT_FILE")
 
     database = args.database.resolve()
     table_count, row_count = inspect_database(database)
@@ -128,9 +135,9 @@ def main() -> int:
             prepared_database = Path(temporary_dir) / database.name
             cleared = omit_file_references(database, prepared_database)
             print(f"Cleared {cleared} local file reference(s) in a temporary copy; the source SQLite file was not changed.")
-            asyncio.run(publish(prepared_database, args.project_id, args.replace_existing))
+            publish(prepared_database, args.project_id, args.service_account, args.replace_existing)
     else:
-        asyncio.run(publish(database, args.project_id, args.replace_existing))
+        publish(database, args.project_id, args.service_account, args.replace_existing)
     return 0
 
 

@@ -35,19 +35,15 @@ python -m pip install -r backend/requirements.txt
 python backend/scripts/publish_sqlite_snapshot.py --database examhub_india.db
 ```
 
-Review the reported database size, tables, and rows. The current local database has three file-path references (a stored-document path, preview path, and scorecard path), and none of those files exist locally. This deployment has no file-storage service, so the import command below clears those obsolete references in a temporary copy, while preserving the source database and other rows. The database also already contains one admin record; setting `SUPERADMIN_EMAIL` and `SUPERADMIN_PASSWORD` will not change an existing admin password. Use the existing admin credentials, or recover/update that account before snapshotting if you do not know them. Before publishing, set the two service account variables in your PowerShell session from the Firebase service account key (keep them private):
+Review the reported database size, tables, and rows. The current local database has three file-path references (a stored-document path, preview path, and scorecard path), and none of those files exist locally. This deployment has no file-storage service, so the import command below clears those obsolete references in a temporary copy, while preserving the source database and other rows. The database also already contains one admin record; setting `SUPERADMIN_EMAIL` and `SUPERADMIN_PASSWORD` will not change an existing admin password. Use the existing admin credentials, or recover/update that account before snapshotting if you do not know them. The importer uses Node.js and a service-account JSON file to publish over HTTPS, so it does not require Python's native Firestore gRPC library.
 
-```powershell
-$env:FIREBASE_CLIENT_EMAIL = "your-service-account@examhub-india-6ba59.iam.gserviceaccount.com"
-$env:FIREBASE_PRIVATE_KEY = "-----BEGIN PRIVATE KEY-----`n...`n-----END PRIVATE KEY-----`n"
-```
-
-Then publish:
+Then publish. Replace the example path with the location of your downloaded JSON key file. Keep that file private.
 
 ```powershell
 python backend/scripts/publish_sqlite_snapshot.py `
   --database examhub_india.db `
   --project-id examhub-india-6ba59 `
+  --service-account "E:\path\to\firebase-service-account.json" `
   --omit-file-references `
   --apply
 ```
