@@ -47,7 +47,9 @@ def inspect_database(path: Path) -> tuple[int, int]:
 
 def omit_file_references(source: Path, target: Path) -> int:
     """Copy the authoritative DB and clear obsolete local file paths in the copy."""
-    with sqlite3.connect(str(source)) as input_db, sqlite3.connect(str(target)) as output_db:
+    input_db = sqlite3.connect(str(source))
+    output_db = sqlite3.connect(str(target))
+    try:
         input_db.backup(output_db)
         cleared = 0
         for table, columns in (
@@ -69,6 +71,9 @@ def omit_file_references(source: Path, target: Path) -> int:
                 cleared += cursor.rowcount
         output_db.commit()
         return cleared
+    finally:
+        output_db.close()
+        input_db.close()
 
 
 async def publish(path: Path, project_id: str, replace_existing: bool) -> None:
