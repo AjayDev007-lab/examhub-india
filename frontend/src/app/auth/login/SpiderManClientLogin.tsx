@@ -8,7 +8,7 @@ import {
   CheckCircle2, Eye, EyeOff, Zap, Award, Volume2, VolumeX,
   GraduationCap, BookOpen, ShieldCheck, Info
 } from "lucide-react";
-import { fetchApi } from "@/lib/api";
+import { signInWithExamHub } from "@/lib/firebaseSession";
 import SpiderManLive3DCanvas, { SpiderManActionState } from "@/components/SpiderManLive3DCanvas";
 import { soundEngine } from "@/lib/spidermanAudio";
 
@@ -82,10 +82,7 @@ export default function SpiderManClientLogin() {
     setSpiderAction("focused_login");
 
     try {
-      const res = await fetchApi("/api/auth/login", {
-        method: "POST",
-        body: JSON.stringify({ email: emailClean, password }),
-      });
+      const res = await signInWithExamHub(emailClean, password);
       const isAdmin = res.user_type === "admin";
       localStorage.setItem(isAdmin ? "examhub_admin_user" : "examhub_user", JSON.stringify(res.user));
       setLoginSuccess(true);

@@ -4,7 +4,7 @@
 // Zero credentials committed to git; reads strictly from Vercel environment variables
 // ============================================================================
 
-import { initializeApp, getApps, cert, App } from "firebase-admin/app";
+import { initializeApp, getApps, cert, applicationDefault, App } from "firebase-admin/app";
 import { getFirestore, Firestore } from "firebase-admin/firestore";
 import crypto from "crypto";
 
@@ -13,6 +13,7 @@ export interface FirebaseAdminConfigStatus {
   projectId: string;
   hasClientEmail: boolean;
   hasPrivateKey: boolean;
+  usesApplicationDefaultCredentials: boolean;
   error?: string;
 }
 
@@ -94,19 +95,24 @@ export function getFirebaseAdminConfigStatus(): FirebaseAdminConfigStatus {
     "examhub-india-6ba59";
   const clientEmail = cleanEnvString(process.env.FIREBASE_CLIENT_EMAIL);
   const rawKey = cleanPrivateKey(process.env.FIREBASE_PRIVATE_KEY);
+  const usesApplicationDefaultCredentials = Boolean(
+    process.env.GOOGLE_APPLICATION_CREDENTIALS ||
+    process.env.K_SERVICE ||
+    process.env.FIREBASE_CONFIG
+  );
 
   const hasClientEmail = Boolean(clientEmail && clientEmail.includes("@"));
   const hasPrivateKey = Boolean(rawKey && (rawKey.includes("BEGIN PRIVATE KEY") || rawKey.length > 50));
-  const isConfigured = Boolean(projectId && hasClientEmail && hasPrivateKey && !initError);
+  const hasServiceAccountCredentials = hasClientEmail && hasPrivateKey;
+  const isConfigured = Boolean(
+    projectId && (hasServiceAccountCredentials || usesApplicationDefaultCredentials) && !initError
+  );
 
   let error: string | undefined;
   if (initError) {
     error = initError;
   } else if (!isConfigured) {
-    const missing: string[] = [];
-    if (!hasClientEmail) missing.push("FIREBASE_CLIENT_EMAIL");
-    if (!hasPrivateKey) missing.push("FIREBASE_PRIVATE_KEY");
-    error = `Firebase Admin credentials missing in Vercel environment variables (${missing.join(", ")}). Serverless queue is paused for durability protection.`;
+    error = "Firebase Admin credentials are unavailable. Set FIREBASE_CLIENT_EMAIL and FIREBASE_PRIVATE_KEY, or run on Google Cloud with Application Default Credentials.";
   }
 
   return {
@@ -114,6 +120,7 @@ export function getFirebaseAdminConfigStatus(): FirebaseAdminConfigStatus {
     projectId,
     hasClientEmail,
     hasPrivateKey,
+    usesApplicationDefaultCredentials,
     error
   };
 }
@@ -133,7 +140,8 @@ export function getFirebaseAdminApp(): App | null {
   if (adminApp) return adminApp;
 
   const status = getFirebaseAdminConfigStatus();
-  if (!status.hasClientEmail || !status.hasPrivateKey) {
+  const hasServiceAccountCredentials = status.hasClientEmail && status.hasPrivateKey;
+  if (!hasServiceAccountCredentials && !status.usesApplicationDefaultCredentials) {
     return null;
   }
 
@@ -145,26 +153,30 @@ export function getFirebaseAdminApp(): App | null {
     }
 
     const projectId = status.projectId;
-    const clientEmail = cleanEnvString(process.env.FIREBASE_CLIENT_EMAIL);
-    const privateKey = cleanPrivateKey(process.env.FIREBASE_PRIVATE_KEY);
-    const rawKey = process.env.FIREBASE_PRIVATE_KEY || "";
+    if (hasServiceAccountCredentials) {
+      const clientEmail = cleanEnvString(process.env.FIREBASE_CLIENT_EMAIL);
+      const privateKey = cleanPrivateKey(process.env.FIREBASE_PRIVATE_KEY);
+      const rawKey = process.env.FIREBASE_PRIVATE_KEY || "";
 
-    try {
-      crypto.createPrivateKey(privateKey);
-    } catch (pemErr: any) {
-      const keyDiag = `len=${rawKey.length}, hasBegin=${rawKey.includes("BEGIN")}, hasEnd=${rawKey.includes("END")}, emailPrefix=${(clientEmail || "").slice(0, 8)}`;
-      initError = `Firebase Admin initialization error: Invalid PEM key format [${pemErr.message}] (${keyDiag})`;
-      console.error(initError);
-      return null;
-    }
+      try {
+        crypto.createPrivateKey(privateKey);
+      } catch (pemErr: any) {
+        const keyDiag = `len=${rawKey.length}, hasBegin=${rawKey.includes("BEGIN")}, hasEnd=${rawKey.includes("END")}, emailPrefix=${(clientEmail || "").slice(0, 8)}`;
+        initError = `Firebase Admin initialization error: Invalid PEM key format [${pemErr.message}] (${keyDiag})`;
+        console.error(initError);
+        return null;
+      }
 
-    adminApp = initializeApp({
-      credential: cert({
+      adminApp = initializeApp({
+        credential: cert({ projectId, clientEmail, privateKey }),
         projectId,
-        clientEmail,
-        privateKey
-      })
-    });
+      });
+    } else {
+      adminApp = initializeApp({
+        credential: applicationDefault(),
+        projectId,
+      });
+    }
 
     initError = null;
     return adminApp;

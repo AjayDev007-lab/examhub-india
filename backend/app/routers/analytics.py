@@ -16,7 +16,11 @@ from app.models.models import (
 )
 from app.auth.security import get_current_admin, require_role
 
-router = APIRouter(prefix="/api/admin", tags=["Admin Analytics, Alerts & Automation Engine"])
+router = APIRouter(
+    prefix="/api/admin",
+    tags=["Admin Analytics, Alerts & Automation Engine"],
+    dependencies=[Depends(get_current_admin)],
+)
 
 def utc_now():
     return datetime.now(timezone.utc)

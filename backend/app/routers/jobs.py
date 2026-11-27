@@ -60,6 +60,19 @@ class JobStatusUpdate(BaseModel):
     status: Optional[str] = None # "DRAFT", "PENDING_VERIFICATION", "VERIFIED", "PUBLISHED", "UPDATED", "EXPIRED", "CANCELLED", "REJECTED"
 
 
+class JobUpdate(BaseModel):
+    title: Optional[str] = None
+    status: Optional[str] = None
+    vacancies_count: Optional[int] = None
+    total_vacancies: Optional[int] = None
+    application_end_date: Optional[datetime] = None
+    last_date_to_apply: Optional[datetime] = None
+    official_application_url: Optional[str] = None
+    official_apply_url: Optional[str] = None
+    official_notification_pdf: Optional[str] = None
+    official_notification_pdf_url: Optional[str] = None
+
+
 class JobReportCreate(BaseModel):
     issue_type: Optional[str] = None
     report_type: Optional[str] = None
@@ -479,12 +492,15 @@ async def track_job_apply(
 
 @router.post("/{job_id}/report")
 async def report_job_issue(
-    job_id: int,
+    job_id: str,
     payload: JobReportCreate,
     db: AsyncSession = Depends(get_db),
     current_user: Optional[User] = Depends(get_optional_user)
 ):
-    job = await db.get(JobNotification, job_id)
+    job = await db.get(JobNotification, int(job_id)) if job_id.isdigit() else None
+    if not job:
+        result = await db.execute(select(JobNotification).where(JobNotification.slug == job_id.lower()))
+        job = result.scalars().first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
@@ -574,7 +590,7 @@ async def admin_create_job(
 @router.put("/{identifier}")
 async def admin_update_job(
     identifier: str,
-    payload: JobStatusUpdate,
+    payload: JobUpdate,
     db: AsyncSession = Depends(get_db),
     admin: AdminUser = Depends(require_role(["SUPER_ADMIN", "EXAM_CONTROLLER", "JOB_MANAGER"]))
 ):
@@ -588,8 +604,19 @@ async def admin_update_job(
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    if payload.status:
-        job.status = payload.status
+    changes = payload.model_dump(exclude_unset=True)
+    if "title" in changes and changes["title"]:
+        job.title = changes["title"].strip()
+    if "status" in changes and changes["status"]:
+        job.status = changes["status"]
+    if "vacancies_count" in changes or "total_vacancies" in changes:
+        job.vacancies_count = changes.get("total_vacancies", changes.get("vacancies_count"))
+    if "last_date_to_apply" in changes or "application_end_date" in changes:
+        job.application_end_date = changes.get("last_date_to_apply", changes.get("application_end_date"))
+    if "official_apply_url" in changes or "official_application_url" in changes:
+        job.official_application_url = changes.get("official_apply_url", changes.get("official_application_url"))
+    if "official_notification_pdf_url" in changes or "official_notification_pdf" in changes:
+        job.official_notification_pdf = changes.get("official_notification_pdf_url", changes.get("official_notification_pdf"))
     job.updated_at = utc_now()
     await db.commit()
     await db.refresh(job)

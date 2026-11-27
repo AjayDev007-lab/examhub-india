@@ -16,10 +16,13 @@ import {
 } from "@/lib/telegramManager";
 import { getAllApprovals, getPendingApprovals } from "@/lib/approvalManager";
 import { dbStore } from "@/lib/data";
+import { requireAdminSession } from "@/lib/backendProxy";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const unauthorized = await requireAdminSession(request);
+  if (unauthorized) return unauthorized;
   const token = getSanitizedTelegramBotToken();
   const config = getTelegramConfig();
 

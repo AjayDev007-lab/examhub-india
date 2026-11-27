@@ -1,6 +1,6 @@
 import os
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload
@@ -14,6 +14,7 @@ from app.services.document_service import (
 )
 from app.services.audit_service import log_audit_event
 from app.config import settings
+from app.services.durable_files import persist_local_file, read_stored_file
 from datetime import datetime, timezone
 
 router = APIRouter(prefix="/api/documents", tags=["Personal Document Management"])
@@ -82,7 +83,9 @@ async def upload_document(
         preview_filename = f"prev_{stored_name}.png"
         preview_path = os.path.join(settings.STORAGE_DIR, "previews", preview_filename)
         if generate_pdf_preview(upload_path, preview_path):
-            preview_name = preview_filename
+            preview_name = await persist_local_file(preview_path, f"student-previews/{user.id}/{preview_filename}", "image/png")
+
+    stored_path = await persist_local_file(upload_path, f"student-documents/{user.id}/{stored_name}", detected_mime)
 
     # Resolve document type
     dt_res = await db.execute(select(DocumentType).where(DocumentType.code == document_type_code.upper().strip()))
@@ -96,7 +99,7 @@ async def upload_document(
         document_type_id=doc_type.id,
         title=title.strip(),
         original_filename=file.filename or stored_name,
-        stored_path=os.path.join("uploads", stored_name),
+        stored_path=stored_path,
         preview_path=preview_name,
         mime_type=detected_mime,
         file_size=len(file_bytes),
@@ -136,13 +139,10 @@ async def download_student_document(
             detail="Document not found or access unauthorized"
         )
 
-    # Determine full disk path
-    if doc.stored_path.startswith("uploads"):
-        full_path = os.path.join(settings.STORAGE_DIR, doc.stored_path)
-    else:
-        full_path = os.path.join(settings.STORAGE_DIR, "documents", doc.stored_path)
-
-    if not os.path.exists(full_path):
+    legacy_path = doc.stored_path if doc.stored_path.startswith("uploads") else os.path.join("documents", doc.stored_path)
+    try:
+        file_bytes = await read_stored_file(doc.stored_path, legacy_path=legacy_path)
+    except FileNotFoundError:
         raise HTTPException(status_code=404, detail="File content missing from encrypted storage")
 
     # Record download audit
@@ -156,10 +156,10 @@ async def download_student_document(
     db.add(download_record)
     await db.commit()
 
-    return FileResponse(
-        full_path,
+    return Response(
+        content=file_bytes,
         media_type=doc.mime_type,
-        filename=doc.original_filename
+        headers={"Content-Disposition": f'attachment; filename="{doc.original_filename.replace(chr(34), "")}"', "X-Content-Type-Options": "nosniff"},
     )
 
 @router.get("/{document_id}/preview")
@@ -177,11 +177,11 @@ async def preview_student_document(
     if not doc or not doc.preview_path:
         raise HTTPException(status_code=404, detail="Preview not available for this document")
 
-    preview_path = os.path.join(settings.STORAGE_DIR, "previews", doc.preview_path)
-    if not os.path.exists(preview_path):
+    try:
+        preview_bytes = await read_stored_file(doc.preview_path, legacy_path=os.path.join("previews", doc.preview_path))
+    except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Preview file missing")
-
-    return FileResponse(preview_path, media_type="image/png")
+    return Response(content=preview_bytes, media_type="image/png", headers={"X-Content-Type-Options": "nosniff"})
 
 @router.delete("/{document_id}")
 async def delete_student_document(

@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { aiManager, processAIManagerCommand } from "@/lib/aiManager";
+import { requireAdminSession } from "@/lib/backendProxy";
 
 // GET /api/admin/ai/manager - Retrieve complete state for 18-section control dashboard
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const unauthorized = await requireAdminSession(req);
+  if (unauthorized) return unauthorized;
   try {
     return NextResponse.json({
       success: true,
@@ -28,6 +31,8 @@ export async function GET() {
 
 // POST /api/admin/ai/manager - Execute natural language command or operational action
 export async function POST(req: NextRequest) {
+  const unauthorized = await requireAdminSession(req);
+  if (unauthorized) return unauthorized;
   try {
     const body = await req.json();
     const action = body.action || "COMMAND";

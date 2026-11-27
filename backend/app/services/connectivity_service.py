@@ -1,8 +1,9 @@
 import time
-import httpx
+import aiohttp
 import urllib.parse
 import ipaddress
 import socket
+import asyncio
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +16,52 @@ PROHIBITED_METADATA_IPS = {
     "fd00:ec2::254"    # IPv6 AWS metadata
 }
 
+
+class PublicOnlyResolver(aiohttp.abc.AbstractResolver):
+    """Resolve once and pin outbound sockets to publicly routable addresses."""
+
+    async def resolve(self, host: str, port: int = 0, family: int = socket.AF_INET) -> list[dict[str, Any]]:
+        try:
+            literal = ipaddress.ip_address(host)
+            if not literal.is_global:
+                raise OSError("Target IP is not publicly routable")
+            addresses = [(socket.AF_INET6 if literal.version == 6 else socket.AF_INET, socket.SOCK_STREAM, 0, "", (str(literal), port))]
+        except ValueError:
+            try:
+                addresses = await asyncio.get_running_loop().getaddrinfo(
+                    host, port, family=family, type=socket.SOCK_STREAM
+                )
+            except OSError as exc:
+                raise OSError("Target host could not be safely resolved") from exc
+
+        results = []
+        seen = set()
+        for address_family, socket_type, protocol, _, sockaddr in addresses:
+            address = sockaddr[0]
+            if address in seen:
+                continue
+            seen.add(address)
+            try:
+                parsed_address = ipaddress.ip_address(address)
+            except ValueError as exc:
+                raise OSError("Target host resolved to an invalid address") from exc
+            if not parsed_address.is_global:
+                raise OSError(f"Target host resolves to a non-public address ({address})")
+            results.append({
+                "hostname": host,
+                "host": address,
+                "port": port,
+                "family": address_family,
+                "proto": protocol or socket_type,
+                "flags": 0,
+            })
+        if not results:
+            raise OSError("Target host could not be safely resolved")
+        return results
+
+    async def close(self) -> None:
+        return None
+
 def validate_target_url(url: str) -> Tuple[bool, str]:
     """
     Validates target URL to prevent SSRF and unsafe schemes.
@@ -26,22 +73,39 @@ def validate_target_url(url: str) -> Tuple[bool, str]:
     parsed = urllib.parse.urlparse(url.strip())
     if parsed.scheme.lower() not in ("http", "https"):
         return False, "Only HTTP and HTTPS protocols are permitted"
+    if parsed.username or parsed.password:
+        return False, "Credentials in target URLs are not permitted"
     
     hostname = parsed.hostname
     if not hostname:
         return False, "Invalid target host"
         
     hostname_clean = hostname.strip().lower()
-    if hostname_clean in PROHIBITED_METADATA_IPS:
+    if hostname_clean in PROHIBITED_METADATA_IPS or hostname_clean in {"localhost", "localhost.localdomain"} or hostname_clean.endswith(".localhost"):
         return False, "Target host is prohibited (SSRF security policy)"
-        
+
     try:
         ip = ipaddress.ip_address(hostname_clean)
-        if ip.is_link_local or ip.is_reserved or ip.is_multicast:
-            return False, f"Target IP {hostname_clean} is not permitted"
+        if not ip.is_global:
+            return False, f"Target IP {hostname_clean} is not publicly routable"
     except ValueError:
-        # Not a raw IP literal; hostname will be resolved safely by HTTP client
-        pass
+        # Reject hostnames that resolve to any private, loopback, metadata, or
+        # otherwise non-public address before allowing the outbound request.
+        try:
+            port = parsed.port or (443 if parsed.scheme.lower() == "https" else 80)
+            addresses = socket.getaddrinfo(hostname_clean, port, type=socket.SOCK_STREAM)
+        except (OSError, ValueError):
+            return False, "Target host could not be safely resolved"
+        resolved_ips = {entry[4][0] for entry in addresses}
+        if not resolved_ips:
+            return False, "Target host could not be safely resolved"
+        for address in resolved_ips:
+            try:
+                resolved_ip = ipaddress.ip_address(address)
+            except ValueError:
+                return False, "Target host resolved to an invalid address"
+            if not resolved_ip.is_global:
+                return False, f"Target host resolves to a non-public address ({address})"
 
     return True, "Valid"
 
@@ -58,7 +122,7 @@ async def test_institution_connectivity(
     Measures latency in milliseconds, records status code, updates organization health status,
     and logs an audit trail in integration_logs.
     """
-    valid, reason = validate_target_url(target_url)
+    valid, reason = await asyncio.to_thread(validate_target_url, target_url)
     if not valid:
         return {
             "success": False,
@@ -83,9 +147,17 @@ async def test_institution_connectivity(
     log_message = ""
 
     try:
-        async with httpx.AsyncClient(timeout=timeout_secs, follow_redirects=True, verify=False) as client:
-            resp = await client.get(target_url, headers=headers)
-            status_code = resp.status_code
+        timeout = aiohttp.ClientTimeout(total=timeout_secs)
+        connector = aiohttp.TCPConnector(
+            resolver=PublicOnlyResolver(),
+            use_dns_cache=False,
+            ssl=True,
+            limit=1,
+        )
+        async with aiohttp.ClientSession(timeout=timeout, connector=connector) as client:
+            async with client.get(target_url, headers=headers, allow_redirects=False) as resp:
+                status_code = resp.status
+                await resp.read()
             latency_ms = int((time.perf_counter() - start_time) * 1000)
 
             if 200 <= status_code < 400:
@@ -106,13 +178,13 @@ async def test_institution_connectivity(
                 health_status = "DEGRADED"
                 log_message = f"Server returned error HTTP {status_code} ({latency_ms}ms)"
 
-    except httpx.TimeoutException:
+    except asyncio.TimeoutError:
         latency_ms = int((time.perf_counter() - start_time) * 1000)
         status_code = 504
         is_success = False
         health_status = "UNREACHABLE"
         log_message = f"Request timed out after {timeout_secs}s ({latency_ms}ms)"
-    except httpx.RequestError as exc:
+    except aiohttp.ClientError as exc:
         latency_ms = int((time.perf_counter() - start_time) * 1000)
         status_code = 502
         is_success = False

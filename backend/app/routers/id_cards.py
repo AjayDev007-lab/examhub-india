@@ -1,6 +1,6 @@
 import os
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import Optional
@@ -14,6 +14,7 @@ from app.services.document_service import (
 )
 from app.services.audit_service import log_audit_event
 from app.config import settings
+from app.services.durable_files import persist_local_file, read_stored_file, durable_reference
 
 router = APIRouter(prefix="/api/id-cards", tags=["Student ID Card Engine"])
 
@@ -66,6 +67,10 @@ async def check_and_retrieve_id_card(
     if not os.path.exists(pdf_path):
         generate_id_card_pdf(card_data, pdf_path)
         generate_pdf_preview(pdf_path, preview_path)
+    pdf_ref = await persist_local_file(pdf_path, f"generated-id-cards/{pdf_filename}", "application/pdf")
+    preview_ref = None
+    if os.path.exists(preview_path):
+        preview_ref = await persist_local_file(preview_path, f"generated-id-cards/{preview_filename}", "image/png")
 
     card_data["download_url"] = f"/api/id-cards/{org.id}/download?enrollment={req.student_enrollment_no.strip()}"
 
@@ -91,8 +96,8 @@ async def check_and_retrieve_id_card(
                 document_type_id=doc_type_id,
                 title=f"{org.name} Student ID Card",
                 original_filename=pdf_filename,
-                stored_path=pdf_filename,
-                preview_path=preview_filename if os.path.exists(preview_path) else None,
+                stored_path=pdf_ref,
+                preview_path=preview_ref,
                 mime_type="application/pdf",
                 file_size=os.path.getsize(pdf_path) if os.path.exists(pdf_path) else 0,
                 is_verified=True,
@@ -130,11 +135,12 @@ async def download_id_card(org_id: int, enrollment: str, db: AsyncSession = Depe
         raise HTTPException(status_code=404, detail="Institution not found")
 
     pdf_filename = f"idcard_{org.code}_{enrollment.strip()}.pdf"
-    file_path = os.path.join(settings.STORAGE_DIR, "documents", pdf_filename)
-    if not os.path.exists(file_path):
+    try:
+        pdf_bytes = await read_stored_file(durable_reference(f"generated-id-cards/{pdf_filename}", os.path.join("documents", pdf_filename)), legacy_path=os.path.join("documents", pdf_filename))
+    except FileNotFoundError:
         raise HTTPException(status_code=404, detail="ID card document not found")
 
-    return FileResponse(file_path, media_type="application/pdf", filename=f"StudentID_{org.code}_{enrollment}.pdf")
+    return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="StudentID_{org.code}_{enrollment}.pdf"', "X-Content-Type-Options": "nosniff"})
 
 @router.post("/upload")
 async def upload_legitimate_id_card(
@@ -161,7 +167,9 @@ async def upload_legitimate_id_card(
         preview_filename = f"prev_{stored_name}.png"
         preview_path = os.path.join(settings.STORAGE_DIR, "previews", preview_filename)
         if generate_pdf_preview(upload_path, preview_path):
-            preview_name = preview_filename
+            preview_name = await persist_local_file(preview_path, f"student-previews/{user.id}/{preview_filename}", "image/png")
+
+    stored_path = await persist_local_file(upload_path, f"student-id-cards/{user.id}/{stored_name}", detected_mime)
 
     doc_type_res = await db.execute(select(DocumentType).where(DocumentType.code == "STUDENT_ID_CARD"))
     doc_type = doc_type_res.scalar_one_or_none()
@@ -172,7 +180,7 @@ async def upload_legitimate_id_card(
         document_type_id=doc_type_id,
         title=title.strip(),
         original_filename=file.filename or stored_name,
-        stored_path=os.path.join("uploads", stored_name),
+        stored_path=stored_path,
         preview_path=preview_name,
         mime_type=detected_mime,
         file_size=len(file_bytes),

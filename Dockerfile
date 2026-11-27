@@ -24,11 +24,12 @@ COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/pytho
 COPY --from=builder /usr/local/bin /usr/local/bin
 
 COPY backend/app /app/app
-COPY storage /app/storage
+RUN mkdir -p /app/storage/documents /app/storage/previews /app/storage/uploads
 
 ENV PYTHONUNBUFFERED=1
 ENV STORAGE_DIR=/app/storage
 
-EXPOSE 8000
+ENV PORT=8080
+EXPOSE 8080
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080}"]

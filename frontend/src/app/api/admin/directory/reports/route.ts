@@ -1,21 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
-import { dbStore } from "@/lib/data";
+import { NextRequest } from "next/server";
+import { proxyBackendRequest } from "@/lib/backendProxy";
 
 export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const status = searchParams.get("status")?.toUpperCase().trim();
-
-    let reports = dbStore?.brokenReports || [];
-    if (status) {
-      reports = reports.filter((r) => r.status === status);
-    }
-
-    return NextResponse.json({
-      reports,
-      total: reports.length
-    });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || "Failed to load reports" }, { status: 500 });
-  }
+  return proxyBackendRequest(request, "/api/admin/directory/reports", "admin");
 }

@@ -14,6 +14,9 @@ class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
+class FirebaseTokenExchange(BaseModel):
+    id_token: str = Field(..., min_length=20)
+
 class SendOtpRequest(BaseModel):
     mobile: str = Field(..., pattern=r"^[6-9]\d{9}$")
     purpose: str = "LOGIN"

@@ -1,14 +1,6 @@
-import { NextResponse } from "next/server";
-import { dbStore } from "@/lib/data";
+import { NextRequest } from "next/server";
+import { proxyBackendRequest } from "@/lib/backendProxy";
 
-export async function GET() {
-  const healthyCount = dbStore.organizations.filter(o => o.health_status === "HEALTHY").length;
-  return NextResponse.json({
-    total_organizations: dbStore.organizations.length,
-    total_examinations: dbStore.exams.length,
-    total_results_indexed: 1240,
-    total_students_registered: dbStore.students.length,
-    active_integrations: healthyCount,
-    recent_announcements: 6
-  });
+export async function GET(request: NextRequest) {
+  return proxyBackendRequest(request, "/api/admin/dashboard", "admin");
 }

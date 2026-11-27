@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ShieldCheck, Lock, Mail, AlertCircle, RefreshCw } from "lucide-react";
-import { fetchApi } from "@/lib/api";
+import { signInWithExamHub } from "@/lib/firebaseSession";
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -18,10 +18,8 @@ export default function AdminLoginPage() {
     setLoading(true);
     setErrorMsg(null);
     try {
-      const res = await fetchApi("/api/admin/login", {
-        method: "POST",
-        body: JSON.stringify({ email: email.trim(), password }),
-      });
+      const res = await signInWithExamHub(email.trim().toLowerCase(), password, "/api/admin/login");
+      if (res.user_type !== "admin") throw new Error("Administrator credentials required");
       localStorage.setItem("examhub_admin_user", JSON.stringify(res.user));
       window.location.href = "/admin/dashboard";
     } catch (err: any) {

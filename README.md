@@ -2,6 +2,8 @@
 ### All India Examination Results, Hall Tickets & Student ID Cards
 **Tagline:** *All Your Examination Documents and Results in One Place.*
 
+**No-billing deployment guide:** [Vercel + Firebase setup](FREE_VERCEL_FIREBASE.md). It covers the free low-traffic architecture, database import, environment variables, and the remaining Firebase/Vercel console steps.
+
 ---
 
 ## 1. System Vision & Architecture

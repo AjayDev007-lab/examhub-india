@@ -1,14 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
-import { dbStore } from "@/lib/data";
+import { NextRequest } from "next/server";
+import { proxyPublicBackendRequest } from "@/lib/backendProxy";
 
-export async function GET() {
-  try {
-    const sources = (dbStore as any).jobSources || [];
-    return NextResponse.json({
-      total: sources.length,
-      sources
-    });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
-  }
+export async function GET(request: NextRequest) {
+  return proxyPublicBackendRequest(request, "/api/jobs/sources/directory");
 }

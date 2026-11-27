@@ -12,10 +12,13 @@ import {
   TELEGRAM_DEFAULT_ADMIN_CHAT_ID
 } from "@/lib/telegramManager";
 import { dbStore } from "@/lib/data";
+import { requireCronAuthorization } from "@/lib/cronAuth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
+  const unauthorized = requireCronAuthorization(req);
+  if (unauthorized) return unauthorized;
   try {
     const jobs = dbStore.jobs || [];
     const publishedCount = jobs.filter((j: any) => j.telegram_posted).length || 18;

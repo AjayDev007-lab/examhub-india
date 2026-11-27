@@ -9,9 +9,7 @@ export async function GET(request: NextRequest) {
   if (!token) return NextResponse.json({ detail: "Authentication required" }, { status: 401 });
   try {
     const response = await fetch(`${backendUrl}/api/auth/me`, {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: "no-store",
-      signal: AbortSignal.timeout(8000),
+      headers: { Authorization: `Bearer ${token}` }, cache: "no-store", signal: AbortSignal.timeout(8000),
     });
     return NextResponse.json(await response.json().catch(() => ({})), { status: response.status, headers: { "Cache-Control": "no-store" } });
   } catch {

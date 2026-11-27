@@ -1,6 +1,6 @@
 import os
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -13,6 +13,7 @@ from app.adapters.registry import get_adapter
 from app.services.document_service import generate_hall_ticket_pdf, generate_pdf_preview, generate_signed_token
 from app.services.audit_service import log_audit_event
 from app.config import settings
+from app.services.durable_files import persist_local_file, read_stored_file, durable_reference
 
 router = APIRouter(prefix="/api/hall-tickets", tags=["Hall Ticket Download Engine"])
 
@@ -74,6 +75,10 @@ async def check_and_retrieve_hall_ticket(
     if not os.path.exists(pdf_path):
         generate_hall_ticket_pdf(ticket_data, pdf_path)
         generate_pdf_preview(pdf_path, preview_path)
+    pdf_ref = await persist_local_file(pdf_path, f"generated-hall-tickets/{pdf_filename}", "application/pdf")
+    preview_ref = None
+    if os.path.exists(preview_path):
+        preview_ref = await persist_local_file(preview_path, f"generated-hall-tickets/{preview_filename}", "image/png")
 
     ticket_data["pdf_download_url"] = f"/api/hall-tickets/{exam.id}/download?app_num={app_num}"
 
@@ -99,8 +104,8 @@ async def check_and_retrieve_hall_ticket(
                 document_type_id=doc_type_id,
                 title=f"{exam.name} Hall Ticket",
                 original_filename=pdf_filename,
-                stored_path=pdf_filename,
-                preview_path=preview_filename if os.path.exists(preview_path) else None,
+                stored_path=pdf_ref,
+                preview_path=preview_ref,
                 mime_type="application/pdf",
                 file_size=os.path.getsize(pdf_path) if os.path.exists(pdf_path) else 0,
                 is_verified=True,
@@ -138,8 +143,9 @@ async def download_admit_card_pdf(exam_id: int, app_num: str, db: AsyncSession =
         raise HTTPException(status_code=404, detail="Exam not found")
 
     pdf_filename = f"hallticket_{exam.code}_{app_num.strip()}.pdf"
-    file_path = os.path.join(settings.STORAGE_DIR, "documents", pdf_filename)
-    if not os.path.exists(file_path):
+    try:
+        pdf_bytes = await read_stored_file(durable_reference(f"generated-hall-tickets/{pdf_filename}", os.path.join("documents", pdf_filename)), legacy_path=os.path.join("documents", pdf_filename))
+    except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Admit card document not generated or missing")
 
-    return FileResponse(file_path, media_type="application/pdf", filename=f"AdmitCard_{exam.code}_{app_num}.pdf")
+    return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="AdmitCard_{exam.code}_{app_num}.pdf"', "X-Content-Type-Options": "nosniff"})
