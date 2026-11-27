@@ -53,6 +53,10 @@ function documentsUrl(projectId, suffix = "") {
   return `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents${suffix}`;
 }
 
+function documentName(projectId, path) {
+  return `projects/${projectId}/databases/(default)/documents/${path}`;
+}
+
 async function firestoreRequest(url, token, options = {}) {
   const response = await fetch(url, {
     ...options,
@@ -164,7 +168,7 @@ async function main() {
       const id = `${nextSlot}-${String(chunkIndex).padStart(8, "0")}`;
       return {
         update: {
-          name: `${documentsUrl(projectId)}/${CHUNKS_COLLECTION}/${id}`,
+          name: documentName(projectId, `${CHUNKS_COLLECTION}/${id}`),
           fields: {
             slot: { stringValue: nextSlot },
             index: integerValue(chunkIndex),
@@ -178,7 +182,7 @@ async function main() {
 
   await commit(projectId, token, [{
     update: {
-      name: `${documentsUrl(projectId)}/${pointerPath}`,
+      name: documentName(projectId, pointerPath),
       fields: {
         slot: { stringValue: nextSlot },
         chunkCount: integerValue(chunks.length),
