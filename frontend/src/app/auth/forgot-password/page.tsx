@@ -55,9 +55,13 @@ export default function ForgotPasswordPage() {
         setLoading(false);
         return;
       } catch (fbErr: any) {
-        setErrorMsg(formatFirebaseAuthError(fbErr));
-        setLoading(false);
-        return;
+        // Accounts created before Firebase Auth was enabled still use the
+        // backend's one-time recovery flow until their first successful login.
+        if (fbErr?.code !== "auth/user-not-found") {
+          setErrorMsg(formatFirebaseAuthError(fbErr));
+          setLoading(false);
+          return;
+        }
       }
     }
 

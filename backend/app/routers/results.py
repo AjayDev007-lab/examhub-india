@@ -1,6 +1,6 @@
 import os
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_
 from sqlalchemy.orm import selectinload
@@ -16,6 +16,7 @@ from app.adapters.registry import get_adapter
 from app.services.document_service import generate_scorecard_pdf, generate_pdf_preview, generate_signed_token
 from app.services.audit_service import log_audit_event
 from app.config import settings
+from app.services.durable_files import persist_local_file, read_stored_file
 from datetime import datetime, timezone
 
 router = APIRouter(prefix="/api/results", tags=["Result Checking Engine"])
@@ -61,7 +62,7 @@ async def check_result(
             "grade": existing_result.grade,
             "rank": existing_result.rank,
             "qualifying_status": existing_result.qualifying_status,
-            "scorecard_path": existing_result.scorecard_path,
+            "scorecard_path": f"/api/results/{existing_result.id}/download" if existing_result.scorecard_path else None,
             "is_official": existing_result.is_official,
             "result_status": existing_result.result_status,
             "published_date": existing_result.published_date,
@@ -153,7 +154,12 @@ async def check_result(
         )
         generate_pdf_preview(pdf_path, preview_path)
 
-    db_record.scorecard_path = pdf_filename
+    scorecard_ref = await persist_local_file(pdf_path, f"generated-scorecards/{pdf_filename}", "application/pdf")
+    preview_ref = None
+    if os.path.exists(preview_path):
+        preview_ref = await persist_local_file(preview_path, f"generated-scorecards/{os.path.basename(preview_path)}", "image/png")
+
+    db_record.scorecard_path = scorecard_ref
     await db.commit()
 
     result_data["has_scorecard"] = True
@@ -182,8 +188,8 @@ async def check_result(
                 document_type_id=doc_type_id,
                 title=f"{exam.name} Official Scorecard",
                 original_filename=pdf_filename,
-                stored_path=pdf_filename,
-                preview_path=f"scorecard_{exam.code}_{roll_clean}.png" if os.path.exists(preview_path) else None,
+                stored_path=scorecard_ref,
+                preview_path=preview_ref,
                 mime_type="application/pdf",
                 file_size=os.path.getsize(pdf_path) if os.path.exists(pdf_path) else 0,
                 is_verified=True,
@@ -256,7 +262,7 @@ async def get_result_by_id(result_id: int, db: AsyncSession = Depends(get_db)):
         grade=result.grade,
         rank=result.rank,
         qualifying_status=result.qualifying_status,
-        scorecard_path=result.scorecard_path,
+        scorecard_path=f"/api/results/{result.id}/download" if result.scorecard_path else None,
         is_official=result.is_official,
         result_status=result.result_status,
         published_date=result.published_date,
@@ -271,12 +277,13 @@ async def download_result_scorecard(result_id: int, db: AsyncSession = Depends(g
     if not result or not result.scorecard_path:
         raise HTTPException(status_code=404, detail="Scorecard file not found")
 
-    file_path = os.path.join(settings.STORAGE_DIR, "documents", result.scorecard_path)
-    if not os.path.exists(file_path):
+    try:
+        file_bytes = await read_stored_file(result.scorecard_path, legacy_path=os.path.join("documents", result.scorecard_path))
+    except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Scorecard file missing from storage")
 
-    return FileResponse(
-        file_path,
+    return Response(
+        content=file_bytes,
         media_type="application/pdf",
-        filename=f"Scorecard_{result.student_identifier_roll}.pdf"
+        headers={"Content-Disposition": f'attachment; filename="Scorecard_{result.student_identifier_roll}.pdf"', "X-Content-Type-Options": "nosniff"}
     )

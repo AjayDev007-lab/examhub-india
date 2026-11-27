@@ -15,7 +15,6 @@ import {
   TELEGRAM_ADMIN_USERNAME,
   TELEGRAM_PUBLIC_CHANNEL_ID,
   TELEGRAM_PUBLIC_CHANNEL_URL,
-  getSanitizedTelegramBotToken
 } from "@/lib/telegramManager";
 import {
   resolveApproval,
@@ -33,28 +32,29 @@ import {
   getGuardianRepairs
 } from "@/lib/websiteGuardian";
 import { dbStore } from "@/lib/data";
+import { timingSafeEqual } from "node:crypto";
 
 export const dynamic = "force-dynamic";
 
 // GET /api/telegram/webhook - Webhook health & status check
 export async function GET() {
-  const token = getSanitizedTelegramBotToken();
-  const tokenPrefix = token ? token.slice(0, 10) : "NONE";
-  return NextResponse.json({
-    status: "ONLINE",
-    bot: TELEGRAM_BOT_USERNAME,
-    admin: TELEGRAM_ADMIN_USERNAME,
-    channel: TELEGRAM_PUBLIC_CHANNEL_ID,
-    isTokenConfigured: Boolean(token && token.length > 10),
-    tokenPrefix,
-    tokenLength: token.length,
-    timestamp: new Date().toISOString()
-  });
+  return NextResponse.json({ status: "ONLINE" });
 }
 
 // POST /api/telegram/webhook - Handles Telegram updates (callbacks & messages)
 export async function POST(req: NextRequest) {
   try {
+    const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET ?? "";
+    const providedSecret = req.headers.get("x-telegram-bot-api-secret-token") ?? "";
+    const expected = Buffer.from(webhookSecret);
+    const provided = Buffer.from(providedSecret);
+    if (!webhookSecret) {
+      return NextResponse.json({ ok: false, error: "Telegram webhook authentication is not configured" }, { status: 503 });
+    }
+    if (expected.length !== provided.length || !timingSafeEqual(expected, provided)) {
+      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    }
+
     const update = await req.json();
 
     // ------------------------------------------------------------------------

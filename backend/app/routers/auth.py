@@ -10,9 +10,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from app.config import settings
 from app.database import get_db
+from app.firebase_auth import has_linked_firebase_identity, read_firebase_identity, verify_firebase_id_token, write_firebase_identity
 from app.models.models import User, UserSession, NotificationPreference, PasswordResetToken, AdminUser
-from app.schemas.schemas import UserRegister, UserLogin, SendOtpRequest, VerifyOtpRequest, Token, UserOut, ForgotPasswordRequest, ResetPasswordRequest
-from app.auth.security import hash_password, verify_password, create_access_token, generate_otp, verify_otp, get_current_user
+from app.schemas.schemas import UserRegister, UserLogin, FirebaseTokenExchange, SendOtpRequest, VerifyOtpRequest, Token, UserOut, ForgotPasswordRequest, ResetPasswordRequest
+from app.auth.security import hash_password, verify_password, create_access_token, decode_access_token, generate_otp, verify_otp, get_current_user
 from app.services.audit_service import log_audit_event
 from datetime import datetime, timezone, timedelta
 
@@ -33,6 +34,132 @@ def deliver_password_reset_email(email: str, full_name: str, reset_url: str) -> 
         smtp.send_message(message)
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
+
+@router.post("/firebase-exchange", response_model=Token)
+async def exchange_firebase_token(
+    req: FirebaseTokenExchange,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Validate Firebase Auth and issue the existing app session for API compatibility."""
+    if not settings.FIREBASE_AUTH_ENABLED:
+        raise HTTPException(status_code=503, detail="Firebase Authentication is not enabled on this backend")
+
+    try:
+        claims = await verify_firebase_id_token(req.id_token)
+    except Exception as exc:
+        raise HTTPException(status_code=401, detail="Firebase sign-in token is invalid or expired") from exc
+
+    uid = str(claims.get("uid") or "").strip()
+    email = str(claims.get("email") or "").strip().lower()
+    if not uid or not email:
+        raise HTTPException(status_code=401, detail="This Firebase account is missing its user ID or email")
+
+    try:
+        identity = await read_firebase_identity(uid)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Firebase Authentication is temporarily unavailable") from exc
+    account_type = identity.get("accountType") if identity else None
+    account_id = identity.get("accountId") if identity else None
+    if identity and identity.get("email") != email:
+        raise HTTPException(status_code=403, detail="Firebase email does not match the linked ExamHub account")
+
+    # First-time linking is allowed only when this request also carries a valid
+    # existing ExamHub session for the same account. Email alone never grants a role.
+    if not identity:
+        legacy_header = request.headers.get("authorization", "")
+        legacy_token = legacy_header[7:].strip() if legacy_header.lower().startswith("bearer ") else ""
+        legacy_payload = decode_access_token(legacy_token) if legacy_token else None
+        if not legacy_payload or str(legacy_payload.get("email", "")).lower() != email:
+            raise HTTPException(status_code=403, detail="Sign in with your existing ExamHub account to link Firebase")
+        account_type = legacy_payload.get("type")
+        try:
+            account_id = int(legacy_payload.get("sub"))
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=401, detail="Existing ExamHub session is invalid")
+
+    if account_type == "student":
+        student = (await db.execute(select(User).where(
+            User.id == account_id,
+            User.email == email,
+            User.is_active == True,
+            User.deleted_at.is_(None),
+        ))).scalar_one_or_none()
+    else:
+        student = None
+    if student:
+        if not identity:
+            try:
+                await write_firebase_identity(uid, email, "student", student.id)
+            except Exception as exc:
+                raise HTTPException(status_code=503, detail="Unable to save the Firebase account link") from exc
+        client_ip = request.client.host if request.client else "127.0.0.1"
+        session = UserSession(
+            user_id=student.id,
+            session_token=secrets.token_hex(32),
+            ip_address=client_ip,
+            user_agent=request.headers.get("user-agent", "Unknown"),
+            expires_at=datetime.now(timezone.utc) + timedelta(days=1),
+        )
+        db.add(session)
+        await log_audit_event(
+            db,
+            actor_type="USER",
+            actor_id=student.id,
+            action="USER_LOGIN_FIREBASE",
+            target_type="USER",
+            target_id=student.id,
+            ip_address=client_ip,
+        )
+        token = create_access_token({"sub": str(student.id), "email": student.email, "type": "student"})
+        return Token(
+            access_token=token,
+            token_type="bearer",
+            user_type="student",
+            user={
+                "id": student.id,
+                "full_name": student.full_name,
+                "email": student.email,
+                "mobile": student.mobile,
+                "is_verified": student.is_verified,
+                "mobile_verified": student.mobile_verified,
+            },
+        )
+
+    if account_type != "admin":
+        raise HTTPException(status_code=403, detail="Firebase account is not linked to an active ExamHub account")
+    admin = (await db.execute(
+        select(AdminUser).options(selectinload(AdminUser.role)).where(
+            AdminUser.id == account_id, AdminUser.email == email, AdminUser.is_active == True
+        )
+    )).scalar_one_or_none()
+    if not admin:
+        raise HTTPException(status_code=403, detail="Firebase account is not linked to an active ExamHub administrator")
+
+    if not identity:
+        try:
+            await write_firebase_identity(uid, email, "admin", admin.id)
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail="Unable to save the Firebase administrator link") from exc
+
+    admin.last_login_at = datetime.now(timezone.utc)
+    await log_audit_event(
+        db,
+        actor_type="ADMIN",
+        actor_id=admin.id,
+        action="ADMIN_LOGIN_FIREBASE",
+        target_type="ADMIN",
+        target_id=admin.id,
+        ip_address=request.client.host if request.client else "127.0.0.1",
+    )
+    token = create_access_token({"sub": str(admin.id), "email": admin.email, "type": "admin"})
+    return Token(
+        access_token=token,
+        token_type="bearer",
+        user_type="admin",
+        user={"id": admin.id, "full_name": admin.full_name, "email": admin.email,
+              "role": admin.role.name if admin.role else "SUPER_ADMIN"},
+    )
 
 @router.post("/register", response_model=Token, status_code=status.HTTP_201_CREATED)
 async def register(req: UserRegister, request: Request, db: AsyncSession = Depends(get_db)):
@@ -107,6 +234,14 @@ async def login(req: UserLogin, request: Request, db: AsyncSession = Depends(get
     user = (await db.execute(stmt)).scalar_one_or_none()
     if user:
         if verify_password(req.password, user.password_hash):
+            if settings.FIREBASE_AUTH_ENABLED:
+                try:
+                    if await has_linked_firebase_identity(email_clean, "student"):
+                        raise HTTPException(status_code=401, detail="This account uses Firebase Authentication. Sign in through the ExamHub website.")
+                except HTTPException:
+                    raise
+                except Exception as exc:
+                    raise HTTPException(status_code=503, detail="Firebase Authentication is temporarily unavailable") from exc
             token = create_access_token({"sub": str(user.id), "email": user.email, "type": "student"})
             
             # Record active student session
@@ -157,6 +292,14 @@ async def login(req: UserLogin, request: Request, db: AsyncSession = Depends(get
     admin = (await db.execute(stmt_admin)).scalar_one_or_none()
     if admin:
         if verify_password(req.password, admin.password_hash):
+            if settings.FIREBASE_AUTH_ENABLED:
+                try:
+                    if await has_linked_firebase_identity(email_clean, "admin"):
+                        raise HTTPException(status_code=401, detail="This account uses Firebase Authentication. Sign in through the ExamHub website.")
+                except HTTPException:
+                    raise
+                except Exception as exc:
+                    raise HTTPException(status_code=503, detail="Firebase Authentication is temporarily unavailable") from exc
             admin.last_login_at = datetime.now(timezone.utc)
             await db.commit()
             admin_token = create_access_token({"sub": str(admin.id), "email": admin.email, "type": "admin"})

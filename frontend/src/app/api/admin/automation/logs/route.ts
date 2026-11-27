@@ -1,13 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
-import { dbStore } from "@/lib/data";
+import { NextRequest } from "next/server";
+import { proxyBackendRequest } from "@/lib/backendProxy";
 
 export async function GET(request: NextRequest) {
-  try {
-    return NextResponse.json({
-      total: dbStore.scheduledTaskLogs.length,
-      logs: dbStore.scheduledTaskLogs
-    });
-  } catch (error) {
-    return NextResponse.json({ error: "Failed to load task logs" }, { status: 500 });
-  }
+  return proxyBackendRequest(request, "/api/admin/automation/logs", "admin");
 }

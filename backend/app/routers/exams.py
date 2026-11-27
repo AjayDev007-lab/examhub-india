@@ -28,7 +28,10 @@ async def list_organizations(
     query: Optional[str] = None,
     db: AsyncSession = Depends(get_db)
 ):
-    stmt = select(Organization).where(Organization.is_active == True)
+    stmt = select(Organization).where(
+        Organization.is_active == True,
+        Organization.approval_status == "APPROVED",
+    )
     if category_id:
         stmt = stmt.where(Organization.category_id == category_id)
     if state_id:

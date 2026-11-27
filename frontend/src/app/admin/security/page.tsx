@@ -91,21 +91,21 @@ export default function SecurityCentrePage() {
         {/* Security Health Dashboard */}
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-1 shadow-sm">
-            <span className="text-[11px] font-semibold text-slate-400">WAF & SSRF Guard</span>
-            <div className="text-lg font-black text-emerald-400">ENFORCING</div>
-            <span className="text-[10px] text-slate-400">Private IPs & localhost blocked</span>
+            <span className="text-[11px] font-semibold text-slate-400">Outbound request guard</span>
+            <div className="text-lg font-black text-emerald-400">{securityStatus.ssrfProtection}</div>
+            <span className="text-[10px] text-slate-400">Private, loopback and metadata addresses blocked</span>
           </div>
 
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-1 shadow-sm">
             <span className="text-[11px] font-semibold text-slate-400">Rate Limiter</span>
-            <div className="text-lg font-black text-white">60 req/min</div>
-            <span className="text-[10px] text-emerald-400">Burst protection active</span>
+            <div className="text-lg font-black text-white">{securityStatus.rateLimiter}</div>
+            <span className="text-[10px] text-amber-400">Check deployment controls before enabling public traffic</span>
           </div>
 
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-1 shadow-sm">
             <span className="text-[11px] font-semibold text-slate-400">Active Admin Sessions</span>
-            <div className="text-lg font-black text-white">{securityStatus.activeAdminSessions} session</div>
-            <span className="text-[10px] text-blue-400">Hardware token / Argon2id</span>
+            <div className="text-lg font-black text-white">{securityStatus.activeAdminSessions ?? "Not tracked"}</div>
+            <span className="text-[10px] text-blue-400">Firebase Auth with active-account checks</span>
           </div>
 
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-1 shadow-sm">
@@ -122,7 +122,7 @@ export default function SecurityCentrePage() {
               <ShieldAlert className="w-4 h-4 text-red-400" />
               Security Incidents & Telemetry
             </h2>
-            <span className="text-xs text-slate-400">Tamper-evident log</span>
+            <span className="text-xs text-slate-400">Persisted incident records</span>
           </div>
 
           <div className="space-y-3">

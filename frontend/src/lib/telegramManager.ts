@@ -991,6 +991,10 @@ export async function setTelegramWebhookUrl(
 ): Promise<{ success: boolean; description?: string }> {
   const token = getSanitizedTelegramBotToken(customToken);
   if (!token) return { success: false, description: "No bot token configured." };
+  const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+  if (!webhookSecret || !/^[A-Za-z0-9_-]{1,256}$/.test(webhookSecret)) {
+    return { success: false, description: "Set TELEGRAM_WEBHOOK_SECRET to a Telegram-compatible secret before registering the webhook." };
+  }
 
   try {
     const res = await fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
@@ -998,6 +1002,7 @@ export async function setTelegramWebhookUrl(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         url: webhookUrl,
+        secret_token: webhookSecret,
         allowed_updates: ["message", "callback_query"]
       })
     });

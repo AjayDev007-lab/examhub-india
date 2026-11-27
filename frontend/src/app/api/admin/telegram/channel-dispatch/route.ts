@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbStore } from "@/lib/data";
+import { requireAdminSession } from "@/lib/backendProxy";
 import { 
   sendTelegramChannelPost, 
   formatJobTelegramPost, 
@@ -9,6 +10,8 @@ import {
 
 // POST /api/admin/telegram/channel-dispatch - Broadcast updates to public Telegram channel
 export async function POST(req: NextRequest) {
+  const unauthorized = await requireAdminSession(req);
+  if (unauthorized) return unauthorized;
   try {
     const body = await req.json();
     const action = body.action || "DISPATCH_CHANNEL";

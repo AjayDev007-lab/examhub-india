@@ -610,6 +610,24 @@ class Scholarship(Base):
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
 
 
+class CountdownEvent(Base):
+    __tablename__ = "countdown_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(255), nullable=False)
+    exam_name = Column(String(255), nullable=False)
+    authority_code = Column(String(100), nullable=False, default="GOVT")
+    event_type = Column(String(50), nullable=False, index=True)
+    target_date = Column(DateTime, nullable=False, index=True)
+    official_source = Column(String(512), nullable=False)
+    verification_status = Column(String(50), nullable=False, default="CONFIRMED_OFFICIAL")
+    result_status = Column(String(50), nullable=True)
+    exam_slug = Column(String(255), nullable=False, default="general-exam")
+    official_portal_url = Column(String(512), nullable=False, default="https://india.gov.in")
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+
 # 34. AI SETTINGS & CONFIGURATION
 class AISetting(Base):
     __tablename__ = "ai_settings"
@@ -730,6 +748,115 @@ class JobSource(Base):
     created_at = Column(DateTime, default=utc_now, nullable=False)
 
 
+class ITJobPosting(Base):
+    __tablename__ = "it_job_postings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(255), nullable=False, index=True)
+    slug = Column(String(255), unique=True, index=True, nullable=False)
+    company_name = Column(String(255), nullable=False, index=True)
+    company_logo_url = Column(String(512), nullable=False, default="")
+    company_website = Column(String(512), nullable=False)
+    category = Column(String(50), nullable=False, index=True)
+    category_display = Column(String(100), nullable=False)
+    job_type = Column(String(40), nullable=False, default="FULL_TIME")
+    experience_level = Column(String(40), nullable=False, default="FRESHER", index=True)
+    work_mode = Column(String(40), nullable=False, default="HYBRID")
+    location = Column(String(255), nullable=False, default="All India", index=True)
+    salary_range = Column(String(150), nullable=False, default="Not specified")
+    qualification = Column(String(255), nullable=False, default="Any Graduate")
+    required_skills = Column(JSON, nullable=False, default=list)
+    job_description = Column(Text, nullable=False)
+    responsibilities = Column(JSON, nullable=False, default=list)
+    official_apply_url = Column(String(512), nullable=False)
+    application_deadline = Column(DateTime, nullable=True, index=True)
+    is_featured = Column(Boolean, nullable=False, default=False)
+    view_count = Column(Integer, nullable=False, default=0)
+    apply_clicks_count = Column(Integer, nullable=False, default=0)
+    status = Column(String(40), nullable=False, default="PUBLISHED", index=True)
+    published_at = Column(DateTime, default=utc_now, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+
+class UniversityCatalogEntry(Base):
+    __tablename__ = "university_catalog"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False, index=True)
+    short_code = Column(String(40), unique=True, index=True, nullable=False)
+    state = Column(String(100), nullable=False, index=True)
+    city = Column(String(100), nullable=False)
+    type = Column(String(40), nullable=False)
+    official_website = Column(String(512), nullable=False)
+    portal_url = Column(String(512), nullable=False)
+    logo_url = Column(String(512), nullable=False, default="")
+    degrees_offered = Column(JSON, nullable=False, default=list)
+    departments_count = Column(Integer, nullable=False, default=0)
+    papers_count = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+
+class UniversityQuestionPaper(Base):
+    __tablename__ = "university_question_papers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    university_id = Column(Integer, nullable=False, index=True)
+    university_name = Column(String(255), nullable=False)
+    university_code = Column(String(40), nullable=False, index=True)
+    degree = Column(String(80), nullable=False, index=True)
+    department = Column(String(255), nullable=False, index=True)
+    semester = Column(Integer, nullable=False, index=True)
+    subject_name = Column(String(255), nullable=False)
+    subject_code = Column(String(80), nullable=False, index=True)
+    exam_year = Column(Integer, nullable=False, index=True)
+    exam_session = Column(String(20), nullable=False)
+    exam_type = Column(String(30), nullable=False)
+    regulation = Column(String(100), nullable=True)
+    pdf_url = Column(String(1024), nullable=False)
+    file_size_mb = Column(Float, nullable=False, default=0)
+    download_count = Column(Integer, nullable=False, default=0)
+    description = Column(Text, nullable=False, default="")
+    uploaded_at = Column(DateTime, default=utc_now, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+
+
+class SchoolChapterContent(Base):
+    __tablename__ = "school_chapter_content"
+
+    id = Column(String(80), primary_key=True)
+    board_code = Column(String(40), nullable=False, index=True)
+    board_name = Column(String(255), nullable=False)
+    class_level = Column(String(16), nullable=False, index=True)
+    subject = Column(String(100), nullable=False, index=True)
+    subject_code = Column(String(80), nullable=True)
+    chapter_number = Column(Integer, nullable=False)
+    chapter_title = Column(String(255), nullable=False)
+    summary_notes = Column(Text, nullable=False, default="")
+    pdf_notes_url = Column(String(1024), nullable=False, default="")
+    video_lessons = Column(JSON, nullable=False, default=list)
+    previous_exam_questions = Column(JSON, nullable=False, default=list)
+    important_questions = Column(JSON, nullable=False, default=list)
+    practice_quiz = Column(JSON, nullable=False, default=list)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+
+
+class FacultyMember(Base):
+    __tablename__ = "faculty_members"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)
+    email = Column(String(255), nullable=False, unique=True, index=True)
+    institution_id = Column(Integer, nullable=True, index=True)
+    institution_name = Column(String(255), nullable=False)
+    department = Column(String(150), nullable=False, default="General")
+    role = Column(String(50), nullable=False, default="FACULTY")
+    status = Column(String(30), nullable=False, default="ACTIVE", index=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+
 # 40. SAVED JOBS (STUDENT BOOKMARKS)
 class SavedJob(Base):
     __tablename__ = "saved_jobs"
@@ -807,6 +934,27 @@ class StudentExamRegistration(Base):
     user = relationship("User")
     examination = relationship("Examination")
     schedule = relationship("ExamSchedule")
+
+
+# Legacy application tracker records are distinct from "My Exams" registrations.
+class StudentApplicationTracker(Base):
+    __tablename__ = "student_application_tracker"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    exam_id = Column(Integer, nullable=True)
+    exam_slug = Column(String(255), nullable=False)
+    exam_name = Column(String(255), nullable=False)
+    authority_code = Column(String(100), nullable=False, default="EXAM")
+    conducting_authority = Column(String(255), nullable=False, default="Examination Board")
+    application_number = Column(String(150), nullable=False, default="")
+    roll_number = Column(String(100), nullable=False, default="")
+    status = Column(String(50), nullable=False, default="APPLICATION_STARTED", index=True)
+    submission_date = Column(String(40), nullable=True)
+    private_notes = Column(Text, nullable=False, default="")
+    reminders_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
 
 
 # 44. STUDENT CALENDAR EVENTS

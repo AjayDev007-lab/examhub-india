@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
-import { dbStore } from "@/lib/data";
+import { NextRequest } from "next/server";
+import { proxyBackendRequest } from "@/lib/backendProxy";
 
-export async function GET() {
-  return NextResponse.json(dbStore.students);
+export async function GET(request: NextRequest) {
+  return proxyBackendRequest(request, "/api/admin/users", "admin");
 }

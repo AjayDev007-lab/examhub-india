@@ -9,6 +9,9 @@ import {
   GraduationCap, BookOpen, ShieldCheck, Check
 } from "lucide-react";
 import { fetchApi } from "@/lib/api";
+import { auth } from "@/lib/firebase";
+import { exchangeFirebaseIdentity, registerFirebaseIdentity } from "@/lib/firebaseSession";
+import { isFirebaseConfigured } from "@/lib/firebase";
 import SpiderManLive3DCanvas, { SpiderManActionState } from "@/components/SpiderManLive3DCanvas";
 import { soundEngine } from "@/lib/spidermanAudio";
 
@@ -140,7 +143,10 @@ export default function SpiderManClientRegister() {
     const emailClean = email.trim().toLowerCase();
 
     try {
-      const res = await fetchApi("/api/auth/register", {
+      const firebaseUser = isFirebaseConfigured && auth
+        ? await registerFirebaseIdentity(emailClean, password)
+        : null;
+      let res = await fetchApi("/api/auth/register", {
         method: "POST",
         body: JSON.stringify({
           full_name: fullName.trim(),
@@ -150,6 +156,7 @@ export default function SpiderManClientRegister() {
           password_confirm: confirmPassword,
         }),
       });
+      if (firebaseUser) res = await exchangeFirebaseIdentity(firebaseUser);
       localStorage.setItem("examhub_user", JSON.stringify(res.user));
       setRegisterSuccess(true);
       setSpiderAction("celebrate");

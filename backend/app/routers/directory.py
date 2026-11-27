@@ -1,6 +1,7 @@
 import datetime
 import time
 import httpx
+from urllib.parse import urlparse
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, HttpUrl
@@ -25,7 +26,7 @@ class WebsiteCreate(BaseModel):
     state_code: Optional[str] = None
     official_url: str
     application_portal_url: Optional[str] = None
-    domain: str
+    domain: Optional[str] = None
     description: Optional[str] = None
     related_examinations: Optional[List[str]] = []
     contact_email: Optional[str] = None
@@ -465,7 +466,7 @@ async def admin_create_website(
         state_id=state_id,
         official_url=data.official_url,
         application_portal_url=data.application_portal_url,
-        domain=data.domain,
+        domain=data.domain or (urlparse(data.official_url).hostname or "").lower(),
         description=data.description,
         related_examinations=data.related_examinations or [],
         contact_email=data.contact_email,

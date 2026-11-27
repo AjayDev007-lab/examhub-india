@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "sqlite+aiosqlite:///./examhub_india.db"
     SYNC_DATABASE_URL: str = "sqlite:///./examhub_india.db"
+    FIREBASE_PROJECT_ID: str = ""
+    FIREBASE_AUTH_ENABLED: bool = False
+    FIRESTORE_SQLITE_PERSISTENCE: bool = False
     
     # Document storage
     STORAGE_DIR: str = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "storage"))
@@ -37,6 +40,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def require_production_secrets(self):
+        if (self.FIREBASE_AUTH_ENABLED or self.FIRESTORE_SQLITE_PERSISTENCE) and not self.FIREBASE_PROJECT_ID:
+            raise ValueError("Firebase Authentication or persistence requires FIREBASE_PROJECT_ID")
         if self.APP_ENV.lower() == "production":
             if len(self.SECRET_KEY) < 32 or self.SECRET_KEY == "development-only-secret-change-before-production":
                 raise ValueError("Production requires a unique SECRET_KEY of at least 32 characters")

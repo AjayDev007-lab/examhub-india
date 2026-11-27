@@ -1,17 +1,10 @@
-import { NextResponse } from "next/server";
-import { dbStore } from "@/lib/data";
+import { NextRequest } from "next/server";
+import { proxyBackendRequest } from "@/lib/backendProxy";
 
 export async function PUT(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const orgId = Number(id);
-  const org = dbStore.organizations.find(o => o.id === orgId);
-  if (!org) {
-    return NextResponse.json({ detail: "Institution not found" }, { status: 404 });
-  }
-
-  org.is_active = !org.is_active;
-  return NextResponse.json(org);
+  return proxyBackendRequest(request, `/api/admin/institutions/${encodeURIComponent(id)}/toggle-active`, "admin");
 }
