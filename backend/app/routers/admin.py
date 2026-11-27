@@ -30,13 +30,6 @@ async def admin_login(req: AdminLogin, request: Request, db: AsyncSession = Depe
     )
     admin = (await db.execute(stmt)).scalar_one_or_none()
 
-    # Fallback to SuperAdmin if user logs in with either configured superadmin email or default
-    if not admin and req.email.lower().strip() in [settings.SUPERADMIN_EMAIL.lower(), "superadmin@examhub.gov.in", "ajaydevvs22102004@gmail.com"]:
-        stmt_fallback = select(AdminUser).options(selectinload(AdminUser.role)).where(
-            AdminUser.is_active == True
-        )
-        admin = (await db.execute(stmt_fallback)).scalars().first()
-
     if not admin or not verify_password(req.password, admin.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid administrator credentials")
 

@@ -884,6 +884,20 @@ class StudentJobPreference(Base):
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
 
 
+class StudentSchoolProfile(Base):
+    __tablename__ = "student_school_profiles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False, index=True)
+    board_code = Column(String(32), default="", nullable=False)
+    class_level = Column(String(8), default="12", nullable=False)
+    stream = Column(String(32), nullable=True)
+    subjects = Column(JSON, default=list, nullable=False)
+    saved_book_ids = Column(JSON, default=list, nullable=False)
+    reading_progress = Column(JSON, default=dict, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+
 # 47. JOB ALERT SUBSCRIPTIONS
 class JobAlertSubscription(Base):
     __tablename__ = "job_alert_subscriptions"

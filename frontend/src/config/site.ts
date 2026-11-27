@@ -7,7 +7,7 @@ export const SITE_CONFIG = {
   name: "EXAMHUB INDIA",
   tagline: "All Your Examination Documents and Results in One Place",
   description: "Centralized Educational & Career Platform for Indian Students",
-  url: "https://examhub-india.vercel.app",
+  url: process.env.NEXT_PUBLIC_SITE_URL || "https://examhub-india.vercel.app",
   social: {
     instagram: {
       username: "@the_smiley_hacker_5933z",

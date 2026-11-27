@@ -1,4 +1,4 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
+const API_BASE = "";
 
 export async function fetchApi(endpoint: string, options: RequestInit = {}) {
   const headers: Record<string, string> = {
@@ -6,19 +6,12 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
     ...(options.headers as Record<string, string> || {}),
   };
 
-  // Attach token if present in localStorage
-  if (typeof window !== "undefined") {
-    const token = localStorage.getItem("examhub_token") || localStorage.getItem("examhub_admin_token");
-    if (token && !headers["Authorization"]) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
-  }
-
   const url = endpoint.startsWith("http") ? endpoint : `${API_BASE}${endpoint}`;
 
   const res = await fetch(url, {
     ...options,
     headers,
+    credentials: "same-origin",
   });
 
   if (!res.ok) {

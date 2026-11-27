@@ -7,12 +7,10 @@ services:
     container_name: examhub_mysql
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: RootPassword@ExamHub2026!
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in the deployment environment}
       MYSQL_DATABASE: examhub_india
       MYSQL_USER: examhub_user
-      MYSQL_PASSWORD: ExamHubPassword2026!
-    ports:
-      - "3306:3306"
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in the deployment environment}
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
@@ -25,8 +23,6 @@ services:
     image: redis:7-alpine
     container_name: examhub_redis
     restart: always
-    ports:
-      - "6379:6379"
 
   # FastAPI Backend
   backend:
@@ -43,12 +39,21 @@ services:
     environment:
       APP_NAME: "EXAMHUB INDIA"
       APP_ENV: production
-      DATABASE_URL: mysql+pymysql://examhub_user:ExamHubPassword2026!@db:3306/examhub_india
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL to a mysql+aiomysql connection string}
       STORAGE_DIR: /app/storage
-      SECRET_KEY: examhub-india-production-jwt-secret-key-32chars
+      SECRET_KEY: ${SECRET_KEY:?Set a unique random SECRET_KEY of at least 32 characters}
+      SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL:?Set SUPERADMIN_EMAIL}
+      SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD:?Set a unique strong SUPERADMIN_PASSWORD}
+      FRONTEND_ORIGINS: ${FRONTEND_ORIGINS:?Set FRONTEND_ORIGINS as a JSON HTTPS origin list}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?Set PUBLIC_BASE_URL to the HTTPS website URL}
+      SMTP_HOST: ${SMTP_HOST:?Set SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:?Set SMTP_USERNAME}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:?Set SMTP_PASSWORD}
+      SMTP_FROM: ${SMTP_FROM:?Set SMTP_FROM}
       REDIS_URL: redis://redis:6379/0
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     volumes:
       - ./storage:/app/storage
 
@@ -62,7 +67,9 @@ services:
     depends_on:
       - backend
     environment:
-      NEXT_PUBLIC_API_URL: http://backend:8000
+      BACKEND_URL: http://backend:8000
+      SECRET_KEY: ${SECRET_KEY:?Set a unique random SECRET_KEY of at least 32 characters}
+      SITE_HOSTNAME: ${SITE_HOSTNAME:?Set SITE_HOSTNAME to the public website hostname}
     ports:
       - "3000:3000"
 

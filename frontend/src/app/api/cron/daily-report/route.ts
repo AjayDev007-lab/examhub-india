@@ -21,12 +21,8 @@ export async function GET(req: NextRequest) {
   try {
     const authHeader = req.headers.get("authorization");
     const cronSecret = process.env.CRON_SECRET;
-    const adminSecret = process.env.ADMIN_SECRET_KEY || "examhub_superadmin_token_production";
-
-    const isAuthorized =
-      (cronSecret && authHeader === `Bearer ${cronSecret}`) ||
-      (adminSecret && authHeader === `Bearer ${adminSecret}`) ||
-      authHeader === "Bearer examhub_superadmin_token_production";
+    if (!cronSecret) return NextResponse.json({ error: "Cron authentication is not configured" }, { status: 503 });
+    const isAuthorized = Boolean(cronSecret && authHeader === `Bearer ${cronSecret}`);
 
     if (!isAuthorized) {
       return NextResponse.json(

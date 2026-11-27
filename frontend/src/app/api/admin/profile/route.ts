@@ -1,57 +1,22 @@
-import { NextResponse } from "next/server";
-import { dbStore } from "@/lib/data";
+import { NextRequest, NextResponse } from "next/server";
 
-export async function GET() {
-  const admin = (dbStore as any).adminProfile || {
-    id: 1,
-    full_name: "ExamHub Super Administrator",
-    email: "superadmin@examhub.gov.in",
-    role: "SUPER_ADMIN"
-  };
-
-  return NextResponse.json({
-    id: admin.id || 1,
-    full_name: admin.full_name,
-    email: admin.email,
-    role_name: admin.role,
-    is_active: true
-  });
-}
-
-export async function PUT(request: Request) {
+async function forward(request: NextRequest, method: "GET" | "PUT") {
+  const backendUrl = process.env.BACKEND_URL;
+  const token = request.cookies.get("examhub_token")?.value;
+  if (!backendUrl || !token) return NextResponse.json({ detail: "Administrator service is unavailable" }, { status: 503 });
   try {
-    const body = await request.json();
-    const { full_name, email } = body;
-
-    if (!email || !email.includes("@")) {
-      return NextResponse.json({ detail: "A valid email address is required" }, { status: 400 });
-    }
-
-    if (!dbStore.adminProfile) {
-      dbStore.adminProfile = {
-        id: 1,
-        full_name: "ExamHub Super Administrator",
-        email: "superadmin@examhub.gov.in",
-        password: "SuperAdmin@ExamHub2026!",
-        role: "SUPER_ADMIN"
-      };
-    }
-
-    if (full_name && full_name.trim()) {
-      dbStore.adminProfile.full_name = full_name.trim();
-    }
-    if (email && email.trim()) {
-      dbStore.adminProfile.email = email.trim().toLowerCase();
-    }
-
-    return NextResponse.json({
-      id: dbStore.adminProfile.id,
-      full_name: dbStore.adminProfile.full_name,
-      email: dbStore.adminProfile.email,
-      role_name: dbStore.adminProfile.role,
-      is_active: true
+    const response = await fetch(`${backendUrl}/api/admin/profile`, {
+      method,
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      ...(method === "PUT" ? { body: JSON.stringify(await request.json()) } : {}),
+      cache: "no-store",
+      signal: AbortSignal.timeout(8000),
     });
-  } catch (err: any) {
-    return NextResponse.json({ detail: err.message || "Failed to update admin profile" }, { status: 500 });
+    return NextResponse.json(await response.json().catch(() => ({})), { status: response.status, headers: { "Cache-Control": "no-store" } });
+  } catch {
+    return NextResponse.json({ detail: "Administrator service is unavailable" }, { status: 503 });
   }
 }
+
+export const GET = (request: NextRequest) => forward(request, "GET");
+export const PUT = (request: NextRequest) => forward(request, "PUT");

@@ -28,15 +28,16 @@ import {
 
 // Read Firebase environment variables with active project fallbacks
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyDFkI2-OPGnGkZ2PgQqZx5Lc1Z28fB59zQ",
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "examhub-india-6ba59.firebaseapp.com",
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "examhub-india-6ba59",
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "examhub-india-6ba59.firebasestorage.app",
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "109827630610",
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:109827630610:web:93ff9fbacd2838d1d69acb"
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "",
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "",
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "",
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "",
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "",
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || ""
 };
 
 export const isFirebaseConfigured = Boolean(
+  process.env.NEXT_PUBLIC_AUTH_PROVIDER === "firebase" &&
   firebaseConfig.apiKey &&
   firebaseConfig.apiKey.length > 10 &&
   firebaseConfig.projectId &&
@@ -141,6 +142,8 @@ export function formatFirebaseAuthError(error: any, _emailToCheck?: string): str
  */
 export async function logoutUser() {
   if (typeof window === "undefined") return;
+
+  await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" }).catch(() => null);
 
   try {
     if (auth) {

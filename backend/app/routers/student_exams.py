@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+﻿from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_, and_, desc
 from sqlalchemy.orm import selectinload
@@ -11,7 +11,7 @@ from app.models.models import (
     StudentExamRegistration, StudentCalendarEvent, ExamReminder,
     Examination, ExamSchedule, User
 )
-from app.auth.security import get_current_user, get_optional_user
+from app.auth.security import get_current_user
 
 router = APIRouter(prefix="/api/student", tags=["Student Examinations, Calendar & Reminders"])
 
@@ -67,14 +67,11 @@ class ReminderPreferenceUpdate(BaseModel):
 
 @router.get("/exams")
 async def get_my_registered_exams(
-    user_id: Optional[int] = Query(None),
     status_filter: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
-    target_user_id = current_user.id if current_user else user_id
-    if not target_user_id:
-        raise HTTPException(status_code=401, detail="Authentication required")
+    target_user_id = current_user.id
 
     stmt = (
         select(StudentExamRegistration)
@@ -132,13 +129,10 @@ async def get_my_registered_exams(
 @router.post("/exams/register", status_code=status.HTTP_201_CREATED)
 async def register_student_exam(
     payload: ExamRegisterRequest,
-    user_id: Optional[int] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
-    target_user_id = current_user.id if current_user else user_id
-    if not target_user_id:
-        raise HTTPException(status_code=401, detail="Authentication required")
+    target_user_id = current_user.id
 
     exam_res = await db.execute(
         select(Examination).options(selectinload(Examination.organization)).where(Examination.id == payload.examination_id)
@@ -278,13 +272,10 @@ async def register_student_exam(
 @router.post("/exams/external", status_code=status.HTTP_201_CREATED)
 async def add_external_student_exam(
     payload: ExternalExamRequest,
-    user_id: Optional[int] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
-    target_user_id = current_user.id if current_user else user_id
-    if not target_user_id:
-        raise HTTPException(status_code=401, detail="Authentication required")
+    target_user_id = current_user.id
 
     new_reg = StudentExamRegistration(
         user_id=target_user_id,
@@ -345,13 +336,10 @@ async def add_external_student_exam(
 async def update_student_exam_status(
     reg_id: int,
     payload: RegistrationStatusUpdate,
-    user_id: Optional[int] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
-    target_user_id = current_user.id if current_user else user_id
-    if not target_user_id:
-        raise HTTPException(status_code=401, detail="Authentication required")
+    target_user_id = current_user.id
 
     reg = await db.get(StudentExamRegistration, reg_id)
     if not reg or reg.user_id != target_user_id:
@@ -371,13 +359,10 @@ async def update_student_exam_status(
 @router.delete("/exams/{reg_id}")
 async def remove_student_exam(
     reg_id: int,
-    user_id: Optional[int] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
-    target_user_id = current_user.id if current_user else user_id
-    if not target_user_id:
-        raise HTTPException(status_code=401, detail="Authentication required")
+    target_user_id = current_user.id
 
     reg = await db.get(StudentExamRegistration, reg_id)
     if not reg or reg.user_id != target_user_id:
@@ -395,16 +380,13 @@ async def remove_student_exam(
 
 @router.get("/calendar/events")
 async def get_student_calendar_events(
-    user_id: Optional[int] = Query(None),
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
     event_type: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
-    target_user_id = current_user.id if current_user else user_id
-    if not target_user_id:
-        raise HTTPException(status_code=401, detail="Authentication required")
+    target_user_id = current_user.id
 
     query = select(StudentCalendarEvent).where(StudentCalendarEvent.user_id == target_user_id)
 
@@ -452,13 +434,10 @@ async def get_student_calendar_events(
 @router.post("/calendar/events", status_code=status.HTTP_201_CREATED)
 async def create_custom_calendar_event(
     payload: CustomCalendarEventRequest,
-    user_id: Optional[int] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
-    target_user_id = current_user.id if current_user else user_id
-    if not target_user_id:
-        raise HTTPException(status_code=401, detail="Authentication required")
+    target_user_id = current_user.id
 
     new_ev = StudentCalendarEvent(
         user_id=target_user_id,
@@ -479,13 +458,10 @@ async def create_custom_calendar_event(
 @router.delete("/calendar/events/{event_id}")
 async def delete_calendar_event(
     event_id: int,
-    user_id: Optional[int] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
-    target_user_id = current_user.id if current_user else user_id
-    if not target_user_id:
-        raise HTTPException(status_code=401, detail="Authentication required")
+    target_user_id = current_user.id
 
     ev = await db.get(StudentCalendarEvent, event_id)
     if not ev or ev.user_id != target_user_id:
@@ -499,13 +475,10 @@ async def delete_calendar_event(
 # Standard RFC 5545 iCalendar (.ics) export
 @router.get("/calendar/export.ics")
 async def export_calendar_ics(
-    user_id: Optional[int] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
-    target_user_id = current_user.id if current_user else user_id
-    if not target_user_id:
-        raise HTTPException(status_code=401, detail="Authentication required")
+    target_user_id = current_user.id
 
     res = await db.execute(
         select(StudentCalendarEvent)
@@ -563,14 +536,11 @@ async def export_calendar_ics(
 
 @router.get("/reminders")
 async def get_student_reminders(
-    user_id: Optional[int] = Query(None),
     status: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
-    target_user_id = current_user.id if current_user else user_id
-    if not target_user_id:
-        raise HTTPException(status_code=401, detail="Authentication required")
+    target_user_id = current_user.id
 
     query = select(ExamReminder).where(ExamReminder.user_id == target_user_id)
     if status and status != "ALL":

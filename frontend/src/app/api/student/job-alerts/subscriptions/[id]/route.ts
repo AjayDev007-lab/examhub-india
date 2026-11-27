@@ -1,17 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { dbStore } from "@/lib/data";
+import { proxyBackendRequest } from "@/lib/backendProxy";
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
-    const subId = parseInt(id);
-
-    dbStore.jobAlertSubscriptions = dbStore.jobAlertSubscriptions.filter((s: any) => s.id !== subId);
-    return NextResponse.json({ success: true, message: "Subscription cancelled" });
-  } catch (error) {
-    return NextResponse.json({ error: "Failed to cancel subscription" }, { status: 500 });
-  }
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  if (!/^\d+$/.test(id)) return NextResponse.json({ detail: "Invalid subscription id" }, { status: 400 });
+  return proxyBackendRequest(request, `/api/student/job-alerts/subscriptions/${id}`, "student", "DELETE");
 }

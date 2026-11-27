@@ -1,17 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { dbStore } from "@/lib/data";
+import { proxyBackendRequest } from "@/lib/backendProxy";
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
-    const eventId = parseInt(id);
-
-    dbStore.studentCalendarEvents = dbStore.studentCalendarEvents.filter((e: any) => e.id !== eventId);
-    return NextResponse.json({ success: true, message: "Event removed from calendar" });
-  } catch (error) {
-    return NextResponse.json({ error: "Failed to delete event" }, { status: 500 });
-  }
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  if (!/^\d+$/.test(id)) return NextResponse.json({ detail: "Invalid event id" }, { status: 400 });
+  return proxyBackendRequest(request, `/api/student/calendar/events/${id}`, "student", "DELETE");
 }

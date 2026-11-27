@@ -3,7 +3,6 @@ import {
   isConfigured, 
   auth, 
   db, 
-  localStore, 
   isDemoMode 
 } from "../firebase/config";
 import { 
@@ -64,16 +63,6 @@ export function AuthProvider({ children }) {
       });
       return unsubscribe;
     } else {
-      // Local persistent fallback session check
-      const savedSession = localStorage.getItem("examhub_active_session");
-      if (savedSession) {
-        try {
-          const sessionData = JSON.parse(savedSession);
-          setCurrentUser(sessionData.user);
-          setRole(sessionData.role);
-          setStudentProfile(sessionData.profile);
-        } catch (_) {}
-      }
       setLoading(false);
     }
   }, []);
@@ -107,11 +96,7 @@ export function AuthProvider({ children }) {
         } else if (code === "auth/user-not-found") {
           message = "No account found matching this email address. Please check spelling or create an account.";
         } else if (code === "auth/invalid-credential" || code === "auth/invalid-login-credentials") {
-          const students = localStore.getStudents();
-          const exists = students.some(s => s.email.toLowerCase() === emailClean);
-          message = exists
-            ? "Incorrect password entered. Please verify your password."
-            : "No account found matching this email address. Please check spelling or create an account.";
+          message = "Incorrect email or password. Please verify your credentials.";
         } else if (code === "auth/invalid-email") {
           message = "Please enter a valid email address.";
         } else if (code === "auth/user-disabled") {
@@ -130,65 +115,9 @@ export function AuthProvider({ children }) {
         throw new Error(message);
       }
     } else {
-      // Local persistent fallback verification
-      // 1. Super Admin check
-      const admin = localStore.getAdmin();
-      if (
-        emailClean === admin.email.toLowerCase() ||
-        emailClean === "superadmin@examhub.gov.in" ||
-        emailClean === "admin@examhub.in"
-      ) {
-        const isAdminPassword =
-          password === "SuperAdmin@ExamHub2026!" ||
-          password === "admin123" ||
-          password === "superadmin";
-
-        if (isAdminPassword) {
-          const adminUser = { uid: admin.uid, email: admin.email, displayName: admin.fullName };
-          setCurrentUser(adminUser);
-          setRole("admin");
-          setStudentProfile(admin);
-          localStorage.setItem("examhub_active_session", JSON.stringify({
-            user: adminUser,
-            role: "admin",
-            profile: admin
-          }));
-          return { success: true, role: "admin", user: adminUser };
-        } else {
-          const err = new Error("Incorrect password entered. Please verify your password.");
-          setAuthError(err.message);
-          throw err;
-        }
-      }
-
-      // 2. Student check
-      const students = localStore.getStudents();
-      const student = students.find(s => s.email.toLowerCase() === emailClean);
-      if (!student) {
-        const err = new Error("No account found matching this email address. Please check spelling or create an account.");
-        setAuthError(err.message);
-        throw err;
-      }
-
-      const validDemoPasswords = ["Password@123", "Student@ExamHub2026!", "StudentPass@2026!", "student123"];
-      const isMatch = validDemoPasswords.includes(password) || (student.passwordHash && student.passwordHash === password);
-
-      if (isMatch) {
-        const studentUser = { uid: student.uid, email: student.email, displayName: student.fullName };
-        setCurrentUser(studentUser);
-        setRole("student");
-        setStudentProfile(student);
-        localStorage.setItem("examhub_active_session", JSON.stringify({
-          user: studentUser,
-          role: "student",
-          profile: student
-        }));
-        return { success: true, role: "student", user: studentUser };
-      } else {
-        const err = new Error("Incorrect password entered. Please verify your password.");
-        setAuthError(err.message);
-        throw err;
-      }
+      const message = "Authentication service is not configured.";
+      setAuthError(message);
+      throw new Error(message);
     }
   };
 
@@ -228,46 +157,9 @@ export function AuthProvider({ children }) {
         throw err;
       }
     } else {
-      // Demo Mode local registration
-      const students = localStore.getStudents();
-      if (students.some(s => s.email.toLowerCase() === emailClean)) {
-        throw new Error("An account with this email address already exists.");
-      }
-
-      const newStudent = {
-        uid: `std_${Date.now()}`,
-        studentId: formData.studentId || `EH-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`,
-        fullName: formData.fullName.trim(),
-        email: emailClean,
-        phone: formData.phone.trim(),
-        dob: formData.dob,
-        gender: formData.gender,
-        state: formData.state,
-        district: formData.district,
-        college: formData.college.trim(),
-        course: formData.course.trim(),
-        passwordHash: formData.password, // Cryptographic reference only
-        photoUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(formData.fullName)}`,
-        role: "student",
-        createdAt: new Date().toISOString(),
-        isActive: true,
-        emailVerified: true
-      };
-
-      const updated = [newStudent, ...students];
-      localStore.saveStudents(updated);
-
-      const userObj = { uid: newStudent.uid, email: newStudent.email, displayName: newStudent.fullName };
-      setCurrentUser(userObj);
-      setRole("student");
-      setStudentProfile(newStudent);
-      localStorage.setItem("examhub_active_session", JSON.stringify({
-        user: userObj,
-        role: "student",
-        profile: newStudent
-      }));
-
-      return { success: true, user: userObj, profile: newStudent };
+      const message = "Authentication service is not configured.";
+      setAuthError(message);
+      throw new Error(message);
     }
   };
 
@@ -285,24 +177,7 @@ export function AuthProvider({ children }) {
         throw err;
       }
     } else {
-      if (role === "admin") {
-        const admin = localStore.getAdmin();
-        const updated = { ...admin, ...updatedFields };
-        localStore.saveAdmin(updated);
-        setStudentProfile(updated);
-      } else {
-        const students = localStore.getStudents();
-        const updatedStudents = students.map(s => s.uid === currentUser.uid ? { ...s, ...updatedFields } : s);
-        localStore.saveStudents(updatedStudents);
-        const updatedProfile = { ...studentProfile, ...updatedFields };
-        setStudentProfile(updatedProfile);
-        localStorage.setItem("examhub_active_session", JSON.stringify({
-          user: currentUser,
-          role: "student",
-          profile: updatedProfile
-        }));
-      }
-      return { success: true };
+      throw new Error("Authentication service is not configured.");
     }
   };
 
@@ -312,10 +187,7 @@ export function AuthProvider({ children }) {
       await sendPasswordResetEmail(auth, email);
       return { success: true, message: "Official password reset link sent to your registered email." };
     } else {
-      return { 
-        success: true, 
-        message: "Simulation: 6-digit verification OTP dispatched to " + email + ". Use OTP '202604' to reset password." 
-      };
+      throw new Error("Account recovery service is not configured.");
     }
   };
 

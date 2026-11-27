@@ -1,23 +1,18 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const backendUrl = process.env.BACKEND_URL;
+  if (!backendUrl) return NextResponse.json({ detail: "Mobile OTP delivery is not configured" }, { status: 503 });
   try {
-    const body = await request.json();
-    const mobile = (body.mobile || "").trim();
-
-    if (!mobile || !/^[6-9]\d{9}$/.test(mobile)) {
-      return NextResponse.json({ detail: "Please enter a valid 10-digit Indian mobile number" }, { status: 400 });
-    }
-
-    // Deterministic test code for standard demo number, else random 6-digits
-    const otp = mobile === "9876543210" ? "123456" : `${Math.floor(100000 + Math.random() * 900000)}`;
-
-    return NextResponse.json({
-      success: true,
-      message: `OTP sent to ${mobile.slice(0, 2)}******${mobile.slice(-2)}. Valid for 5 minutes.`,
-      debug_demo_otp: otp
+    const response = await fetch(`${backendUrl}/api/auth/send-otp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(await request.json()),
+      cache: "no-store",
+      signal: AbortSignal.timeout(8000),
     });
-  } catch (err: any) {
-    return NextResponse.json({ detail: err.message || "Failed to send OTP" }, { status: 500 });
+    return NextResponse.json(await response.json().catch(() => ({})), { status: response.status });
+  } catch {
+    return NextResponse.json({ detail: "OTP delivery service is unavailable" }, { status: 503 });
   }
 }

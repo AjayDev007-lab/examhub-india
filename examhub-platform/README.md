@@ -89,8 +89,7 @@ When running in Demo Mode (without live Firebase keys), you can log in with:
 
 | Role | Email | Password |
 |---|---|---|
-| **Student** | `student@examhub.in` | `Password@123` |
-| **Super Admin** | `ajaydevvs22102004@gmail.com` | `SuperAdmin@ExamHub2026!` |
+| **Student / Super Admin** | No demo credentials are shipped. Configure Firebase Authentication and provision administrator roles securely. |
 
 ---
 

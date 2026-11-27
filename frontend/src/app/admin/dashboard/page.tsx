@@ -258,6 +258,7 @@ export default function AdminDashboardPage() {
   }
 
   const handleAdminLogout = () => {
+    fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" }).catch(() => {});
     localStorage.removeItem("examhub_admin_token");
     localStorage.removeItem("examhub_admin_user");
     window.location.href = "/admin/login";

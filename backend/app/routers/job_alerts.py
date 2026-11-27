@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+﻿from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_, and_, desc
 from typing import Optional, List
@@ -9,7 +9,7 @@ from app.database import get_db
 from app.models.models import (
     StudentJobPreference, JobAlertSubscription, JobNotification, User
 )
-from app.auth.security import get_current_user, get_optional_user
+from app.auth.security import get_current_user
 
 router = APIRouter(prefix="/api/student", tags=["Student Job Preferences & Smart Alerts"])
 
@@ -47,13 +47,10 @@ class JobAlertSubscriptionRequest(BaseModel):
 
 @router.get("/job-preferences")
 async def get_student_job_preferences(
-    user_id: Optional[int] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
-    target_user_id = current_user.id if current_user else user_id
-    if not target_user_id:
-        raise HTTPException(status_code=401, detail="Authentication required")
+    target_user_id = current_user.id
 
     stmt = select(StudentJobPreference).where(StudentJobPreference.user_id == target_user_id)
     res = await db.execute(stmt)
@@ -101,13 +98,10 @@ async def get_student_job_preferences(
 @router.put("/job-preferences")
 async def update_student_job_preferences(
     payload: JobPreferenceUpdate,
-    user_id: Optional[int] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
-    target_user_id = current_user.id if current_user else user_id
-    if not target_user_id:
-        raise HTTPException(status_code=401, detail="Authentication required")
+    target_user_id = current_user.id
 
     stmt = select(StudentJobPreference).where(StudentJobPreference.user_id == target_user_id)
     res = await db.execute(stmt)
@@ -134,14 +128,11 @@ async def update_student_job_preferences(
 
 @router.get("/job-recommendations")
 async def get_personalized_job_recommendations(
-    user_id: Optional[int] = Query(None),
     limit: int = Query(20, ge=1, le=50),
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
-    target_user_id = current_user.id if current_user else user_id
-    if not target_user_id:
-        raise HTTPException(status_code=401, detail="Authentication required")
+    target_user_id = current_user.id
 
     # Load preferences
     stmt = select(StudentJobPreference).where(StudentJobPreference.user_id == target_user_id)
@@ -234,14 +225,11 @@ async def get_personalized_job_recommendations(
 
 @router.get("/job-alerts")
 async def get_student_job_alerts(
-    user_id: Optional[int] = Query(None),
     limit: int = Query(20, ge=1, le=50),
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
-    target_user_id = current_user.id if current_user else user_id
-    if not target_user_id:
-        raise HTTPException(status_code=401, detail="Authentication required")
+    target_user_id = current_user.id
 
     # Fetch user's subscriptions
     sub_res = await db.execute(
@@ -311,13 +299,10 @@ async def get_student_job_alerts(
 @router.post("/job-alerts/subscribe", status_code=status.HTTP_201_CREATED)
 async def create_job_alert_subscription(
     payload: JobAlertSubscriptionRequest,
-    user_id: Optional[int] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
-    target_user_id = current_user.id if current_user else user_id
-    if not target_user_id:
-        raise HTTPException(status_code=401, detail="Authentication required")
+    target_user_id = current_user.id
 
     sub = JobAlertSubscription(
         user_id=target_user_id,
@@ -338,13 +323,10 @@ async def create_job_alert_subscription(
 @router.delete("/job-alerts/subscriptions/{sub_id}")
 async def delete_job_alert_subscription(
     sub_id: int,
-    user_id: Optional[int] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
-    target_user_id = current_user.id if current_user else user_id
-    if not target_user_id:
-        raise HTTPException(status_code=401, detail="Authentication required")
+    target_user_id = current_user.id
 
     sub = await db.get(JobAlertSubscription, sub_id)
     if not sub or sub.user_id != target_user_id:

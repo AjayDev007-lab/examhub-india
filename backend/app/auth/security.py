@@ -1,5 +1,5 @@
 import datetime
-import random
+import secrets
 import hmac
 import hashlib
 from typing import Optional, Dict, Any
@@ -49,11 +49,7 @@ def decode_access_token(token: str) -> Optional[dict]:
 
 def generate_otp(mobile: str) -> str:
     """Generates a secure 6-digit OTP and stores its SHA-256 hash with a 5-minute expiry."""
-    # Deterministic test code for standard test mobile or random 6 digits
-    if mobile == "9876543210":
-        otp = "123456"
-    else:
-        otp = f"{random.randint(100000, 999999)}"
+    otp = f"{secrets.randbelow(900000) + 100000}"
     
     otp_hash = hashlib.sha256(otp.encode()).hexdigest()
     expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=5)

@@ -147,15 +147,13 @@ pytest tests/test_api.py -v
 
 ---
 
-## 5. Default Credentials
+## 5. Production Setup
 
-- **Super Admin Portal (`/admin/login`):**
-  - **Email:** `superadmin@examhub.gov.in`
-  - **Password:** `SuperAdmin@ExamHub2026!`
-- **Demo Student Account (`/auth/login`):**
-  - **Email:** `student@examhub.in`
-  - **Password:** `Student@ExamHub2026!`
-  - **Mobile OTP:** `9876543210` (Demo OTP: `123456`)
+The application does not ship with production credentials. Configure unique values from `.env.example` before starting the services. Production startup requires a strong `SECRET_KEY`, administrator credentials, an HTTPS frontend origin, and SMTP credentials for account recovery. Mobile OTP sign-in remains unavailable until an SMS provider is integrated.
+
+For Vercel, set the project Root Directory to `frontend`. Configure `BACKEND_URL` as a server-only variable pointing to the FastAPI service, and set `SECRET_KEY` to the same random key used by FastAPI. Do not set `NEXT_PUBLIC_API_URL`; API requests are handled by the Next.js server routes.
+
+For Docker Compose, copy `.env.example` to `.env`, replace every placeholder with unique values, and use a URL-encoded database password in `DATABASE_URL`. MySQL and Redis are kept on the private Compose network.
 
 ---
 

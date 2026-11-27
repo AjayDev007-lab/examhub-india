@@ -244,13 +244,10 @@ async def list_recruitment_sources(db: AsyncSession = Depends(get_db)):
 
 @router.get("/student/saved")
 async def get_student_saved_jobs(
-    user_id: Optional[int] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
-    target_user_id = current_user.id if current_user else user_id
-    if not target_user_id:
-        raise HTTPException(status_code=401, detail="Authentication required")
+    target_user_id = current_user.id
 
     query = (
         select(JobNotification)
@@ -291,13 +288,10 @@ async def get_student_saved_jobs(
 
 @router.get("/student/applied")
 async def get_student_applied_jobs(
-    user_id: Optional[int] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
-    target_user_id = current_user.id if current_user else user_id
-    if not target_user_id:
-        raise HTTPException(status_code=401, detail="Authentication required")
+    target_user_id = current_user.id
 
     query = (
         select(JobApplication, JobNotification)
@@ -412,18 +406,18 @@ async def get_job_detail(
 
 @router.post("/{job_id}/save")
 async def toggle_save_job(
-    job_id: int,
-    user_id: Optional[int] = Query(None),
+    job_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
-    target_user_id = current_user.id if current_user else user_id
-    if not target_user_id:
-        raise HTTPException(status_code=401, detail="Authentication required")
-
-    job = await db.get(JobNotification, job_id)
+    target_user_id = current_user.id
+    job = await db.get(JobNotification, int(job_id)) if job_id.isdigit() else None
+    if not job:
+        result = await db.execute(select(JobNotification).where(JobNotification.slug == job_id.lower()))
+        job = result.scalars().first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
+    job_id = job.id
 
     res = await db.execute(
         select(SavedJob).where(SavedJob.user_id == target_user_id, SavedJob.job_id == job_id)
@@ -442,18 +436,21 @@ async def toggle_save_job(
 
 @router.post("/{job_id}/apply")
 async def track_job_apply(
-    job_id: int,
+    job_id: str,
     payload: Optional[JobApplicationCreate] = None,
-    user_id: Optional[int] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
-    job = await db.get(JobNotification, job_id)
+    job = await db.get(JobNotification, int(job_id)) if job_id.isdigit() else None
+    if not job:
+        result = await db.execute(select(JobNotification).where(JobNotification.slug == job_id.lower()))
+        job = result.scalars().first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
+    job_id = job.id
     job.apply_clicks_count += 1
-    target_user_id = current_user.id if current_user else user_id
+    target_user_id = current_user.id
 
     if target_user_id:
         # Check if already tracked

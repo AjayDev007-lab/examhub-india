@@ -14,6 +14,6 @@ export default function robots(): {
       allow: ["/", "/results", "/hall-tickets", "/jobs", "/official-websites", "/school", "/updates", "/about", "/contact", "/privacy", "/terms"],
       disallow: ["/admin/", "/admin/*", "/dashboard", "/dashboard/*", "/student/", "/student/*", "/api/"],
     },
-    sitemap: "https://examhub-india.vercel.app/sitemap.xml",
+    sitemap: `${process.env.NEXT_PUBLIC_SITE_URL || "https://examhub-india.vercel.app"}/sitemap.xml`,
   };
 }

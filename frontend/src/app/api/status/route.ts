@@ -1,31 +1,16 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
-// Fallback in-memory status store for serverless
-let operatingState = {
-  mode: "ONLINE", // "ONLINE", "MAINTENANCE", "OFFLINE"
-  maintenance_message: "ExamHub India is currently undergoing scheduled platform upgrades to serve you better. We will be back online shortly.",
-  estimated_return_time: "Tonight by 23:30 IST",
-  scheduled_end_time: null,
-  auto_online_enabled: true
-};
-
-export async function GET(req: NextRequest) {
-  const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+export async function GET() {
+  const backendUrl = process.env.BACKEND_URL;
+  if (!backendUrl) return NextResponse.json({ detail: "Status service is not configured" }, { status: 503 });
   try {
-    const res = await fetch(`${backendUrl}/api/status`, { cache: "no-store" });
+    const res = await fetch(`${backendUrl}/api/status`, { cache: "no-store", signal: AbortSignal.timeout(5000) });
     if (res.ok) {
       const data = await res.json();
-      operatingState = { ...operatingState, ...data };
-      return NextResponse.json(data);
+      return NextResponse.json(data, { headers: { "Cache-Control": "no-store" } });
     }
-  } catch (_) {}
-
-  const activeMode = req.cookies.get("examhub_site_mode")?.value || (globalThis as any).__examhub_site_mode || operatingState.mode;
-
-  return NextResponse.json({
-    mode: activeMode,
-    is_public_accessible: activeMode === "ONLINE",
-    maintenance_message: operatingState.maintenance_message,
-    estimated_return_time: operatingState.estimated_return_time
-  });
+    return NextResponse.json({ detail: "Status service is unavailable" }, { status: res.status });
+  } catch {
+    return NextResponse.json({ detail: "Status service is unavailable" }, { status: 503 });
+  }
 }

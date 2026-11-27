@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { verifySessionToken } from "@/lib/session";
 
 // In-memory / edge status check helper
 let cachedMode = "ONLINE";
@@ -32,12 +33,16 @@ async function getOperatingMode(req: NextRequest): Promise<{ mode: string; messa
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const isPublicAsset = /\.[a-z0-9]+$/i.test(pathname) && !pathname.startsWith("/api/");
+  const authHeader = request.headers.get("authorization") || "";
+  const adminToken = request.cookies.get("examhub_token")?.value || authHeader.replace(/^Bearer\s+/i, "");
+  const adminSession = await verifySessionToken(adminToken, "admin");
 
   // 1. Always allow Next.js internals, static assets, and images
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/static") ||
-    pathname.includes(".") ||
+    isPublicAsset ||
     pathname === "/favicon.ico"
   ) {
     return NextResponse.next();
@@ -50,27 +55,10 @@ export async function middleware(request: NextRequest) {
       return NextResponse.next();
     }
 
-    const userTypeCookie = request.cookies.get("examhub_user_type")?.value;
-    const adminToken = request.cookies.get("examhub_admin_token")?.value || request.cookies.get("examhub_token")?.value;
-    const authHeader = request.headers.get("authorization");
-    const bypassCookie = request.cookies.get("examhub_maintenance_bypass")?.value;
-    const bypassHeader = request.headers.get("x-examhub-bypass");
-
-    const hasAdminAuth =
-      userTypeCookie === "admin" ||
-      bypassCookie === "true" ||
-      bypassHeader === "true" ||
-      (authHeader && (authHeader.includes("examhub_superadmin_secure_token") || authHeader.startsWith("Bearer ")));
-
     // For API endpoints under /api/admin/*
     if (pathname.startsWith("/api/admin")) {
-      if (userTypeCookie === "student") {
-        return NextResponse.json(
-          { detail: "Forbidden: Student accounts are strictly prohibited from accessing Administrative APIs." },
-          { status: 403 }
-        );
-      }
-      if (!hasAdminAuth && !adminToken) {
+      if (pathname === "/api/admin/login") return NextResponse.next();
+      if (!adminSession) {
         return NextResponse.json(
           { detail: "Unauthorized: Administrator authentication required." },
           { status: 401 }
@@ -81,10 +69,7 @@ export async function middleware(request: NextRequest) {
 
     // For UI pages under /admin/*
     if (pathname.startsWith("/admin")) {
-      if (userTypeCookie === "student") {
-        return NextResponse.redirect(new URL("/dashboard?error=admin_access_denied", request.url));
-      }
-      if (!hasAdminAuth && !adminToken) {
+      if (!adminSession) {
         return NextResponse.redirect(new URL("/admin/login", request.url));
       }
       return NextResponse.next();
@@ -93,11 +78,30 @@ export async function middleware(request: NextRequest) {
 
   // 3. Student routes protection (Requirement 12)
   if (pathname.startsWith("/dashboard") || pathname.startsWith("/student")) {
-    const userTypeCookie = request.cookies.get("examhub_user_type")?.value;
     const token = request.cookies.get("examhub_token")?.value;
-
-    if (!token && !userTypeCookie) {
+    const studentSession = await verifySessionToken(token, "student");
+    if (!studentSession) {
       return NextResponse.redirect(new URL("/auth/login", request.url));
+    }
+  }
+
+  if (
+    pathname.startsWith("/api/student/") ||
+    pathname === "/api/jobs/saved" ||
+    pathname === "/api/jobs/applied" ||
+    /^\/api\/jobs\/[^/]+\/(save|apply)$/.test(pathname)
+  ) {
+    const token = request.cookies.get("examhub_token")?.value || (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+    const studentSession = await verifySessionToken(token, "student");
+    if (!studentSession) {
+      return NextResponse.json({ detail: "Authentication required" }, { status: 401 });
+    }
+  }
+
+  if (pathname === "/api/auth/me") {
+    const token = request.cookies.get("examhub_token")?.value || authHeader.replace(/^Bearer\s+/i, "");
+    if (!await verifySessionToken(token, "student")) {
+      return NextResponse.json({ detail: "Authentication required" }, { status: 401 });
     }
   }
 
@@ -111,15 +115,12 @@ export async function middleware(request: NextRequest) {
   }
 
   // 3. Check for Admin Bypass Cookie / Header
-  const bypassCookie = request.cookies.get("examhub_maintenance_bypass");
-  const bypassHeader = request.headers.get("x-examhub-bypass");
-  if (bypassCookie?.value === "true" || bypassHeader === "true") {
+  if (adminSession) {
     return NextResponse.next();
   }
 
   // 4. Check Current Operating Mode
-  const modeCookie = request.cookies.get("examhub_site_mode")?.value;
-  let activeMode = modeCookie;
+  let activeMode: string | undefined;
   let activeMessage: string | undefined = undefined;
   let activeEstimated: string | undefined = undefined;
 

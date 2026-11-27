@@ -1,15 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbStore } from "@/lib/data";
+import { getStudentSession } from "@/lib/session";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await getStudentSession(request);
+    if (!session) return NextResponse.json({ detail: "Authentication required" }, { status: 401 });
     const { id: rawId } = await params;
     const id = parseInt(rawId, 10);
 
-    const app = (dbStore?.studentApplications || []).find((a) => a.id === id);
+    const app = (dbStore?.studentApplications || []).find((a) => a.id === id && a.user_id === session.id);
     if (!app) {
       return NextResponse.json({ error: "Application record not found" }, { status: 404 });
     }
@@ -31,11 +34,13 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await getStudentSession(request);
+    if (!session) return NextResponse.json({ detail: "Authentication required" }, { status: 401 });
     const { id: rawId } = await params;
     const id = parseInt(rawId, 10);
     const body = await request.json();
 
-    const app = (dbStore?.studentApplications || []).find((a) => a.id === id);
+    const app = (dbStore?.studentApplications || []).find((a) => a.id === id && a.user_id === session.id);
     if (!app) {
       return NextResponse.json({ error: "Application record not found" }, { status: 404 });
     }
@@ -66,10 +71,12 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await getStudentSession(request);
+    if (!session) return NextResponse.json({ detail: "Authentication required" }, { status: 401 });
     const { id: rawId } = await params;
     const id = parseInt(rawId, 10);
 
-    const index = (dbStore?.studentApplications || []).findIndex((a) => a.id === id);
+    const index = (dbStore?.studentApplications || []).findIndex((a) => a.id === id && a.user_id === session.id);
     if (index === -1) {
       return NextResponse.json({ error: "Application record not found" }, { status: 404 });
     }

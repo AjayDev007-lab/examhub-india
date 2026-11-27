@@ -14,7 +14,11 @@ from app.models.models import (
 )
 from app.auth.security import get_current_admin
 
-router = APIRouter(prefix="/api/admin/maintenance", tags=["Advanced Website Maintenance & Health Centre"])
+router = APIRouter(
+    prefix="/api/admin/maintenance",
+    tags=["Advanced Website Maintenance & Health Centre"],
+    dependencies=[Depends(get_current_admin)],
+)
 
 def utc_now():
     return datetime.now(timezone.utc)

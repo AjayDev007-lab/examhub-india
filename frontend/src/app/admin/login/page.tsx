@@ -8,8 +8,8 @@ import { fetchApi } from "@/lib/api";
 
 export default function AdminLoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("ajaydevvs22102004@gmail.com");
-  const [password, setPassword] = useState("SuperAdmin@ExamHub2026!");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -22,11 +22,7 @@ export default function AdminLoginPage() {
         method: "POST",
         body: JSON.stringify({ email: email.trim(), password }),
       });
-      localStorage.setItem("examhub_admin_token", res.access_token);
       localStorage.setItem("examhub_admin_user", JSON.stringify(res.user));
-      document.cookie = `examhub_token=${res.access_token}; path=/; max-age=86400; SameSite=Lax`;
-      document.cookie = `examhub_admin_token=${res.access_token}; path=/; max-age=86400; SameSite=Lax`;
-      document.cookie = `examhub_user_type=admin; path=/; max-age=86400; SameSite=Lax`;
       window.location.href = "/admin/dashboard";
     } catch (err: any) {
       setErrorMsg(err.message || "Invalid administrator credentials");
@@ -86,7 +82,7 @@ export default function AdminLoginPage() {
           </div>
 
           <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800/80 text-[11px] text-slate-400 leading-relaxed">
-            <span className="font-semibold text-slate-300">Authorized Personnel Only:</span> Activity on this portal is recorded in tamper-evident security audit logs.
+            <span className="font-semibold text-slate-300">Authorized Personnel Only:</span> Sign in with your administrator account.
           </div>
 
           <button

@@ -1,29 +1,11 @@
-import { NextResponse, NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-export async function GET(req: NextRequest) {
-  const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-  const authHeader = req.headers.get("authorization") || "";
-
+export async function GET(request: NextRequest) {
+  const backendUrl = process.env.BACKEND_URL;
+  const token = request.cookies.get("examhub_token")?.value;
+  if (!backendUrl || !token) return NextResponse.json({ detail: "Website control service is unavailable" }, { status: 503 });
   try {
-    const res = await fetch(`${backendUrl}/api/admin/website-control/history`, {
-      headers: { Authorization: authHeader },
-      cache: "no-store"
-    });
-    if (res.ok) return NextResponse.json(await res.json());
-  } catch (_) {}
-
-  return NextResponse.json({
-    total: 2,
-    history: [
-      {
-        id: 1,
-        previous_mode: "INITIALIZING",
-        new_mode: "ONLINE",
-        reason: "Platform operational readiness confirmed on deployment initialization.",
-        admin_email: "superadmin@examhub.gov.in",
-        ip_address: "127.0.0.1",
-        timestamp: new Date(Date.now() - 3600000 * 24).toISOString()
-      }
-    ]
-  });
+    const response = await fetch(`${backendUrl}/api/admin/website-control/history`, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store", signal: AbortSignal.timeout(8000) });
+    return NextResponse.json(await response.json().catch(() => ({})), { status: response.status, headers: { "Cache-Control": "no-store" } });
+  } catch { return NextResponse.json({ detail: "Website control service is unavailable" }, { status: 503 }); }
 }

@@ -82,22 +82,14 @@ export default function IDCardsPage() {
     setUploadSuccessMsg(null);
 
     try {
-      const token = localStorage.getItem("examhub_token");
-      if (!token) {
-        throw new Error("Please log in to your student account first to upload documents to your personal vault.");
-      }
-
       const formData = new FormData();
       formData.append("title", uploadTitle || "Institution Student ID Card");
       formData.append("organization_id", selectedOrgId || "1");
       formData.append("file", uploadFile);
 
-      const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-      const res = await fetch(`${API_BASE}/api/id-cards/upload`, {
+      const res = await fetch("/api/id-cards/upload", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        credentials: "same-origin",
         body: formData,
       });
 

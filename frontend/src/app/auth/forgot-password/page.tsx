@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { 
   KeyRound, Lock, Mail, ArrowRight, AlertCircle, 
@@ -24,6 +24,14 @@ export default function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    const token = new URLSearchParams(window.location.search).get("token");
+    if (token) {
+      setResetToken(token);
+      setStep("reset");
+    }
+  }, []);
 
   // Step 1: Request recovery token
   const handleRequestReset = async (e: React.FormEvent) => {
@@ -59,11 +67,7 @@ export default function ForgotPasswordPage() {
         body: JSON.stringify({ identifier: identifier.trim() }),
       });
 
-      setSuccessMsg(res.message || "Recovery instructions dispatched.");
-      if (res.debug_reset_token) {
-        setResetToken(res.debug_reset_token);
-      }
-      setStep("reset");
+      setSuccessMsg(res.message || "If your account exists, recovery instructions will be emailed to you.");
     } catch (err: any) {
       setErrorMsg(err.message || "Unable to request password recovery. Please try again.");
     } finally {

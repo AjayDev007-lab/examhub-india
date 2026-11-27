@@ -1,20 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { dbStore } from "@/lib/data";
+import { proxyBackendRequest } from "@/lib/backendProxy";
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
-    const regId = parseInt(id);
-
-    dbStore.studentExamRegistrations = dbStore.studentExamRegistrations.filter((r: any) => r.id !== regId);
-    dbStore.studentCalendarEvents = dbStore.studentCalendarEvents.filter((e: any) => e.registrationId !== regId);
-    dbStore.examReminders = dbStore.examReminders.filter((rem: any) => rem.registrationId !== regId);
-
-    return NextResponse.json({ success: true, message: "Exam removed from your list" });
-  } catch (error) {
-    return NextResponse.json({ error: "Failed to remove exam" }, { status: 500 });
-  }
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  if (!/^\d+$/.test(id)) return NextResponse.json({ detail: "Invalid registration id" }, { status: 400 });
+  return proxyBackendRequest(request, `/api/student/exams/${id}`, "student", "DELETE");
 }

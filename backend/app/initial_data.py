@@ -12,6 +12,7 @@ from app.models.models import (
     JobNotification, JobSource, SavedJob, JobApplication,
     StudentExamRegistration, StudentCalendarEvent, ExamReminder,
     StudentJobPreference, JobAlertSubscription, NotificationTemplate,
+    StudentSchoolProfile,
     NotificationDeliveryLog, AdminAlert, AnalyticsEvent, ScheduledTaskLog,
     MonitoringSource, MonitoringSchedule, MonitoringRun, DetectedUpdate,
     UpdateVerificationLog, MaintenanceTask, WebsiteHealthCheck,
@@ -112,15 +113,19 @@ async def seed_database():
                 AdminPermission(role_id=manager_role.id, permission_name="institution:manage")
             ])
 
-            # Seed SuperAdmin User
-            super_admin = AdminUser(
-                full_name="ExamHub Super Administrator",
-                email=settings.SUPERADMIN_EMAIL,
-                password_hash=hash_password(settings.SUPERADMIN_PASSWORD),
-                role_id=super_role.id,
-                is_active=True
-            )
-            db.add(super_admin)
+
+        if settings.SUPERADMIN_EMAIL and settings.SUPERADMIN_PASSWORD:
+            admin_res = await db.execute(select(AdminUser).where(AdminUser.email == settings.SUPERADMIN_EMAIL.lower()))
+            if not admin_res.scalar_one_or_none():
+                super_role = await db.scalar(select(AdminRole).where(AdminRole.name == "SUPER_ADMIN"))
+                if super_role:
+                    db.add(AdminUser(
+                        full_name="ExamHub Super Administrator",
+                        email=settings.SUPERADMIN_EMAIL.lower(),
+                        password_hash=hash_password(settings.SUPERADMIN_PASSWORD),
+                        role_id=super_role.id,
+                        is_active=True,
+                    ))
 
         # 2. Seed States
         state_stmt = select(State)
@@ -460,7 +465,8 @@ async def seed_database():
                     source_portal="https://ssc.gov.in"
                 )
             ]
-            db.add_all(announcements)
+            if settings.APP_ENV.lower() != "production":
+                db.add_all(announcements)
 
             # Seed Demo Verified Exam Results for Testing
             demo_results = [
@@ -532,19 +538,21 @@ async def seed_database():
                     result_status="AVAILABLE"
                 )
             ]
-            db.add_all(demo_results)
+            if settings.APP_ENV.lower() != "production":
+                db.add_all(demo_results)
 
             # Seed Demo Student Account
-            demo_student = User(
-                full_name="Aarav Kapoor",
-                email="student@examhub.in",
-                mobile="9876543210",
-                password_hash=hash_password("Student@ExamHub2026!"),
-                is_active=True,
-                is_verified=True,
-                mobile_verified=True
-            )
-            db.add(demo_student)
+            if settings.APP_ENV.lower() != "production":
+                demo_student = User(
+                    full_name="Aarav Kapoor",
+                    email="student@examhub.in",
+                    mobile="9876543210",
+                    password_hash=hash_password("Student@ExamHub2026!"),
+                    is_active=True,
+                    is_verified=True,
+                    mobile_verified=True
+                )
+                db.add(demo_student)
 
             # Seed System Settings
             settings_entries = [

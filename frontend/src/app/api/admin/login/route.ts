@@ -1,48 +1,35 @@
-import { NextResponse } from "next/server";
-import { dbStore } from "@/lib/data";
+import { NextRequest, NextResponse } from "next/server";
 
-export async function POST(request: Request) {
+export const dynamic = "force-dynamic";
+
+export async function POST(request: NextRequest) {
+  const backendUrl = process.env.BACKEND_URL;
+  if (!backendUrl) return NextResponse.json({ detail: "Authentication service is not configured" }, { status: 503 });
+
   try {
-    const body = await request.json();
-    const { email, password } = body;
-
-    const emailClean = (email || "").trim().toLowerCase();
-    const admin = (dbStore as any).adminProfile || {
-      id: 1,
-      full_name: "ExamHub Super Administrator",
-      email: "ajaydevvs22102004@gmail.com",
-      password: "SuperAdmin@ExamHub2026!",
-      role: "SUPER_ADMIN"
-    };
-
-    // SuperAdmin credentials check (supports updated email and password as well as default credentials)
-    if (
-      (emailClean === admin.email.toLowerCase() || emailClean === "superadmin@examhub.gov.in" || emailClean === "ajaydevvs22102004@gmail.com") &&
-      (password === admin.password || password === "SuperAdmin@ExamHub2026!" || password === "superadmin")
-    ) {
-      const token = "examhub_superadmin_secure_token_" + Date.now();
-      const res = NextResponse.json({
-        access_token: token,
-        token_type: "bearer",
-        user_type: "admin",
-        user: {
-          id: admin.id || 1,
-          full_name: admin.full_name || "ExamHub Super Administrator",
-          email: admin.email || "superadmin@examhub.gov.in",
-          role: admin.role || "SUPER_ADMIN"
-        }
-      });
-      res.cookies.set("examhub_token", token, { path: "/", httpOnly: false, sameSite: "lax", maxAge: 86400 });
-      res.cookies.set("examhub_admin_token", token, { path: "/", httpOnly: false, sameSite: "lax", maxAge: 86400 });
-      res.cookies.set("examhub_user_type", "admin", { path: "/", httpOnly: false, sameSite: "lax", maxAge: 86400 });
-      return res;
+    const response = await fetch(`${backendUrl}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(await request.json()),
+      cache: "no-store",
+      signal: AbortSignal.timeout(8000),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) return NextResponse.json(data, { status: response.status });
+    if (data.user_type !== "admin" || !data.access_token) {
+      return NextResponse.json({ detail: "Administrator credentials required" }, { status: 403 });
     }
 
-    return NextResponse.json(
-      { detail: "Invalid administrator credentials" },
-      { status: 401 }
-    );
-  } catch (err: any) {
-    return NextResponse.json({ detail: err.message || "Login failed" }, { status: 500 });
+    const result = NextResponse.json({ user_type: "admin", user: data.user });
+    result.cookies.set("examhub_token", data.access_token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      path: "/",
+      maxAge: 60 * 60 * 8,
+    });
+    return result;
+  } catch {
+    return NextResponse.json({ detail: "Authentication service is unavailable" }, { status: 503 });
   }
 }

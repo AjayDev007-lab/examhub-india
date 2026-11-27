@@ -1,4 +1,9 @@
 import secrets
+import hashlib
+import smtplib
+from email.message import EmailMessage
+from email.utils import formataddr
+from fastapi import BackgroundTasks
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -10,6 +15,22 @@ from app.schemas.schemas import UserRegister, UserLogin, SendOtpRequest, VerifyO
 from app.auth.security import hash_password, verify_password, create_access_token, generate_otp, verify_otp, get_current_user
 from app.services.audit_service import log_audit_event
 from datetime import datetime, timezone, timedelta
+
+
+def deliver_password_reset_email(email: str, full_name: str, reset_url: str) -> None:
+    """Send account recovery out of band; never return recovery tokens in API responses."""
+    message = EmailMessage()
+    message["Subject"] = "Reset your ExamHub India password"
+    message["From"] = formataddr(("ExamHub India", settings.SMTP_FROM))
+    message["To"] = email
+    message.set_content(
+        f"Hello {full_name},\n\nUse this one-time link to reset your password. It expires in 15 minutes:\n{reset_url}\n\n"
+        "If you did not request this change, you can ignore this email."
+    )
+    with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10) as smtp:
+        smtp.starttls()
+        smtp.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
+        smtp.send_message(message)
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
@@ -134,10 +155,6 @@ async def login(req: UserLogin, request: Request, db: AsyncSession = Depends(get
         AdminUser.is_active == True
     )
     admin = (await db.execute(stmt_admin)).scalar_one_or_none()
-    if not admin and email_clean in [settings.SUPERADMIN_EMAIL.lower(), "superadmin@examhub.gov.in", "ajaydevvs22102004@gmail.com"]:
-        stmt_fallback = select(AdminUser).options(selectinload(AdminUser.role)).where(AdminUser.is_active == True)
-        admin = (await db.execute(stmt_fallback)).scalars().first()
-
     if admin:
         if verify_password(req.password, admin.password_hash):
             admin.last_login_at = datetime.now(timezone.utc)
@@ -178,12 +195,7 @@ async def login(req: UserLogin, request: Request, db: AsyncSession = Depends(get
 
 @router.post("/send-otp")
 async def send_otp(req: SendOtpRequest):
-    otp = generate_otp(req.mobile)
-    return {
-        "success": True,
-        "message": f"OTP sent to {req.mobile[:2]}******{req.mobile[-2:]}. Valid for 5 minutes.",
-        "debug_demo_otp": otp
-    }
+    raise HTTPException(status_code=503, detail="Mobile OTP delivery is not configured")
 
 @router.post("/verify-otp", response_model=Token)
 async def verify_login_otp(req: VerifyOtpRequest, request: Request, db: AsyncSession = Depends(get_db)):
@@ -241,7 +253,7 @@ async def logout(current_user: User = Depends(get_current_user), db: AsyncSessio
     return {"success": True, "message": "Successfully logged out"}
 
 @router.post("/forgot-password")
-async def forgot_password(req: ForgotPasswordRequest, request: Request, db: AsyncSession = Depends(get_db)):
+async def forgot_password(req: ForgotPasswordRequest, request: Request, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
     identifier = req.identifier.strip().lower()
     stmt = select(User).where(
         (User.email == identifier) | (User.mobile == identifier),
@@ -250,7 +262,6 @@ async def forgot_password(req: ForgotPasswordRequest, request: Request, db: Asyn
     )
     user = (await db.execute(stmt)).scalar_one_or_none()
 
-    debug_token = None
     if user:
         reset_token = secrets.token_urlsafe(32)
         expires = datetime.now(timezone.utc) + timedelta(minutes=15)
@@ -258,14 +269,15 @@ async def forgot_password(req: ForgotPasswordRequest, request: Request, db: Asyn
 
         token_entry = PasswordResetToken(
             user_id=user.id,
-            reset_token=reset_token,
+            reset_token=hashlib.sha256(reset_token.encode()).hexdigest(),
             expires_at=expires,
             is_used=False,
             ip_address=client_ip
         )
         db.add(token_entry)
         await db.commit()
-        debug_token = reset_token
+        reset_url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/auth/forgot-password?token={reset_token}"
+        background_tasks.add_task(deliver_password_reset_email, user.email, user.full_name, reset_url)
 
         await log_audit_event(
             db,
@@ -280,8 +292,7 @@ async def forgot_password(req: ForgotPasswordRequest, request: Request, db: Asyn
     # Return non-enumerating generic response
     return {
         "success": True,
-        "message": "If an account matches your details, recovery instructions have been dispatched.",
-        "debug_reset_token": debug_token
+        "message": "If an account matches your details, recovery instructions will be sent to its registered email address."
     }
 
 @router.post("/reset-password")
@@ -292,7 +303,7 @@ async def reset_password(req: ResetPasswordRequest, request: Request, db: AsyncS
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Password must be at least 8 characters")
 
     stmt = select(PasswordResetToken).where(
-        PasswordResetToken.reset_token == req.token.strip(),
+        PasswordResetToken.reset_token == hashlib.sha256(req.token.strip().encode()).hexdigest(),
         PasswordResetToken.is_used == False
     )
     token_entry = (await db.execute(stmt)).scalar_one_or_none()

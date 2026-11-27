@@ -67,7 +67,7 @@ class StudentUpdatePreferenceUpdate(BaseModel):
 # =========================================================================
 # 1. ADMIN MONITORING DASHBOARD STATS
 # =========================================================================
-@router.get("/admin/daily-updates/stats")
+@router.get("/admin/daily-updates/stats", dependencies=[Depends(get_current_admin)])
 async def get_daily_updates_stats(db: AsyncSession = Depends(get_db)):
     sources_cnt = (await db.execute(select(func.count(MonitoringSource.id)))).scalar() or 0
     active_sources = (await db.execute(select(func.count(MonitoringSource.id)).where(MonitoringSource.is_enabled == True))).scalar() or 0
@@ -113,7 +113,7 @@ async def get_daily_updates_stats(db: AsyncSession = Depends(get_db)):
 # =========================================================================
 # 2. SOURCE MANAGEMENT
 # =========================================================================
-@router.get("/admin/daily-updates/sources")
+@router.get("/admin/daily-updates/sources", dependencies=[Depends(get_current_admin)])
 async def list_monitoring_sources(
     category: Optional[str] = Query(None),
     status_filter: Optional[str] = Query(None),
@@ -148,7 +148,7 @@ async def list_monitoring_sources(
         for s in sources
     ]}
 
-@router.post("/admin/daily-updates/sources")
+@router.post("/admin/daily-updates/sources", dependencies=[Depends(get_current_admin)])
 async def create_monitoring_source(
     payload: SourceCreate,
     db: AsyncSession = Depends(get_db)
@@ -174,7 +174,7 @@ async def create_monitoring_source(
     await db.refresh(source)
     return {"success": True, "source_id": source.id, "message": "Source registered successfully"}
 
-@router.put("/admin/daily-updates/sources/{source_id}")
+@router.put("/admin/daily-updates/sources/{source_id}", dependencies=[Depends(get_current_admin)])
 async def update_monitoring_source(
     source_id: int,
     payload: SourceUpdate,
@@ -193,7 +193,7 @@ async def update_monitoring_source(
 # =========================================================================
 # 3. DETECTED UPDATES & VERIFICATION PIPELINE
 # =========================================================================
-@router.get("/admin/daily-updates/updates")
+@router.get("/admin/daily-updates/updates", dependencies=[Depends(get_current_admin)])
 async def list_admin_detected_updates(
     category: Optional[str] = Query(None),
     verification_status: Optional[str] = Query(None),
@@ -245,7 +245,7 @@ async def list_admin_detected_updates(
         for u in updates
     ]}
 
-@router.post("/admin/daily-updates/updates/{update_id}/verify")
+@router.post("/admin/daily-updates/updates/{update_id}/verify", dependencies=[Depends(get_current_admin)])
 async def verify_detected_update(
     update_id: int,
     payload: UpdateVerificationAction,
@@ -301,7 +301,7 @@ async def verify_detected_update(
 # =========================================================================
 # 4. MONITORING SCHEDULES & TRIGGER MANUAL RUN
 # =========================================================================
-@router.get("/admin/daily-updates/schedules")
+@router.get("/admin/daily-updates/schedules", dependencies=[Depends(get_current_admin)])
 async def list_monitoring_schedules(db: AsyncSession = Depends(get_db)):
     res = await db.execute(select(MonitoringSchedule).order_by(MonitoringSchedule.time_slot))
     schedules = res.scalars().all()
@@ -317,7 +317,7 @@ async def list_monitoring_schedules(db: AsyncSession = Depends(get_db)):
         for s in schedules
     ]}
 
-@router.post("/admin/daily-updates/runs")
+@router.post("/admin/daily-updates/runs", dependencies=[Depends(get_current_admin)])
 async def trigger_monitoring_run(
     payload: TriggerRunRequest,
     db: AsyncSession = Depends(get_db)
@@ -345,7 +345,7 @@ async def trigger_monitoring_run(
         "message": f"Successfully executed automated information monitoring scan across {sources_cnt} official sources."
     }
 
-@router.get("/admin/daily-updates/history")
+@router.get("/admin/daily-updates/history", dependencies=[Depends(get_current_admin)])
 async def get_monitoring_history(
     limit: int = Query(20, ge=1, le=50),
     db: AsyncSession = Depends(get_db)

@@ -1,21 +1,17 @@
-import { NextResponse, NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-export async function PUT(req: NextRequest) {
-  const body = await req.json();
-  const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-  const authHeader = req.headers.get("authorization") || "";
-
+export async function PUT(request: NextRequest) {
+  const backendUrl = process.env.BACKEND_URL;
+  const token = request.cookies.get("examhub_token")?.value;
+  if (!backendUrl || !token) return NextResponse.json({ detail: "Website control service is unavailable" }, { status: 503 });
   try {
-    const res = await fetch(`${backendUrl}/api/admin/website-control/settings`, {
+    const response = await fetch(`${backendUrl}/api/admin/website-control/settings`, {
       method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: authHeader
-      },
-      body: JSON.stringify(body)
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(await request.json()),
+      cache: "no-store",
+      signal: AbortSignal.timeout(8000),
     });
-    if (res.ok) return NextResponse.json(await res.json());
-  } catch (_) {}
-
-  return NextResponse.json({ success: true, message: "Website operating settings updated successfully." });
+    return NextResponse.json(await response.json().catch(() => ({})), { status: response.status });
+  } catch { return NextResponse.json({ detail: "Website control service is unavailable" }, { status: 503 }); }
 }

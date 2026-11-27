@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { dbStore } from "./data";
+import { createHmac, timingSafeEqual } from "node:crypto";
 
 export interface AdminAuthResult {
   authorized: boolean;
@@ -20,23 +21,29 @@ export interface AdminAuthResult {
   error?: string;
 }
 
+function isValidAdminJwt(token: string): boolean {
+  const secret = process.env.SECRET_KEY;
+  if (!secret || secret.length < 32) return false;
+  const parts = token.split(".");
+  if (parts.length !== 3) return false;
+  try {
+    const header = JSON.parse(Buffer.from(parts[0], "base64url").toString("utf8"));
+    const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
+    if (header.alg !== "HS256" || payload.type !== "admin" || Number(payload.sub) < 1 || payload.exp <= Math.floor(Date.now() / 1000)) return false;
+    const expected = createHmac("sha256", secret).update(`${parts[0]}.${parts[1]}`).digest();
+    const actual = Buffer.from(parts[2], "base64url");
+    return expected.length === actual.length && timingSafeEqual(expected, actual);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Validates that an incoming request is authentically from a SuperAdmin or Admin.
  * Rejects unauthenticated requests (HTTP 401) and student accounts (HTTP 403).
  */
 export function verifyAdminAuthorization(req: NextRequest): AdminAuthResult {
   // 1. Check for Student accounts attempting role escalation
-  const userTypeCookie = req.cookies.get("examhub_user_type")?.value?.trim().toLowerCase();
-  const userTypeHeader = req.headers.get("x-user-type")?.trim().toLowerCase();
-
-  if (userTypeCookie === "student" || userTypeHeader === "student") {
-    return {
-      authorized: false,
-      status: 403,
-      error: "Access Denied (HTTP 403): Student accounts are strictly prohibited from accessing administrator commands."
-    };
-  }
-
   // 2. Extract Bearer token from Authorization header or Cookies
   const authHeader = req.headers.get("authorization")?.trim();
   let token = "";
@@ -47,20 +54,11 @@ export function verifyAdminAuthorization(req: NextRequest): AdminAuthResult {
 
   if (!token) {
     token =
-      req.cookies.get("examhub_admin_token")?.value?.trim() ||
       req.cookies.get("examhub_token")?.value?.trim() ||
       "";
   }
 
   // Check for student tokens
-  if (token.startsWith("examhub_student_token_")) {
-    return {
-      authorized: false,
-      status: 403,
-      error: "Access Denied (HTTP 403): Student credential token cannot be used for administrative operations."
-    };
-  }
-
   // 3. Reject completely unauthenticated requests
   if (!token) {
     return {
@@ -71,14 +69,7 @@ export function verifyAdminAuthorization(req: NextRequest): AdminAuthResult {
   }
 
   // 4. Validate Token Format and Authenticity
-  const adminSecret = process.env.ADMIN_SECRET_KEY || process.env.CRON_SECRET || "ExamHubAdminSecret2026";
-  const isValidAdminToken =
-    token.startsWith("examhub_superadmin_secure_token_") ||
-    token.startsWith("examhub_admin_token_") ||
-    token === adminSecret ||
-    token === "examhub_superadmin_token_production";
-
-  if (!isValidAdminToken) {
+  if (!isValidAdminJwt(token)) {
     return {
       authorized: false,
       status: 401,
@@ -88,23 +79,17 @@ export function verifyAdminAuthorization(req: NextRequest): AdminAuthResult {
 
   // 5. CSRF Protection for state-changing mutations (POST, PUT, DELETE)
   if (req.method !== "GET" && req.method !== "HEAD") {
-    const origin = req.headers.get("origin")?.toLowerCase();
-    const referer = req.headers.get("referer")?.toLowerCase();
-    const allowedHosts = [
-      "examhub-india.vercel.app",
-      "localhost",
-      "127.0.0.1"
-    ];
-
-    if (origin) {
-      const isAllowedOrigin = allowedHosts.some(host => origin.includes(host));
-      if (!isAllowedOrigin) {
-        return {
-          authorized: false,
-          status: 403,
-          error: "Cross-Site Request Forgery (CSRF) Protection: Untrusted origin blocked."
-        };
-      }
+    const origin = req.headers.get("origin") || req.headers.get("referer");
+    const allowedHosts = new Set(["examhub-india.vercel.app", "localhost", "127.0.0.1", process.env.SITE_HOSTNAME].filter(Boolean));
+    const isCookieAuth = Boolean(req.cookies.get("examhub_token")?.value);
+    let trusted = false;
+    try { trusted = Boolean(origin && allowedHosts.has(new URL(origin).hostname)); } catch { trusted = false; }
+    if (isCookieAuth && !trusted || origin && !trusted) {
+      return {
+        authorized: false,
+        status: 403,
+        error: "Cross-Site Request Forgery protection blocked this request."
+      };
     }
   }
 

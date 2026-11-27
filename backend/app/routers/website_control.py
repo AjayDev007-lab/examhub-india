@@ -32,7 +32,7 @@ class SettingsUpdateRequest(BaseModel):
     scheduled_end_time: Optional[str] = None
 
 class EmergencyRecoveryRequest(BaseModel):
-    recovery_key: str
+    reason: Optional[str] = None
     reason: Optional[str] = "Emergency recovery invoked by Super Admin"
 
 # =========================================================================
@@ -257,12 +257,9 @@ async def update_website_control_settings(
 async def emergency_website_recovery(
     payload: EmergencyRecoveryRequest,
     request: Request,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    admin: AdminUser = Depends(get_current_admin)
 ):
-    # Verified master emergency key
-    if payload.recovery_key != "EMERGENCY-SUPERADMIN-RESTORE-ONLINE-2026":
-        raise HTTPException(status_code=403, detail="Invalid emergency recovery key.")
-
     stmt = select(WebsiteOperatingControl).order_by(WebsiteOperatingControl.id.asc()).limit(1)
     control = (await db.execute(stmt)).scalar_one_or_none()
 
@@ -279,7 +276,7 @@ async def emergency_website_recovery(
         previous_mode=prev_mode,
         new_mode="ONLINE",
         reason=payload.reason or "Master emergency recovery key used to force website ONLINE.",
-        admin_email="emergency-recovery@examhub.gov.in",
+        admin_email=admin.email,
         ip_address=client_ip,
         timestamp=utc_now()
     ))

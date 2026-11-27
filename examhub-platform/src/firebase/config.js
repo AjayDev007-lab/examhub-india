@@ -1,6 +1,6 @@
-/**
+﻿/**
  * Firebase Architecture & Resilient Local State Fallback Engine
- * EXAMHUB INDIA — Production Ready Firebase Integration
+ * EXAMHUB INDIA â€” Production Ready Firebase Integration
  */
 
 import { initializeApp, getApps, getApp } from "firebase/app";
@@ -8,21 +8,21 @@ import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
-// Read environment variables with production fallbacks
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDFkI2-OPGnGkZ2PgQqZx5Lc1Z28fB59zQ",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "examhub-india-6ba59.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "examhub-india-6ba59",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "examhub-india-6ba59.firebasestorage.app",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "109827630610",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:109827630610:web:93ff9fbacd2838d1d69acb"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || ""
 };
 
 // Check if valid Firebase configuration is present
 export const isConfigured = Boolean(
   firebaseConfig.apiKey &&
-  firebaseConfig.apiKey !== "your-api-key" &&
-  firebaseConfig.projectId
+  firebaseConfig.apiKey.length > 10 &&
+  firebaseConfig.projectId &&
+  firebaseConfig.authDomain
 );
 
 export const isDemoMode = !isConfigured;
@@ -185,118 +185,9 @@ const SEED_EXAMS = [
   }
 ];
 
-const SEED_HALL_TICKETS = [
-  {
-    id: "ht_001",
-    examId: "exam_01",
-    examName: "National Eligibility cum Entrance Test (NEET UG) 2026",
-    examCode: "NEET-UG-2026",
-    studentId: "std_001",
-    studentUid: "std_001",
-    studentName: "ADITYA SHARMA",
-    rollNumber: "2604108821",
-    registrationNumber: "NEET260098412",
-    examDate: "Sunday, May 03, 2026",
-    examTime: "02:00 PM to 05:20 PM IST",
-    reportingTime: "12:30 PM",
-    gateClosingTime: "01:30 PM",
-    centreName: "Kendriya Vidyalaya No. 1, AFS Campus",
-    centreCode: "MH-PUN-084",
-    centreAddress: "Viman Nagar Road, Lohegaon, Pune, Maharashtra — 411014",
-    photoUrl: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=256",
-    barcodeValue: "EH2604108821NEETUG",
-    instructions: [
-      "Candidate must bring this original printed Hall Ticket with a valid Government Photo ID (Aadhaar / Voter ID / Passport).",
-      "One passport size photograph must be pasted in the designated box in presence of the invigilator.",
-      "Electronic devices, smartwatches, calculators, and rough sheets are strictly prohibited inside the hall.",
-      "Report strictly before Gate Closing Time (01:30 PM). No candidate shall be permitted after gate closure."
-    ]
-  },
-  {
-    id: "ht_002",
-    examId: "exam_02",
-    examName: "Joint Entrance Examination (JEE Main) Session 2",
-    examCode: "JEE-MAIN-2026-S2",
-    studentId: "std_001",
-    studentUid: "std_001",
-    studentName: "ADITYA SHARMA",
-    rollNumber: "2602104590",
-    registrationNumber: "JEE260144921",
-    examDate: "Wednesday, April 08, 2026",
-    examTime: "09:00 AM to 12:00 PM IST",
-    reportingTime: "07:30 AM",
-    gateClosingTime: "08:30 AM",
-    centreName: "iON Digital Zone iDZ 1, Ramwadi",
-    centreCode: "MH-PUN-019",
-    centreAddress: "Survey No. 45/2, Nagar Road, Ramwadi, Pune, Maharashtra — 411014",
-    photoUrl: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=256",
-    barcodeValue: "EH2602104590JEEMAIN",
-    instructions: [
-      "Bring printed copy of Admit Card downloaded from ExamHub India or NTA portal.",
-      "Carry transparent ballpoint pen and original Aadhaar card.",
-      "Rough sheets will be provided in the test lab and must be dropped in the drop box before exiting."
-    ]
-  }
-];
+const SEED_HALL_TICKETS = [];
 
-const SEED_RESULTS = [
-  {
-    id: "res_001",
-    examId: "exam_05",
-    examName: "Staff Selection Commission (SSC CGL) Tier-I 2025",
-    studentId: "std_001",
-    studentUid: "std_001",
-    studentName: "ADITYA SHARMA",
-    rollNumber: "2604108821",
-    registrationNumber: "RID-2604108821",
-    marksObtained: 172.5,
-    maxMarks: 200.0,
-    percentage: 86.25,
-    grade: "DISTINCTION",
-    percentile: "98.84 Percentile",
-    rank: "AIR 142",
-    status: "PASS",
-    qualifyingStatus: "QUALIFIED FOR TIER-II",
-    subjectMarks: [
-      { subject: "General Intelligence & Reasoning", obtained: 46.5, max: 50 },
-      { subject: "General Awareness & Current Affairs", obtained: 38.0, max: 50 },
-      { subject: "Quantitative Aptitude (Mathematics)", obtained: 48.0, max: 50 },
-      { subject: "English Comprehension", obtained: 40.0, max: 50 }
-    ],
-    publishedDate: "2026-01-28",
-    isPublished: true,
-    authority: "Staff Selection Commission",
-    officialPortal: "https://ssc.gov.in"
-  },
-  {
-    id: "res_002",
-    examId: "exam_04",
-    examName: "Railway Recruitment Board (RRB) Group D CEN 08/2025",
-    studentId: "std_002",
-    studentUid: "std_002",
-    studentName: "PRIYA SUNDARAM",
-    rollNumber: "2608103342",
-    registrationNumber: "RID-2608103342",
-    marksObtained: 84.0,
-    maxMarks: 100.0,
-    percentage: 84.0,
-    grade: "EXCELLENT",
-    percentile: "96.42 Percentile",
-    rank: "AIR 890",
-    status: "PASS",
-    qualifyingStatus: "SHORTLISTED FOR PET",
-    subjectMarks: [
-      { subject: "General Science", obtained: 22.0, max: 25 },
-      { subject: "Mathematics", obtained: 21.5, max: 25 },
-      { subject: "General Intelligence & Reasoning", obtained: 26.5, max: 30 },
-      { subject: "General Awareness & Current Affairs", obtained: 14.0, max: 20 }
-    ],
-    publishedDate: "2026-02-14",
-    isPublished: true,
-    authority: "Railway Recruitment Board",
-    officialPortal: "https://indianrailways.gov.in"
-  }
-];
+const SEED_RESULTS = [];
 
 const SEED_NOTIFICATIONS = [
   {

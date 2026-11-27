@@ -131,12 +131,8 @@ export default function AdminAutoPublishingPage() {
   }, []);
 
   function getAuthHeaders() {
-    const token = typeof window !== "undefined"
-      ? (localStorage.getItem("examhub_admin_token") || localStorage.getItem("examhub_token") || "examhub_superadmin_secure_token_session")
-      : "examhub_superadmin_secure_token_session";
     return {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}`
     };
   }
 

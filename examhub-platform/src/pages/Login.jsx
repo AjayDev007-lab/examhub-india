@@ -10,9 +10,7 @@ import {
   CheckCircle2, 
   Sparkles, 
   ArrowRight,
-  RefreshCw,
-  User,
-  Key
+  RefreshCw
 } from "lucide-react";
 
 export default function Login({ onNavigate }) {
@@ -84,18 +82,6 @@ export default function Login({ onNavigate }) {
     }
   };
 
-  // Quick fill helper for review and evaluation
-  const fillCredentials = (type) => {
-    setErrorMsg(null);
-    if (type === "student") {
-      setEmail("student@examhub.in");
-      setPassword("Password@123");
-    } else {
-      setEmail("ajaydevvs22102004@gmail.com");
-      setPassword("SuperAdmin@ExamHub2026!");
-    }
-  };
-
   return (
     <div className="min-h-[85vh] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full glass-panel-glow rounded-3xl p-8 sm:p-10 border border-cyan-500/30 relative">
@@ -111,31 +97,6 @@ export default function Login({ onNavigate }) {
           <p className="text-xs text-slate-400">
             Unified access for Indian scholars & administrative officials
           </p>
-        </div>
-
-        {/* Quick Demo Autofill Pills */}
-        <div className="mb-6 p-3 rounded-2xl bg-midnight-950/70 border border-slate-800 space-y-2 text-xs">
-          <span className="text-[10px] text-cyan-400 font-bold uppercase tracking-wider block">
-            One-Click Verified Demo Credentials:
-          </span>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => fillCredentials("student")}
-              className="py-1.5 px-2.5 rounded-lg bg-cyan-950/60 hover:bg-cyan-900/60 border border-cyan-500/40 text-cyan-200 text-[11px] font-semibold flex items-center justify-center space-x-1"
-            >
-              <User className="w-3 h-3 text-cyan-400" />
-              <span>Student Account</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => fillCredentials("admin")}
-              className="py-1.5 px-2.5 rounded-lg bg-blue-950/60 hover:bg-blue-900/60 border border-blue-500/40 text-blue-200 text-[11px] font-semibold flex items-center justify-center space-x-1"
-            >
-              <Key className="w-3 h-3 text-blue-400" />
-              <span>Super Admin</span>
-            </button>
-          </div>
         </div>
 
         {/* Status Alerts */}

@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbStore } from "@/lib/data";
+import { getStudentSession } from "@/lib/session";
 
 export async function GET(request: NextRequest) {
   try {
+    const session = await getStudentSession(request);
+    if (!session) return NextResponse.json({ detail: "Authentication required" }, { status: 401 });
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
 
-    let apps = dbStore?.studentApplications || [];
+    let apps = (dbStore?.studentApplications || []).filter(a => a.user_id === session.id);
 
     if (status && status !== "ALL") {
       apps = apps.filter((a) => a.status === status);
@@ -23,6 +26,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await getStudentSession(request);
+    if (!session) return NextResponse.json({ detail: "Authentication required" }, { status: 401 });
     const body = await request.json();
     const { exam_id, exam_slug, exam_name, authority_code, conducting_authority, notes, status, application_number, roll_number } = body;
 
@@ -36,7 +41,7 @@ export async function POST(request: NextRequest) {
 
     // Check if already in tracker
     const existing = dbStore!.studentApplications.find(
-      (a) => (exam_id && a.exam_id === exam_id) || (exam_slug && a.exam_slug === exam_slug)
+      (a) => a.user_id === session.id && ((exam_id && a.exam_id === exam_id) || (exam_slug && a.exam_slug === exam_slug))
     );
 
     if (existing) {
@@ -50,7 +55,7 @@ export async function POST(request: NextRequest) {
 
     const newApp = {
       id: dbStore!.studentApplications.length + 1,
-      user_id: 1, // Demo user / logged-in student
+      user_id: session.id,
       exam_id: exam_id || 1,
       exam_slug: exam_slug || "custom-exam",
       exam_name: exam_name || "General Examination",

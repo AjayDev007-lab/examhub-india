@@ -20,13 +20,15 @@ service cloud.firestore {
     // Users and Students Collection
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
-      allow write: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && request.resource.data.role == 'student';
+      allow update: if isAdmin() || (isOwner(userId) && request.resource.data.role == resource.data.role);
+      allow delete: if isAdmin();
     }
     
     match /students/{studentId} {
       allow read: if isOwner(studentId) || isAdmin();
-      allow create: if isAuthenticated();
-      allow update: if isOwner(studentId) || isAdmin();
+      allow create: if isOwner(studentId) && request.resource.data.uid == request.auth.uid && request.resource.data.role == 'student';
+      allow update: if isAdmin() || (isOwner(studentId) && request.resource.data.uid == resource.data.uid && request.resource.data.role == resource.data.role);
       allow delete: if isAdmin();
     }
     
@@ -68,6 +70,10 @@ service cloud.firestore {
     match /notifications/{notifId} {
       allow read: if true;
       allow write: if isAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

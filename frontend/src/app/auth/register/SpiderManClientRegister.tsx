@@ -9,16 +9,6 @@ import {
   GraduationCap, BookOpen, ShieldCheck, Check
 } from "lucide-react";
 import { fetchApi } from "@/lib/api";
-import { 
-  isFirebaseConfigured, 
-  auth, 
-  db, 
-  createUserWithEmailAndPassword, 
-  updateProfile, 
-  doc, 
-  setDoc, 
-  formatFirebaseAuthError 
-} from "@/lib/firebase";
 import SpiderManLive3DCanvas, { SpiderManActionState } from "@/components/SpiderManLive3DCanvas";
 import { soundEngine } from "@/lib/spidermanAudio";
 
@@ -150,110 +140,20 @@ export default function SpiderManClientRegister() {
     const emailClean = email.trim().toLowerCase();
 
     try {
-      // 1. Official Firebase Authentication (Single Source of Truth)
-      if (isFirebaseConfigured && auth) {
-        try {
-          const cred = await createUserWithEmailAndPassword(auth, emailClean, password);
-          
-          if (cred.user) {
-            await updateProfile(cred.user, {
-              displayName: fullName.trim()
-            });
-
-            // Store student document in Cloud Firestore
-            if (db) {
-              try {
-                await setDoc(doc(db, "students", cred.user.uid), {
-                  uid: cred.user.uid,
-                  fullName: fullName.trim(),
-                  email: emailClean,
-                  mobile: mobile.trim() || "",
-                  role: "student",
-                  createdAt: new Date().toISOString()
-                });
-              } catch (dbErr) {
-                console.warn("Firestore document write warning:", dbErr);
-              }
-            }
-
-            const idToken = await cred.user.getIdToken();
-
-            localStorage.setItem("examhub_token", idToken);
-            localStorage.setItem("examhub_user", JSON.stringify({
-              uid: cred.user.uid,
-              email: cred.user.email || emailClean,
-              full_name: fullName.trim(),
-              role: "student"
-            }));
-
-            document.cookie = `examhub_token=${idToken}; path=/; max-age=86400; SameSite=Lax`;
-            document.cookie = `examhub_user_type=student; path=/; max-age=86400; SameSite=Lax`;
-
-            setRegisterSuccess(true);
-            setSpiderAction("celebrate");
-
-            // Dispatch private registration alert to Admin Telegram (@AJ4Y2)
-            fetch("/api/auth/register-notify", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                fullName: fullName.trim(),
-                email: emailClean,
-                mobile: mobile.trim() || undefined,
-                uid: cred.user.uid
-              })
-            }).catch(() => {});
-
-            setTimeout(() => {
-              window.location.href = "/dashboard";
-            }, 1400);
-            return;
-          }
-        } catch (fbErr: any) {
-          const friendlyMsg = formatFirebaseAuthError(fbErr);
-          setErrorMsg(friendlyMsg);
-          setSpiderAction("error");
-          setLoading(false);
-          return;
-        }
-      }
-
-      // 2. Fallback to Backend API when Firebase credentials are not yet configured
-      try {
-        const res = await fetchApi("/api/auth/register", {
-          method: "POST",
-          body: JSON.stringify({
-            full_name: fullName.trim(),
-            email: emailClean,
-            mobile: mobile.trim() || undefined,
-            password,
-            password_confirm: confirmPassword,
-          }),
-        });
-
-        const token = res.access_token || ("student_secure_token_" + Date.now());
-        const studentUser = res.user || {
+      const res = await fetchApi("/api/auth/register", {
+        method: "POST",
+        body: JSON.stringify({
           full_name: fullName.trim(),
           email: emailClean,
           mobile: mobile.trim() || undefined,
-          role: "student",
-        };
-
-        localStorage.setItem("examhub_token", token);
-        localStorage.setItem("examhub_user", JSON.stringify(studentUser));
-        document.cookie = `examhub_token=${token}; path=/; max-age=86400; SameSite=Lax`;
-        document.cookie = `examhub_user_type=student; path=/; max-age=86400; SameSite=Lax`;
-
-        setRegisterSuccess(true);
-        setSpiderAction("celebrate");
-
-        setTimeout(() => {
-          window.location.href = "/dashboard";
-        }, 1400);
-      } catch (apiErr: any) {
-        setErrorMsg(apiErr.message || "Registration failed. An account with this email may already exist.");
-        setSpiderAction("error");
-      }
+          password,
+          password_confirm: confirmPassword,
+        }),
+      });
+      localStorage.setItem("examhub_user", JSON.stringify(res.user));
+      setRegisterSuccess(true);
+      setSpiderAction("celebrate");
+      setTimeout(() => { window.location.href = "/dashboard"; }, 1400);
     } catch (err: any) {
       setErrorMsg(err.message || "Registration failed. An account with this email may already exist.");
       setSpiderAction("error");

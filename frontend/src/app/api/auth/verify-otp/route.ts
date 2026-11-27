@@ -1,52 +1,23 @@
-import { NextResponse } from "next/server";
-import { dbStore } from "@/lib/data";
+import { NextRequest, NextResponse } from "next/server";
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const backendUrl = process.env.BACKEND_URL;
+  if (!backendUrl) return NextResponse.json({ detail: "Mobile OTP delivery is not configured" }, { status: 503 });
   try {
-    const body = await request.json();
-    const mobile = (body.mobile || "").trim();
-    const otp = (body.otp || "").trim();
-
-    if (!mobile || !otp) {
-      return NextResponse.json({ detail: "Mobile and OTP are required" }, { status: 400 });
-    }
-
-    // Verify OTP format (accept valid demo OTP 123456 or 6 digits)
-    if (otp !== "123456" && otp.length !== 6) {
-      return NextResponse.json({ detail: "Invalid or expired OTP" }, { status: 400 });
-    }
-
-    let user = dbStore.students.find(s => s.mobile === mobile);
-    if (!user) {
-      user = {
-        id: dbStore.students.length + 1,
-        full_name: `Student ${mobile.slice(-4)}`,
-        email: `${mobile}@student.examhub.in`,
-        mobile: mobile,
-        is_active: true,
-        is_verified: true,
-        mobile_verified: true,
-        created_at: new Date().toISOString()
-      };
-      dbStore.students.push(user);
-    } else {
-      user.mobile_verified = true;
-    }
-
-    return NextResponse.json({
-      access_token: "student_jwt_token_" + Date.now(),
-      token_type: "bearer",
-      user_type: "student",
-      user: {
-        id: user.id,
-        full_name: user.full_name,
-        email: user.email,
-        mobile: user.mobile,
-        is_verified: user.is_verified,
-        mobile_verified: user.mobile_verified
-      }
+    const response = await fetch(`${backendUrl}/api/auth/verify-otp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(await request.json()),
+      cache: "no-store",
+      signal: AbortSignal.timeout(8000),
     });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) return NextResponse.json(data, { status: response.status });
+    if (!data.access_token || data.user_type !== "student") return NextResponse.json({ detail: "Invalid session response" }, { status: 502 });
+    const result = NextResponse.json({ user_type: "student", user: data.user });
+    result.cookies.set("examhub_token", data.access_token, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 86400 });
+    return result;
   } catch (err: any) {
-    return NextResponse.json({ detail: err.message || "OTP verification failed" }, { status: 500 });
+    return NextResponse.json({ detail: "OTP verification service is unavailable" }, { status: 503 });
   }
 }

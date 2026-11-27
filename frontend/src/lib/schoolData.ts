@@ -1244,11 +1244,10 @@ export interface StudentSchoolProfile {
 }
 
 export const defaultStudentSchoolProfile: StudentSchoolProfile = {
-  user_id: 1,
-  board_code: "CBSE",
+  user_id: 0,
+  board_code: "",
   class_level: "12",
-  stream: "SCIENCE",
-  subjects: ["Physics", "Chemistry", "Mathematics", "English"],
-  saved_book_ids: [11, 12],
-  reading_progress: { 11: 45, 12: 20 }
+  subjects: [],
+  saved_book_ids: [],
+  reading_progress: {}
 };

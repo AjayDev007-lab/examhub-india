@@ -9,7 +9,7 @@ from app.initial_data import seed_database
 from app.routers import (
     auth, exams, results, hall_tickets, id_cards, documents, notifications,
     admin, admin_institutions, directory, jobs, student_exams, job_alerts, analytics,
-    daily_updates, maintenance, website_control, ai_manager
+    daily_updates, maintenance, website_control, ai_manager, student_school_profile
 )
 
 @asynccontextmanager
@@ -29,7 +29,7 @@ app = FastAPI(
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # In production, restrict to frontend domain
+    allow_origins=settings.FRONTEND_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -43,6 +43,9 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    if settings.APP_ENV.lower() == "production":
+        response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains; preload"
     return response
 
 # Include Routers
@@ -61,6 +64,7 @@ app.include_router(directory.admin_router)
 app.include_router(jobs.router)
 app.include_router(student_exams.router)
 app.include_router(job_alerts.router)
+app.include_router(student_school_profile.router)
 app.include_router(analytics.router)
 app.include_router(daily_updates.router)
 app.include_router(maintenance.router)
